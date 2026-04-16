@@ -3099,7 +3099,7 @@ async function loadListedItems(clientId) {
     .from('orders')
     .select('id, order_ref, order_date')
     .eq('client_id', String(clientId))
-    .in('status', ['Submitted', 'fulfilled', 'partial']);
+    .in('status', ['submitted', 'fulfilled', 'partial']);
 
   if (ordErr) {
     tableEl.innerHTML = `<div style="padding:20px;text-align:center;color:#A32D2D;">Error: ${ordErr.message}</div>`;
