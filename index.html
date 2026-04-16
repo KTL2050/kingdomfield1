@@ -226,6 +226,12 @@ tr:hover td{background:var(--bg2);}
 .assign-client-check-item.already-assigned{opacity:0.55;pointer-events:none;background:var(--bg2);}
 .assign-client-check-item.already-assigned::after{content:'';}
 
+/* Hide admin-only elements for managers */
+body.manager-view #add-user-form,
+body.manager-view .card:has(.card-title:contains("Users")),
+body.manager-view .card:has(.card-title:contains("Role Permissions")) {
+    display: none !important;
+}
 </style>
 </head>
 <body>
@@ -824,13 +830,14 @@ const isSalesRep = () => currentUser?.role === 'sales_rep';
 const canAdmin   = () => currentUser?.role === 'admin';
 const canManage  = () => ['admin','manager'].includes(currentUser?.role);
 
+
 const NAV = [
   {id:'dashboard', label:'Dashboard',         sec:'Main',           icon:'M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z'},
   {id:'clients',   label:'Clients',           sec:'Main',           icon:'M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z'},
   {id:'orders',    label:'Place Listing',     sec:'Main',           icon:'M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zm1 3h6M5 7h6M5 10h3'},
   {id:'targets',   label:'Targets',           sec:'Performance',    icon:'M8 1a7 7 0 100 14A7 7 0 008 1zm0 4a3 3 0 100 6 3 3 0 000-6zm0 2a1 1 0 100 2 1 1 0 000-2z'},
   {id:'reports',   label:'Reports',           sec:'Performance',    icon:'M2 12h3v2H2zM6 8h3v6H6zM10 4h3v10h-3z', managerOnly:true},
-  {id:'admin',     label:'User Management',   sec:'Administration', icon:'M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z', adminOnly:true},
+  {id:'admin', label:'User Management', sec:'Administration', icon:'M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z', managerOnly:true},
   {id:'team',      label:'Sales Team',        sec:'Administration', icon:'M2 8a3 3 0 100-6 3 3 0 000 6zm8 0a3 3 0 100-6 3 3 0 000 6zm-1 6s-1 0-1-1 1-4 5-4h2c4 0 5 3 5 4s-1 1-1 1H9zm-7 0s-1 0-1-1c0-.5.3-2 2-3', managerOnly:true},
 ];
 
@@ -927,13 +934,19 @@ function applyRoleUI() {
   const expOrders = document.getElementById('export-orders-btn');
   const addTarget = document.getElementById('add-target-btn');
   
-  // Sync Zoho button - ONLY for admin (not managers or sales reps)
+  // Sync Zoho button - ONLY for admin
   if (syncBtn)    syncBtn.style.display    = canAdmin() ? '' : 'none';
   
-  // Export buttons - only for admin and managers (not sales reps)
+  // Export buttons - for admin and managers (not sales reps)
   if (expTargets) expTargets.style.display = isSalesRep() ? 'none' : '';
   if (expOrders)  expOrders.style.display  = isSalesRep() ? 'none' : '';
   if (addTarget)  addTarget.style.display  = isSalesRep() ? 'none' : '';
+  
+  // For managers, also hide any Add User buttons that might appear
+  if (canManage() && !canAdmin()) {
+    const addUserBtns = document.querySelectorAll('[onclick="showAddUser()"]');
+    addUserBtns.forEach(btn => btn.style.display = 'none');
+  }
 }
 
 function updateUserUI() {
@@ -956,6 +969,7 @@ function signOut() {
 function goTo(screen) {
   if (screen==='reports' && isSalesRep()) { alert('You do not have permission to view reports.'); return; }
   if (screen==='admin' && isSalesRep()) return;
+if (screen==='admin' && !canManage()) return;
   currentScreen = screen;
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+screen)?.classList.add('active');
@@ -2152,53 +2166,205 @@ async function exportOrdersCSV(){if(isSalesRep())return;const{data}=await sb.fro
 
 // ─── ADMIN ─────────────────────────────────────────────────────────────────────
 async function loadAdmin() {
-  const [{count:uc},{count:cc},{count:pc},{data:syncData}] = await Promise.all([
-    sb.from('users').select('*',{count:'exact',head:true}),
-    sb.from('clients').select('*',{count:'exact',head:true}),
-    sb.from('products').select('*',{count:'exact',head:true}),
-    sb.from('sync_log').select('*').order('synced_at',{ascending:false}).limit(1)
-  ]);
-  document.getElementById('a-users').textContent    = uc||0;
-  document.getElementById('a-clients').textContent  = cc||0;
-  document.getElementById('a-products').textContent = pc||0;
-  document.getElementById('a-sync').textContent     = syncData&&syncData[0] ? new Date(syncData[0].synced_at).toLocaleDateString() : 'Never';
-  const { data:allUsers } = await sb.from('users').select('*').order('full_name');
-  const repSel = document.getElementById('assign-rep');
-  const reps   = (allUsers||[]).filter(u=>u.role==='sales_rep'&&u.is_active!==false);
-  // Allow managers to access admin assignment panel
-  repSel.innerHTML = '<option value="">— Select a sales rep —</option>' + reps.map(u=>`<option value="${u.id}">${u.full_name}</option>`).join('');
-  const assignClientSel = document.getElementById('assign-client');
-  assignClientSel.innerHTML = '<option value="">— Select client —</option>' + allClients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  const brandClientSel = document.getElementById('brand-assign-client');
-  if (brandClientSel) brandClientSel.innerHTML = '<option value="">— Select a client —</option>' + allClients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  const us = allUsers||[];
-  const roleLabel = r=>r.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
-  const roleBadge = {admin:'bb',manager:'bb',sales_rep:'bgold'};
-  document.getElementById('users-list').innerHTML = us.length===0 ? '<div class="empty-state">No users found.</div>'
-    : `<table><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>${us.map(u=>{
-        const initials = (u.full_name||'U').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-        const isSelf   = currentUser && u.id===currentUser.id;
-        return `<tr><td><div style="display:flex;align-items:center;gap:9px;">
-          <div style="width:30px;height:30px;border-radius:50%;background:${u.is_active?'var(--royal)':'var(--txt3)'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">${initials}</div>
-          <div><div style="font-size:12.5px;font-weight:500;">${u.full_name}</div>${u.must_change_password?'<div style="font-size:10px;color:var(--gold);font-weight:600;">OTP Pending</div>':''}</div>
-        </div></td>
-        <td style="font-size:12px;color:var(--txt2);">${u.email}</td>
-        <td><span class="badge ${roleBadge[u.role]||'bb'}">${roleLabel(u.role||'')}</span></td>
-        <td><span class="badge ${u.is_active?'bg':'br'}">${u.is_active?'Active':'Inactive'}</span></td>
-        <td><div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
-          ${isSelf ? '<span style="font-size:10.5px;color:var(--txt3);padding:4px 6px;">You</span>'
-            : u.is_active
-              ? `<button class="btn btn-sm" style="color:#854F0B;border-color:#FAC775;" onclick="confirmDeactivateUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')">Deactivate</button>
-                 <button class="btn btn-sm" style="color:var(--royal);border-color:var(--royal-border);" onclick="sendResetOTP('${u.id}','${u.full_name.replace(/'/g,"\\'")}','${u.email}')">Reset PW</button>
-                 <button class="btn btn-sm btn-danger" onclick="confirmRemoveUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')">Remove</button>`
-              : `<button class="btn btn-sm btn-gold" onclick="reactivateUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')">Reactivate</button>
-                 <button class="btn btn-sm btn-danger" onclick="confirmRemoveUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')">Remove</button>`
-          }
-        </div></td></tr>`;
-      }).join('')}</tbody></table>`;
-  loadSkuListView();
-}
+  // Sales reps should not see admin screen at all
+  if (isSalesRep()) {
+    document.getElementById('screen-admin').innerHTML = `<div class="card"><div class="empty-state">You do not have permission to access this area.</div></div>`;
+    return;
+  }
 
+  const isAdminUser = canAdmin();
+  const isManagerUser = canManage() && !canAdmin();
+  
+  // Add class to body for CSS targeting
+  if (isManagerUser) {
+    document.body.classList.add('manager-view');
+  } else {
+    document.body.classList.remove('manager-view');
+  }
+  
+  try {
+    // Get counts for metrics cards
+    const { count: uc, error: ucErr } = await sb.from('users').select('*', { count: 'exact', head: true });
+    const { count: cc, error: ccErr } = await sb.from('clients').select('*', { count: 'exact', head: true });
+    const { count: pc, error: pcErr } = await sb.from('products').select('*', { count: 'exact', head: true });
+    
+    let syncData = null;
+    try {
+      const { data: sd, error: sdErr } = await sb.from('sync_log').select('*').order('synced_at', { ascending: false }).limit(1);
+      if (!sdErr && sd) syncData = sd;
+    } catch (e) {}
+    
+    // Update metrics cards
+    document.getElementById('a-users').textContent = uc || 0;
+    document.getElementById('a-clients').textContent = cc || 0;
+    document.getElementById('a-products').textContent = pc || 0;
+    document.getElementById('a-sync').textContent = syncData && syncData[0] ? new Date(syncData[0].synced_at).toLocaleDateString() : 'Never';
+
+    // Load users for dropdowns
+    const { data: allUsers } = await sb.from('users').select('*').order('full_name');
+    const reps = (allUsers || []).filter(u => u.role === 'sales_rep' && u.is_active !== false);
+    
+    // Populate assign-rep dropdown
+    const repSel = document.getElementById('assign-rep');
+    if (repSel) {
+      repSel.innerHTML = '<option value="">— Select a sales rep —</option>' + reps.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+    }
+    
+    // ─── FOR MANAGERS: HIDE ADMIN-ONLY ELEMENTS ───
+    if (isManagerUser) {
+      // Hide the Users card
+      const usersCard = document.querySelector('#screen-admin .card');
+      const allCards = document.querySelectorAll('#screen-admin .card');
+      for (let i = 0; i < allCards.length; i++) {
+        const cardTitle = allCards[i].querySelector('.card-title');
+        if (cardTitle && cardTitle.textContent.includes('Users')) {
+          allCards[i].style.display = 'none';
+          break;
+        }
+      }
+      
+      // Hide the Add User form
+      const addUserForm = document.getElementById('add-user-form');
+      if (addUserForm) {
+        addUserForm.classList.add('hidden');
+        addUserForm.style.display = 'none';
+      }
+      
+      // Hide the Role Permissions card
+      const allCards2 = document.querySelectorAll('#screen-admin .card');
+      for (let i = 0; i < allCards2.length; i++) {
+        const cardTitle = allCards2[i].querySelector('.card-title');
+        if (cardTitle && cardTitle.textContent.includes('Role Permissions')) {
+          allCards2[i].style.display = 'none';
+          break;
+        }
+      }
+      
+      // Also hide any "Add User" buttons
+      const addUserBtns = document.querySelectorAll('[onclick="showAddUser()"]');
+      addUserBtns.forEach(btn => btn.style.display = 'none');
+      
+      // Load SKU list view
+      loadSkuListView();
+      return;
+    }
+    
+    // ─── FOR ADMIN: Show everything and load users table properly ───
+    const us = allUsers || [];
+    const roleLabel = r => r.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const roleBadge = { admin: 'bb', manager: 'bb', sales_rep: 'bgold' };
+    
+    // Make sure Users card is visible
+    const allCards = document.querySelectorAll('#screen-admin .card');
+    for (let i = 0; i < allCards.length; i++) {
+      const cardTitle = allCards[i].querySelector('.card-title');
+      if (cardTitle && cardTitle.textContent.includes('Users')) {
+        allCards[i].style.display = 'block';
+        break;
+      }
+    }
+    
+    // Populate users list for admin with PROPER TABLE STRUCTURE
+    if (us.length === 0) {
+      document.getElementById('users-list').innerHTML = '<div class="empty-state">No users found. Add your first user!</div>';
+    } else {
+      // Build a clean, properly structured table
+      let usersTableHtml = `
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse: collapse; font-size: 12.5px;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">User</th>
+                <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Email</th>
+                <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Role</th>
+                <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Status</th>
+                <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      
+      for (const u of us) {
+        const initials = (u.full_name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        const isSelf = currentUser && u.id === currentUser.id;
+        
+        usersTableHtml += `
+          <tr style="border-bottom: 0.5px solid var(--brd);">
+            <td style="padding: 10px 8px; vertical-align: middle;">
+              <div style="display: flex; align-items: center; gap: 9px;">
+                <div style="width: 32px; height: 32px; border-radius: 50%; background: ${u.is_active ? 'var(--royal)' : 'var(--txt3)'}; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;">${initials}</div>
+                <div>
+                  <div style="font-size: 12.5px; font-weight: 500;">${u.full_name}</div>
+                  ${u.must_change_password ? '<div style="font-size: 10px; color: var(--gold); font-weight: 600;">OTP Pending</div>' : ''}
+                </div>
+              </div>
+            </td>
+            <td style="padding: 10px 8px; vertical-align: middle; font-size: 12px; color: var(--txt2);">${u.email}</td>
+            <td style="padding: 10px 8px; vertical-align: middle;"><span class="badge ${roleBadge[u.role] || 'bb'}">${roleLabel(u.role || '')}</span></td>
+            <td style="padding: 10px 8px; vertical-align: middle;"><span class="badge ${u.is_active ? 'bg' : 'br'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+            <td style="padding: 10px 8px; vertical-align: middle;">
+              <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center;">
+        `;
+        
+        if (isSelf) {
+          usersTableHtml += '<span style="font-size: 10.5px; color: var(--txt3); padding: 4px 6px;">You</span>';
+        } else if (u.is_active) {
+          usersTableHtml += `
+            <button class="btn btn-sm" style="color: #854F0B; border-color: #FAC775;" onclick="confirmDeactivateUser('${u.id}','${u.full_name.replace(/'/g, "\\'")}')">Deactivate</button>
+            <button class="btn btn-sm" style="color: var(--royal); border-color: var(--royal-border);" onclick="sendResetOTP('${u.id}','${u.full_name.replace(/'/g, "\\'")}','${u.email}')">Reset PW</button>
+            <button class="btn btn-sm btn-danger" onclick="confirmRemoveUser('${u.id}','${u.full_name.replace(/'/g, "\\'")}')">Remove</button>
+          `;
+        } else {
+          usersTableHtml += `
+            <button class="btn btn-sm btn-gold" onclick="reactivateUser('${u.id}','${u.full_name.replace(/'/g, "\\'")}')">Reactivate</button>
+            <button class="btn btn-sm btn-danger" onclick="confirmRemoveUser('${u.id}','${u.full_name.replace(/'/g, "\\'")}')">Remove</button>
+          `;
+        }
+        
+        usersTableHtml += `
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+      
+      usersTableHtml += `
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      document.getElementById('users-list').innerHTML = usersTableHtml;
+    }
+    
+    // Make sure Add User form is visible for admin
+    const addUserForm = document.getElementById('add-user-form');
+    if (addUserForm) {
+      addUserForm.classList.remove('hidden');
+      addUserForm.style.display = 'block';
+    }
+    
+    // Make sure Role Permissions card is visible for admin
+    const allCards2 = document.querySelectorAll('#screen-admin .card');
+    for (let i = 0; i < allCards2.length; i++) {
+      const cardTitle = allCards2[i].querySelector('.card-title');
+      if (cardTitle && cardTitle.textContent.includes('Role Permissions')) {
+        allCards2[i].style.display = 'block';
+        break;
+      }
+    }
+    
+    // Load SKU list view
+    loadSkuListView();
+    
+  } catch (err) {
+    console.error('Error in loadAdmin:', err);
+    const usersListEl = document.getElementById('users-list');
+    if (usersListEl) {
+      usersListEl.innerHTML = `<div class="empty-state" style="color:#A32D2D;">Error loading users: ${err.message}</div>`;
+    }
+  }
+}
 // ─── CLIENT BRAND ASSIGNMENTS ──────────────────────────────────────────────────
 // ─── CLIENT BRAND ASSIGNMENTS (multi-select) ───────────────────────────────────
 let _brandSelectedClientIds = new Set();
