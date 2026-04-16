@@ -1851,13 +1851,14 @@ async function submitListing(status='submitted'){
   const orderRef=document.getElementById('order-ref').value;
   const orderDate=document.getElementById('order-date').value;
 
-  const payload = {
+const payload = {
     order_ref:    orderRef,
     client_id:    String(clientId),
     client_name:  client?.name||'',
     order_date:   orderDate,
     status:       status,
     item_count:   items.length,
+    created_by:   currentUser?.id || null,
   };
 
   const {data:order, error} = await sb.from('orders').insert(payload).select().single();
@@ -2099,20 +2100,22 @@ async function loadReports(){
       </tbody></table>`;
 
   // ── Top Sales Reps by Listings ──
-  const { data: allUsers } = await sb.from('users').select('id,full_name,email').eq('role','sales_rep');
+// ── Top Sales Reps by Listings ──
+  const { data: allUsers } = await sb.from('users').select('id,full_name,email,role').order('full_name');
   const repMap = {};
-  (allUsers||[]).forEach(u=>{ repMap[u.id]={name:u.full_name, email:u.email}; });
+  (allUsers||[]).forEach(u=>{ repMap[u.id]={name:u.full_name, email:u.email, role:u.role}; });
 
   const repStats={};
   all.forEach(o=>{
-    if(o.created_by){
-      const rep = repMap[o.created_by];
-      const name = rep?.name || 'Unknown';
-      if(!repStats[o.created_by]) repStats[o.created_by]={name, email:rep?.email||'', listings:0, items:0, clients:new Set()};
-      repStats[o.created_by].listings++;
-      repStats[o.created_by].items += Number(o.item_count||0);
-      if(o.client_id) repStats[o.created_by].clients.add(o.client_id);
-    }
+    // Use created_by if set, otherwise bucket under 'unassigned'
+    const key = o.created_by || 'unassigned';
+    const rep = repMap[key];
+    const name = rep?.name || (key==='unassigned' ? '(No rep recorded)' : `User ${key}`);
+    const email = rep?.email || '';
+    if(!repStats[key]) repStats[key]={name, email, listings:0, items:0, clients:new Set()};
+    repStats[key].listings++;
+    repStats[key].items += Number(o.item_count||0);
+    if(o.client_id) repStats[key].clients.add(o.client_id);
   });
 
   const topReps=Object.entries(repStats).sort((a,b)=>b[1].listings-a[1].listings);
@@ -3099,7 +3102,7 @@ async function loadListedItems(clientId) {
     .from('orders')
     .select('id, order_ref, order_date')
     .eq('client_id', String(clientId))
-    .in('status', ['submitted', 'fulfilled', 'partial']);
+    .in('status', ['Submitted', 'fulfilled', 'partial']);
 
   if (ordErr) {
     tableEl.innerHTML = `<div style="padding:20px;text-align:center;color:#A32D2D;">Error: ${ordErr.message}</div>`;
