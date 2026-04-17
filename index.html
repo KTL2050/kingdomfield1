@@ -1470,7 +1470,7 @@ const purchasedCodes   = new Set();
     const product = allProducts.find(p=>p.sku?.trim().toLowerCase()===skuRow.sku.trim().toLowerCase());
     return {
       sku: skuRow.sku, item_name: skuRow.item_name || product?.name || '—', _table: skuRow._table,
-      product_id: product?.id || null, available_stock: product?.available_stock ?? null, rate: product?.rate ?? null, in_catalogue: !!product,
+      product_id: product?.id || null, available_stock: product?.stock_on_hand ?? product?.available_stock ?? null, rate: product?.rate ?? null, in_catalogue: !!product,
     };
   });
   const inCatalogue    = enriched.filter(e=>e.in_catalogue);
@@ -1664,7 +1664,7 @@ async function loadClientProducts(preselectedProductId=null){
         item_name:       skuRow.item_name || product?.name || '—',
         _table:          skuRow._table,
         product_id:      product?.id   ?? null,
-        available_stock: product?.available_stock ?? 0,
+        available_stock: product?.stock_on_hand ?? product?.available_stock ?? 0,
         rate:            product?.rate  ?? 0,
         in_catalogue:    !!product,
         already_bought:  codeBought || idBought,
@@ -3527,7 +3527,7 @@ async function loadTeamClientToList(clientId, clientName) {
     return !codeBought&&!idBought&&!!product;
   }).map(skuRow=>{
     const product=allProducts.find(p=>p.sku?.trim().toLowerCase()===skuRow.sku.trim().toLowerCase());
-    return { sku:skuRow.sku, item_name:skuRow.item_name||product?.name||'—', _table:skuRow._table, available_stock:product?.available_stock??0, rate:product?.rate??0 };
+    return { sku:skuRow.sku, item_name:skuRow.item_name||product?.name||'—', _table:skuRow._table, available_stock:product?.stock_on_hand??product?.available_stock??0, rate:product?.rate??0 };
   });
 
   if(toList.length===0){ el.innerHTML='<div style="padding:24px;text-align:center;"><div style="font-size:28px;margin-bottom:8px;">🎉</div><div style="font-weight:600;font-size:13px;">All listing SKUs already purchased!</div></div>'; return; }
