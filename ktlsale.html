@@ -226,6 +226,12 @@ tr:hover td{background:var(--bg2);}
 .assign-client-check-item.already-assigned{opacity:0.55;pointer-events:none;background:var(--bg2);}
 .assign-client-check-item.already-assigned::after{content:'';}
 
+/* Hide admin-only elements for managers */
+body.manager-view #add-user-form,
+body.manager-view .card:has(.card-title:contains("Users")),
+body.manager-view .card:has(.card-title:contains("Role Permissions")) {
+    display: none !important;
+}
 </style>
 </head>
 <body>
@@ -824,6 +830,7 @@ const isSalesRep = () => currentUser?.role === 'sales_rep';
 const canAdmin   = () => currentUser?.role === 'admin';
 const canManage  = () => ['admin','manager'].includes(currentUser?.role);
 
+
 const NAV = [
   {id:'dashboard', label:'Dashboard',         sec:'Main',           icon:'M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z'},
   {id:'clients',   label:'Clients',           sec:'Main',           icon:'M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z'},
@@ -927,13 +934,19 @@ function applyRoleUI() {
   const expOrders = document.getElementById('export-orders-btn');
   const addTarget = document.getElementById('add-target-btn');
   
-  // Sync Zoho button - ONLY for admin (not managers or sales reps)
+  // Sync Zoho button - ONLY for admin
   if (syncBtn)    syncBtn.style.display    = canAdmin() ? '' : 'none';
   
-  // Export buttons - only for admin and managers (not sales reps)
+  // Export buttons - for admin and managers (not sales reps)
   if (expTargets) expTargets.style.display = isSalesRep() ? 'none' : '';
   if (expOrders)  expOrders.style.display  = isSalesRep() ? 'none' : '';
   if (addTarget)  addTarget.style.display  = isSalesRep() ? 'none' : '';
+  
+  // For managers, also hide any Add User buttons that might appear
+  if (canManage() && !canAdmin()) {
+    const addUserBtns = document.querySelectorAll('[onclick="showAddUser()"]');
+    addUserBtns.forEach(btn => btn.style.display = 'none');
+  }
 }
 
 function updateUserUI() {
@@ -1457,7 +1470,7 @@ const purchasedCodes   = new Set();
     const product = allProducts.find(p=>p.sku?.trim().toLowerCase()===skuRow.sku.trim().toLowerCase());
     return {
       sku: skuRow.sku, item_name: skuRow.item_name || product?.name || '—', _table: skuRow._table,
-      product_id: product?.id || null, available_stock: product?.available_stock ?? null, rate: product?.rate ?? null, in_catalogue: !!product,
+      product_id: product?.id || null, available_stock: product?.stock_on_hand ?? product?.available_stock ?? null, rate: product?.rate ?? null, in_catalogue: !!product,
     };
   });
   const inCatalogue    = enriched.filter(e=>e.in_catalogue);
@@ -1651,7 +1664,7 @@ async function loadClientProducts(preselectedProductId=null){
         item_name:       skuRow.item_name || product?.name || '—',
         _table:          skuRow._table,
         product_id:      product?.id   ?? null,
-        available_stock: product?.available_stock ?? 0,
+        available_stock: product?.stock_on_hand ?? product?.available_stock ?? 0,
         rate:            product?.rate  ?? 0,
         in_catalogue:    !!product,
         already_bought:  codeBought || idBought,
@@ -1838,13 +1851,14 @@ async function submitListing(status='submitted'){
   const orderRef=document.getElementById('order-ref').value;
   const orderDate=document.getElementById('order-date').value;
 
-  const payload = {
+const payload = {
     order_ref:    orderRef,
     client_id:    String(clientId),
     client_name:  client?.name||'',
     order_date:   orderDate,
     status:       status,
     item_count:   items.length,
+    created_by:   currentUser?.id || null,
   };
 
   const {data:order, error} = await sb.from('orders').insert(payload).select().single();
@@ -2086,20 +2100,22 @@ async function loadReports(){
       </tbody></table>`;
 
   // ── Top Sales Reps by Listings ──
-  const { data: allUsers } = await sb.from('users').select('id,full_name,email').eq('role','sales_rep');
+// ── Top Sales Reps by Listings ──
+  const { data: allUsers } = await sb.from('users').select('id,full_name,email,role').order('full_name');
   const repMap = {};
-  (allUsers||[]).forEach(u=>{ repMap[u.id]={name:u.full_name, email:u.email}; });
+  (allUsers||[]).forEach(u=>{ repMap[u.id]={name:u.full_name, email:u.email, role:u.role}; });
 
   const repStats={};
   all.forEach(o=>{
-    if(o.created_by){
-      const rep = repMap[o.created_by];
-      const name = rep?.name || 'Unknown';
-      if(!repStats[o.created_by]) repStats[o.created_by]={name, email:rep?.email||'', listings:0, items:0, clients:new Set()};
-      repStats[o.created_by].listings++;
-      repStats[o.created_by].items += Number(o.item_count||0);
-      if(o.client_id) repStats[o.created_by].clients.add(o.client_id);
-    }
+    // Use created_by if set, otherwise bucket under 'unassigned'
+    const key = o.created_by || 'unassigned';
+    const rep = repMap[key];
+    const name = rep?.name || (key==='unassigned' ? '(No rep recorded)' : `User ${key}`);
+    const email = rep?.email || '';
+    if(!repStats[key]) repStats[key]={name, email, listings:0, items:0, clients:new Set()};
+    repStats[key].listings++;
+    repStats[key].items += Number(o.item_count||0);
+    if(o.client_id) repStats[key].clients.add(o.client_id);
   });
 
   const topReps=Object.entries(repStats).sort((a,b)=>b[1].listings-a[1].listings);
@@ -2153,75 +2169,205 @@ async function exportOrdersCSV(){if(isSalesRep())return;const{data}=await sb.fro
 
 // ─── ADMIN ─────────────────────────────────────────────────────────────────────
 async function loadAdmin() {
-  // Managers see only Role Permissions
-  if (!canAdmin()) {
-    document.getElementById('screen-admin').innerHTML = `
-      <div class="card">
-        <div class="card-hdr"><span class="card-title">Role Permissions</span></div>
-        <table>
-          <thead><tr><th>Permission</th><th>Admin</th><th>Manager</th><th>Sales Rep</th></tr></thead>
-          <tbody>
-            <tr><td>View dashboard</td><td><span class="badge bg">Yes</span></td><td><span class="badge bg">Yes</span></td><td><span class="badge bg">Yes</span></td></tr>
-            <tr><td>Place listings</td><td><span class="badge bg">Yes</span></td><td><span class="badge bg">Yes</span></td><td><span class="badge bg">Yes</span></td></tr>
-            <tr><td>View all clients</td><td><span class="badge bg">Yes</span></td><td><span class="badge bg">Yes</span></td><td><span class="badge ba">Assigned only</span></td></tr>
-            <tr><td>Set targets</td><td><span class="badge bg">Yes</span></td><td><span class="badge bg">Yes</span></td><td><span class="badge br">No</span></td></tr>
-            <tr><td>Export reports</td><td><span class="badge bg">Yes</span></td><td><span class="badge bg">Yes</span></td><td><span class="badge br">No</span></td></tr>
-            <tr><td>Manage users</td><td><span class="badge bg">Yes</span></td><td><span class="badge br">No</span></td><td><span class="badge br">No</span></td></tr>
-            <tr><td>Assign brands to clients</td><td><span class="badge bg">Yes</span></td><td><span class="badge br">No</span></td><td><span class="badge br">No</span></td></tr>
-            <tr><td>Manage SKU listing tables</td><td><span class="badge bg">Yes</span></td><td><span class="badge br">No</span></td><td><span class="badge br">No</span></td></tr>
-          </tbody>
-        </table>
-      </div>`;
+  // Sales reps should not see admin screen at all
+  if (isSalesRep()) {
+    document.getElementById('screen-admin').innerHTML = `<div class="card"><div class="empty-state">You do not have permission to access this area.</div></div>`;
     return;
   }
 
-  // Admin sees the full view (existing code below unchanged)
-  const [{count:uc},{count:cc},{count:pc},{data:syncData}] = await Promise.all([
-    sb.from('users').select('*',{count:'exact',head:true}),
-    sb.from('clients').select('*',{count:'exact',head:true}),
-    sb.from('products').select('*',{count:'exact',head:true}),
-    sb.from('sync_log').select('*').order('synced_at',{ascending:false}).limit(1)
-  ]);
-  document.getElementById('a-users').textContent    = uc||0;
-  document.getElementById('a-clients').textContent  = cc||0;
-  document.getElementById('a-products').textContent = pc||0;
-  document.getElementById('a-sync').textContent     = syncData&&syncData[0] ? new Date(syncData[0].synced_at).toLocaleDateString() : 'Never';
-  const { data:allUsers } = await sb.from('users').select('*').order('full_name');
-  const repSel = document.getElementById('assign-rep');
-  const reps   = (allUsers||[]).filter(u=>u.role==='sales_rep'&&u.is_active!==false);
-  repSel.innerHTML = '<option value="">— Select a sales rep —</option>' + reps.map(u=>`<option value="${u.id}">${u.full_name}</option>`).join('');
-  const assignClientSel = document.getElementById('assign-client');
-  assignClientSel.innerHTML = '<option value="">— Select client —</option>' + allClients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  const brandClientSel = document.getElementById('brand-assign-client');
-  if (brandClientSel) brandClientSel.innerHTML = '<option value="">— Select a client —</option>' + allClients.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
-  const us = allUsers||[];
-  const roleLabel = r=>r.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
-  const roleBadge = {admin:'bb',manager:'bb',sales_rep:'bgold'};
-  document.getElementById('users-list').innerHTML = us.length===0 ? '<div class="empty-state">No users found.</div>'
-    : `<table><thead><tr><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead><tbody>${us.map(u=>{
-        const initials = (u.full_name||'U').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
-        const isSelf   = currentUser && u.id===currentUser.id;
-        return `<tr><td><div style="display:flex;align-items:center;gap:9px;">
-          <div style="width:30px;height:30px;border-radius:50%;background:${u.is_active?'var(--royal)':'var(--txt3)'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">${initials}</div>
-          <div><div style="font-size:12.5px;font-weight:500;">${u.full_name}</div>${u.must_change_password?'<div style="font-size:10px;color:var(--gold);font-weight:600;">OTP Pending</div>':''}</div>
-        </div></td>
-        <td style="font-size:12px;color:var(--txt2);">${u.email}</td>
-        <td><span class="badge ${roleBadge[u.role]||'bb'}">${roleLabel(u.role||'')}</span></td>
-        <td><span class="badge ${u.is_active?'bg':'br'}">${u.is_active?'Active':'Inactive'}</span></td>
-        <td><div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
-          ${isSelf ? '<span style="font-size:10.5px;color:var(--txt3);padding:4px 6px;">You</span>'
-            : u.is_active
-              ? `<button class="btn btn-sm" style="color:#854F0B;border-color:#FAC775;" onclick="confirmDeactivateUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')">Deactivate</button>
-                 <button class="btn btn-sm" style="color:var(--royal);border-color:var(--royal-border);" onclick="sendResetOTP('${u.id}','${u.full_name.replace(/'/g,"\\'")}','${u.email}')">Reset PW</button>
-                 <button class="btn btn-sm btn-danger" onclick="confirmRemoveUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')">Remove</button>`
-              : `<button class="btn btn-sm btn-gold" onclick="reactivateUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')">Reactivate</button>
-                 <button class="btn btn-sm btn-danger" onclick="confirmRemoveUser('${u.id}','${u.full_name.replace(/'/g,"\\'")}')">Remove</button>`
-          }
-        </div></td></tr>`;
-      }).join('')}</tbody></table>`;
-  loadSkuListView();
-}
+  const isAdminUser = canAdmin();
+  const isManagerUser = canManage() && !canAdmin();
+  
+  // Add class to body for CSS targeting
+  if (isManagerUser) {
+    document.body.classList.add('manager-view');
+  } else {
+    document.body.classList.remove('manager-view');
+  }
+  
+  try {
+    // Get counts for metrics cards
+    const { count: uc, error: ucErr } = await sb.from('users').select('*', { count: 'exact', head: true });
+    const { count: cc, error: ccErr } = await sb.from('clients').select('*', { count: 'exact', head: true });
+    const { count: pc, error: pcErr } = await sb.from('products').select('*', { count: 'exact', head: true });
+    
+    let syncData = null;
+    try {
+      const { data: sd, error: sdErr } = await sb.from('sync_log').select('*').order('synced_at', { ascending: false }).limit(1);
+      if (!sdErr && sd) syncData = sd;
+    } catch (e) {}
+    
+    // Update metrics cards
+    document.getElementById('a-users').textContent = uc || 0;
+    document.getElementById('a-clients').textContent = cc || 0;
+    document.getElementById('a-products').textContent = pc || 0;
+    document.getElementById('a-sync').textContent = syncData && syncData[0] ? new Date(syncData[0].synced_at).toLocaleDateString() : 'Never';
 
+    // Load users for dropdowns
+    const { data: allUsers } = await sb.from('users').select('*').order('full_name');
+    const reps = (allUsers || []).filter(u => u.role === 'sales_rep' && u.is_active !== false);
+    
+    // Populate assign-rep dropdown
+    const repSel = document.getElementById('assign-rep');
+    if (repSel) {
+      repSel.innerHTML = '<option value="">— Select a sales rep —</option>' + reps.map(u => `<option value="${u.id}">${u.full_name}</option>`).join('');
+    }
+    
+    // ─── FOR MANAGERS: HIDE ADMIN-ONLY ELEMENTS ───
+    if (isManagerUser) {
+      // Hide the Users card
+      const usersCard = document.querySelector('#screen-admin .card');
+      const allCards = document.querySelectorAll('#screen-admin .card');
+      for (let i = 0; i < allCards.length; i++) {
+        const cardTitle = allCards[i].querySelector('.card-title');
+        if (cardTitle && cardTitle.textContent.includes('Users')) {
+          allCards[i].style.display = 'none';
+          break;
+        }
+      }
+      
+      // Hide the Add User form
+      const addUserForm = document.getElementById('add-user-form');
+      if (addUserForm) {
+        addUserForm.classList.add('hidden');
+        addUserForm.style.display = 'none';
+      }
+      
+      // Hide the Role Permissions card
+      const allCards2 = document.querySelectorAll('#screen-admin .card');
+      for (let i = 0; i < allCards2.length; i++) {
+        const cardTitle = allCards2[i].querySelector('.card-title');
+        if (cardTitle && cardTitle.textContent.includes('Role Permissions')) {
+          allCards2[i].style.display = 'none';
+          break;
+        }
+      }
+      
+      // Also hide any "Add User" buttons
+      const addUserBtns = document.querySelectorAll('[onclick="showAddUser()"]');
+      addUserBtns.forEach(btn => btn.style.display = 'none');
+      
+      // Load SKU list view
+      loadSkuListView();
+      return;
+    }
+    
+    // ─── FOR ADMIN: Show everything and load users table properly ───
+    const us = allUsers || [];
+    const roleLabel = r => r.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const roleBadge = { admin: 'bb', manager: 'bb', sales_rep: 'bgold' };
+    
+    // Make sure Users card is visible
+    const allCards = document.querySelectorAll('#screen-admin .card');
+    for (let i = 0; i < allCards.length; i++) {
+      const cardTitle = allCards[i].querySelector('.card-title');
+      if (cardTitle && cardTitle.textContent.includes('Users')) {
+        allCards[i].style.display = 'block';
+        break;
+      }
+    }
+    
+    // Populate users list for admin with PROPER TABLE STRUCTURE
+    if (us.length === 0) {
+      document.getElementById('users-list').innerHTML = '<div class="empty-state">No users found. Add your first user!</div>';
+    } else {
+      // Build a clean, properly structured table
+      let usersTableHtml = `
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse: collapse; font-size: 12.5px;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">User</th>
+                <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Email</th>
+                <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Role</th>
+                <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Status</th>
+                <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      
+      for (const u of us) {
+        const initials = (u.full_name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        const isSelf = currentUser && u.id === currentUser.id;
+        
+        usersTableHtml += `
+          <tr style="border-bottom: 0.5px solid var(--brd);">
+            <td style="padding: 10px 8px; vertical-align: middle;">
+              <div style="display: flex; align-items: center; gap: 9px;">
+                <div style="width: 32px; height: 32px; border-radius: 50%; background: ${u.is_active ? 'var(--royal)' : 'var(--txt3)'}; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;">${initials}</div>
+                <div>
+                  <div style="font-size: 12.5px; font-weight: 500;">${u.full_name}</div>
+                  ${u.must_change_password ? '<div style="font-size: 10px; color: var(--gold); font-weight: 600;">OTP Pending</div>' : ''}
+                </div>
+              </div>
+            </td>
+            <td style="padding: 10px 8px; vertical-align: middle; font-size: 12px; color: var(--txt2);">${u.email}</td>
+            <td style="padding: 10px 8px; vertical-align: middle;"><span class="badge ${roleBadge[u.role] || 'bb'}">${roleLabel(u.role || '')}</span></td>
+            <td style="padding: 10px 8px; vertical-align: middle;"><span class="badge ${u.is_active ? 'bg' : 'br'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+            <td style="padding: 10px 8px; vertical-align: middle;">
+              <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center;">
+        `;
+        
+        if (isSelf) {
+          usersTableHtml += '<span style="font-size: 10.5px; color: var(--txt3); padding: 4px 6px;">You</span>';
+        } else if (u.is_active) {
+          usersTableHtml += `
+            <button class="btn btn-sm" style="color: #854F0B; border-color: #FAC775;" onclick="confirmDeactivateUser('${u.id}','${u.full_name.replace(/'/g, "\\'")}')">Deactivate</button>
+            <button class="btn btn-sm" style="color: var(--royal); border-color: var(--royal-border);" onclick="sendResetOTP('${u.id}','${u.full_name.replace(/'/g, "\\'")}','${u.email}')">Reset PW</button>
+            <button class="btn btn-sm btn-danger" onclick="confirmRemoveUser('${u.id}','${u.full_name.replace(/'/g, "\\'")}')">Remove</button>
+          `;
+        } else {
+          usersTableHtml += `
+            <button class="btn btn-sm btn-gold" onclick="reactivateUser('${u.id}','${u.full_name.replace(/'/g, "\\'")}')">Reactivate</button>
+            <button class="btn btn-sm btn-danger" onclick="confirmRemoveUser('${u.id}','${u.full_name.replace(/'/g, "\\'")}')">Remove</button>
+          `;
+        }
+        
+        usersTableHtml += `
+              </div>
+            </td>
+          </tr>
+        `;
+      }
+      
+      usersTableHtml += `
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      document.getElementById('users-list').innerHTML = usersTableHtml;
+    }
+    
+    // Make sure Add User form is visible for admin
+    const addUserForm = document.getElementById('add-user-form');
+    if (addUserForm) {
+      addUserForm.classList.remove('hidden');
+      addUserForm.style.display = 'block';
+    }
+    
+    // Make sure Role Permissions card is visible for admin
+    const allCards2 = document.querySelectorAll('#screen-admin .card');
+    for (let i = 0; i < allCards2.length; i++) {
+      const cardTitle = allCards2[i].querySelector('.card-title');
+      if (cardTitle && cardTitle.textContent.includes('Role Permissions')) {
+        allCards2[i].style.display = 'block';
+        break;
+      }
+    }
+    
+    // Load SKU list view
+    loadSkuListView();
+    
+  } catch (err) {
+    console.error('Error in loadAdmin:', err);
+    const usersListEl = document.getElementById('users-list');
+    if (usersListEl) {
+      usersListEl.innerHTML = `<div class="empty-state" style="color:#A32D2D;">Error loading users: ${err.message}</div>`;
+    }
+  }
+}
 // ─── CLIENT BRAND ASSIGNMENTS ──────────────────────────────────────────────────
 // ─── CLIENT BRAND ASSIGNMENTS (multi-select) ───────────────────────────────────
 let _brandSelectedClientIds = new Set();
@@ -2539,17 +2685,24 @@ async function checkSyncResume() {
       const state = JSON.parse(data.value);
       if (state.page > 1) {
         const info = document.getElementById('sync-resume-info');
+        const fromEl = document.getElementById('sync-from');
+        const toEl   = document.getElementById('sync-to');
         if (info) {
           info.style.display = 'block';
-          info.innerHTML = `⚡ You have a saved sync at page ${state.page} (${state.date_from} → ${state.date_to}). 
-            <button onclick="resumeSync()" style="margin-left:8px;padding:4px 12px;background:var(--gold-mid);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;">Resume from page ${state.page}</button>
-            <button onclick="clearSyncAndReset()" style="margin-left:8px;font-size:11px;color:var(--txt3);background:none;border:none;cursor:pointer;text-decoration:underline;">Start fresh</button>`;
-          
-          // Set the date inputs to match saved state
-          const fromEl = document.getElementById('sync-from');
-          const toEl = document.getElementById('sync-to');
+          info.innerHTML = `⚡ Paused sync found: page ${state.page} for <strong>${state.date_from} → ${state.date_to}</strong>.
+            <button onclick="
+              document.getElementById('sync-from').value='${state.date_from}';
+              document.getElementById('sync-to').value='${state.date_to}';
+              startFullSync();
+            " style="margin-left:8px;padding:4px 12px;background:var(--gold-mid);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;">
+              Resume (restore saved dates)
+            </button>
+            <button onclick="clearSyncAndReset()" style="margin-left:8px;font-size:11px;color:var(--txt3);background:none;border:none;cursor:pointer;text-decoration:underline;">
+              Discard &amp; start fresh
+            </button>`;
+          // Also restore the saved dates into the inputs so user sees them
           if (fromEl) fromEl.value = state.date_from;
-          if (toEl) toEl.value = state.date_to;
+          if (toEl)   toEl.value   = state.date_to;
         }
       }
     }
@@ -2766,27 +2919,27 @@ try {
   if (fromVal > toVal)    { alert('From date must be before To date.'); return; }
 
   // ── KEY FIX: Load saved state FIRST, then override dates if resuming ──
-  let startPage = 1;
-  try {
-    const { data } = await sb.from('sync_state').select('value').eq('key', 'last_sync_page').single();
-    if (data && data.value) {
-      const state = JSON.parse(data.value);
-      if (state.page > 1) {
-        startPage = state.page;
-        // Restore the exact dates from the saved sync job,
-        // overriding whatever the date inputs currently show
-        fromVal = state.date_from;
-        toVal   = state.date_to;
-        const fromEl = document.getElementById('sync-from');
-        const toEl   = document.getElementById('sync-to');
-        if (fromEl) fromEl.value = fromVal;
-        if (toEl)   toEl.value   = toVal;
-        syncLog(`📌 Resuming from page ${startPage} (${fromVal} → ${toVal})...`, 'info');
-      }
+let startPage = 1;
+const isResume = false; // will be set true only if user clicked "Resume" button
+try {
+  const { data } = await sb.from('sync_state').select('value').eq('key', 'last_sync_page').single();
+  if (data && data.value) {
+    const state = JSON.parse(data.value);
+    // Only resume if the saved dates MATCH what the user has selected.
+    // If the user changed the dates, treat it as a fresh sync and clear the old state.
+    if (state.page > 1 && state.date_from === fromVal && state.date_to === toVal) {
+      startPage = state.page;
+      syncLog(`📌 Resuming from page ${startPage} (dates match: ${fromVal} → ${toVal})...`, 'info');
+    } else if (state.page > 1 && (state.date_from !== fromVal || state.date_to !== toVal)) {
+      // User chose different dates — clear the old saved state and start fresh
+      await sb.from('sync_state').delete().eq('key', 'last_sync_page');
+      syncLog(`🔄 New date range detected (${fromVal} → ${toVal}). Starting fresh from page 1.`, 'info');
+      startPage = 1;
     }
-  } catch (e) {
-    // No saved state — start fresh from page 1
   }
+} catch (e) {
+  // No saved state — start fresh
+}
 
   window._syncRunning = true;
   const startBtn = document.getElementById('sync-start-btn');
@@ -2956,7 +3109,7 @@ async function loadListedItems(clientId) {
     .from('orders')
     .select('id, order_ref, order_date')
     .eq('client_id', String(clientId))
-    .in('status', ['Submitted', 'fulfilled', 'partial']);
+    .in('status', ['submitted', 'fulfilled', 'partial']);
 
   if (ordErr) {
     tableEl.innerHTML = `<div style="padding:20px;text-align:center;color:#A32D2D;">Error: ${ordErr.message}</div>`;
@@ -3381,7 +3534,7 @@ async function loadTeamClientToList(clientId, clientName) {
     return !codeBought&&!idBought&&!!product;
   }).map(skuRow=>{
     const product=allProducts.find(p=>p.sku?.trim().toLowerCase()===skuRow.sku.trim().toLowerCase());
-    return { sku:skuRow.sku, item_name:skuRow.item_name||product?.name||'—', _table:skuRow._table, available_stock:product?.available_stock??0, rate:product?.rate??0 };
+    return { sku:skuRow.sku, item_name:skuRow.item_name||product?.name||'—', _table:skuRow._table, available_stock:product?.stock_on_hand??product?.available_stock??0, rate:product?.rate??0 };
   });
 
   if(toList.length===0){ el.innerHTML='<div style="padding:24px;text-align:center;"><div style="font-size:28px;margin-bottom:8px;">🎉</div><div style="font-weight:600;font-size:13px;">All listing SKUs already purchased!</div></div>'; return; }
