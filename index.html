@@ -2685,17 +2685,24 @@ async function checkSyncResume() {
       const state = JSON.parse(data.value);
       if (state.page > 1) {
         const info = document.getElementById('sync-resume-info');
+        const fromEl = document.getElementById('sync-from');
+        const toEl   = document.getElementById('sync-to');
         if (info) {
           info.style.display = 'block';
-          info.innerHTML = `⚡ You have a saved sync at page ${state.page} (${state.date_from} → ${state.date_to}). 
-            <button onclick="resumeSync()" style="margin-left:8px;padding:4px 12px;background:var(--gold-mid);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;">Resume from page ${state.page}</button>
-            <button onclick="clearSyncAndReset()" style="margin-left:8px;font-size:11px;color:var(--txt3);background:none;border:none;cursor:pointer;text-decoration:underline;">Start fresh</button>`;
-          
-          // Set the date inputs to match saved state
-          const fromEl = document.getElementById('sync-from');
-          const toEl = document.getElementById('sync-to');
+          info.innerHTML = `⚡ Paused sync found: page ${state.page} for <strong>${state.date_from} → ${state.date_to}</strong>.
+            <button onclick="
+              document.getElementById('sync-from').value='${state.date_from}';
+              document.getElementById('sync-to').value='${state.date_to}';
+              startFullSync();
+            " style="margin-left:8px;padding:4px 12px;background:var(--gold-mid);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:11px;">
+              Resume (restore saved dates)
+            </button>
+            <button onclick="clearSyncAndReset()" style="margin-left:8px;font-size:11px;color:var(--txt3);background:none;border:none;cursor:pointer;text-decoration:underline;">
+              Discard &amp; start fresh
+            </button>`;
+          // Also restore the saved dates into the inputs so user sees them
           if (fromEl) fromEl.value = state.date_from;
-          if (toEl) toEl.value = state.date_to;
+          if (toEl)   toEl.value   = state.date_to;
         }
       }
     }
@@ -2912,27 +2919,27 @@ try {
   if (fromVal > toVal)    { alert('From date must be before To date.'); return; }
 
   // ── KEY FIX: Load saved state FIRST, then override dates if resuming ──
-  let startPage = 1;
-  try {
-    const { data } = await sb.from('sync_state').select('value').eq('key', 'last_sync_page').single();
-    if (data && data.value) {
-      const state = JSON.parse(data.value);
-      if (state.page > 1) {
-        startPage = state.page;
-        // Restore the exact dates from the saved sync job,
-        // overriding whatever the date inputs currently show
-        fromVal = state.date_from;
-        toVal   = state.date_to;
-        const fromEl = document.getElementById('sync-from');
-        const toEl   = document.getElementById('sync-to');
-        if (fromEl) fromEl.value = fromVal;
-        if (toEl)   toEl.value   = toVal;
-        syncLog(`📌 Resuming from page ${startPage} (${fromVal} → ${toVal})...`, 'info');
-      }
+let startPage = 1;
+const isResume = false; // will be set true only if user clicked "Resume" button
+try {
+  const { data } = await sb.from('sync_state').select('value').eq('key', 'last_sync_page').single();
+  if (data && data.value) {
+    const state = JSON.parse(data.value);
+    // Only resume if the saved dates MATCH what the user has selected.
+    // If the user changed the dates, treat it as a fresh sync and clear the old state.
+    if (state.page > 1 && state.date_from === fromVal && state.date_to === toVal) {
+      startPage = state.page;
+      syncLog(`📌 Resuming from page ${startPage} (dates match: ${fromVal} → ${toVal})...`, 'info');
+    } else if (state.page > 1 && (state.date_from !== fromVal || state.date_to !== toVal)) {
+      // User chose different dates — clear the old saved state and start fresh
+      await sb.from('sync_state').delete().eq('key', 'last_sync_page');
+      syncLog(`🔄 New date range detected (${fromVal} → ${toVal}). Starting fresh from page 1.`, 'info');
+      startPage = 1;
     }
-  } catch (e) {
-    // No saved state — start fresh from page 1
   }
+} catch (e) {
+  // No saved state — start fresh
+}
 
   window._syncRunning = true;
   const startBtn = document.getElementById('sync-start-btn');
