@@ -545,7 +545,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
               <button class="btn btn-sm btn-gold" id="export-orders-btn" onclick="exportOrdersCSV()">↓ Export CSV</button>
             </div>
           </div>
-          <div style="overflow-x:auto;"><table><thead><tr><th>Ref</th><th>Store</th><th>Date</th><th>Items</th><th>Total (UGX)</th><th>Status</th></tr></thead>
+          <div style="overflow-x:auto;"><table><thead><tr><th>Ref</th><th>Store</th><th>Date</th><th>Items</th><th>Total (UGX)</th><th>Status</th><th></th></tr></thead>
           <tbody id="orders-report-tbody"><tr><td colspan="6" style="text-align:center;padding:20px;">Loading...</td></tr></tbody></table></div>
         </div>
       </div>
@@ -2164,7 +2164,7 @@ async function loadReports(){
     </table>
     </div>`;
 }
-async function loadOrdersReport(){if(isSalesRep())return;const statusFilter=document.getElementById('report-status-filter')?.value||'';let query=sb.from('orders').select('*').order('created_at',{ascending:false}).limit(50);if(statusFilter)query=query.eq('status',statusFilter);const{data}=await query;const orders=data||[];const statusBadge={submitted:'bb',fulfilled:'bg',partial:'ba',draft:'bgold',cancelled:'br'};document.getElementById('orders-report-tbody').innerHTML=orders.length===0?'<tr><td colspan="6" style="text-align:center;padding:20px;">No listings found.</td></tr>':orders.map(o=>`<tr><td class="mono">${o.order_ref}</td><td>${(o.client_name||'—').slice(0,30)}</td><td>${o.order_date||'—'}</td><td>${o.item_count||'—'}</td><td style="font-weight:500;">${Number(o.total_amount||0).toLocaleString()}</td><td><span class="badge ${statusBadge[o.status]||'bb'}">${o.status}</span></td></tr>`).join('');}
+async function loadOrdersReport(){if(isSalesRep())return;const statusFilter=document.getElementById('report-status-filter')?.value||'';let query=sb.from('orders').select('*').order('created_at',{ascending:false}).limit(50);if(statusFilter)query=query.eq('status',statusFilter);const{data}=await query;const orders=data||[];const statusBadge={submitted:'bb',fulfilled:'bg',partial:'ba',draft:'bgold',cancelled:'br'};document.getElementById('orders-report-tbody').innerHTML=orders.length===0?'<tr><td colspan="6" style="text-align:center;padding:20px;">No listings found.</td></tr>':orders.map(o=>`<tr><td class="mono">${o.order_ref}</td><td>${(o.client_name||'—').slice(0,30)}</td><td>${o.order_date||'—'}</td><td>${o.item_count||'—'}</td><td style="font-weight:500;">${Number(o.total_amount||0).toLocaleString()}</td><td><span class="badge ${statusBadge[o.status]||'bb'}">${o.status}</span></td><td>${o.status!=='submitted'&&o.status!=='fulfilled'?`<button class="btn btn-sm btn-green" onclick="changeListingStatus('${o.id}','submitted','reports')">✓ Submit</button>`:''}</td></tr>`).join('');}
 async function exportOrdersCSV(){if(isSalesRep())return;const{data}=await sb.from('orders').select('*').order('created_at',{ascending:false});const orders=data||[];const csv=['Listing Ref,Store,Date,Items,Status',...orders.map(o=>`${o.order_ref},"${o.client_name||''}",${o.order_date||''},${o.item_count||0},${o.status}`)].join('\n');const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='ktlsales_listings.csv';a.click();}
 
 // ─── ADMIN ─────────────────────────────────────────────────────────────────────
@@ -3598,6 +3598,7 @@ function renderSavedListingsTab(tabId, orders) {
         <div class="sl-meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${(o.client_name || '—').slice(0, 20)} · ${o.order_date || ''} · <strong>${o.item_count || 0} items</strong></div>
       </div>
       <div class="sl-actions">
+        ${o.status !== 'submitted' && o.status !== 'fulfilled' ? `<button class="btn btn-sm btn-green" onclick="changeListingStatus('${o.id}','submitted','${tabId}')">✓ Submit</button>` : ''}
         <button class="btn btn-sm" onclick="viewSavedListingItems('${o.id}','${o.order_ref || ''}','${o.order_date || ''}','${(o.client_name || '').replace(/'/g, "\\'")}')">View</button>
         <button class="btn btn-sm btn-royal" onclick="shareListingById('${o.id}','${(o.client_name || '').replace(/'/g, "\\'")}','${o.order_ref || ''}')">Share</button>
       </div>
@@ -3638,6 +3639,37 @@ async function viewSavedListingItems(orderId, orderRef, orderDate, clientName) {
   const panel = document.getElementById('saved-listings-panel');
   if (panel) panel.after(box);
   box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ─── CHANGE LISTING STATUS ────────────────────────────────────────────────────
+async function changeListingStatus(orderId, newStatus, refreshTabId) {
+  const labels = { submitted: 'Submit', fulfilled: 'Mark Fulfilled', draft: 'Revert to Draft', cancelled: 'Cancel' };
+  const label = labels[newStatus] || newStatus;
+  showConfirmDialog({
+    icon: newStatus === 'submitted' ? '✅' : newStatus === 'fulfilled' ? '📦' : '📝',
+    title: `${label} Listing?`,
+    message: `Change this listing status to <strong>${newStatus}</strong>?`,
+    confirmLabel: label,
+    confirmStyle: newStatus === 'submitted' ? 'background:#1D9E75;color:#fff;border:none;' : 'background:var(--royal);color:#fff;border:none;',
+    onConfirm: async () => {
+      const { error } = await sb.from('orders').update({ status: newStatus }).eq('id', orderId);
+      if (error) { alert('Error: ' + error.message); return; }
+      // Refresh whichever tab triggered this
+      if (refreshTabId === 'sl-tab-today') {
+        await loadSavedListingsPanel();
+      } else if (refreshTabId === 'sl-tab-all') {
+        await loadSavedListingsAll();
+      } else {
+        // Called from Reports or dashboard — reload both
+        await loadSavedListingsPanel();
+        if (currentScreen === 'reports') loadReports();
+        if (currentScreen === 'dashboard') loadDashboard();
+      }
+      // Also refresh reports if open
+      if (currentScreen === 'reports') loadReports();
+      if (currentScreen === 'dashboard') loadDashboard();
+    }
+  });
 }
 
 function switchSavedTab(tabEl, contentId) {
