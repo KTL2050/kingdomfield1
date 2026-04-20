@@ -205,6 +205,66 @@ tr:hover td{background:var(--bg2);}
   .mc::after{display:none;}
   .date-range-strip{gap:6px;}
   .share-btns{flex-direction:column;}
+
+  /* ── WALLET MOBILE FIXES ── */
+  #screen-wallet .metrics-grid{grid-template-columns:1fr 1fr;gap:8px;}
+  #screen-wallet .mc{padding:10px 10px;}
+  #screen-wallet .mc-val{font-size:16px;}
+  #screen-wallet .mc-lbl{font-size:9px;letter-spacing:0.04em;}
+  #screen-wallet .mc-sub{font-size:9px;}
+
+  /* Wallet hero scaling */
+  .wh-points{font-size:28px;}
+  .wh-ugx{font-size:14px;}
+  .wh-meta{gap:8px;flex-wrap:wrap;}
+  .wh-stat-val{font-size:13px;}
+  .wh-stat-lbl{font-size:9px;}
+  .wh-badge{font-size:10px;padding:3px 9px;}
+
+  /* Stack hero top row on mobile */
+  .wallet-hero > div:first-child{flex-direction:column!important;gap:10px!important;}
+
+  /* Admin two-col wallet sections: stack vertically */
+  #wallet-view-admin > div[style*="grid-template-columns"]{
+    grid-template-columns:1fr!important;
+  }
+
+  /* Rep view two-col: stack */
+  #wallet-view-rep > div[style*="grid-template-columns"]{
+    grid-template-columns:1fr!important;
+  }
+
+  /* Leaderboard row tighter on mobile */
+  .earner-row{gap:6px;padding:8px 0;}
+  .earner-rank{width:18px;font-size:11px;}
+  .earner-av{width:34px;height:34px;font-size:10px;}
+  .earner-info{flex:1;min-width:0;}
+  .earner-name{font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .earner-pts{font-size:10px;}
+  .earner-bar-wrap{width:50px;}
+  .earner-ugx{font-size:11px;min-width:38px;}
+
+  /* Hide desktop table on mobile, show cards instead */
+  #wadmin-table-wrap{display:none!important;}
+  #wadmin-reps-cards{display:block!important;}
+
+  /* Steps: 2-column grid */
+  .steps-row{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:10px!important;
+  }
+  .step:not(:last-child)::after{display:none;}
+  .step-circle{width:28px;height:28px;font-size:11px;}
+  .step-label{font-size:9.5px;}
+
+  /* How it works info boxes: stack */
+  #screen-wallet .card > div[style*="display:flex"][style*="gap:10px"]{
+    flex-direction:column!important;
+  }
+}
+@media(min-width:769px){
+  #wadmin-reps-cards{display:none!important;}
 }
 @media(min-width:769px){.mob-bar,.drawer-ov,.drawer{display:none!important;}}
 /* ── SAVED LISTINGS HISTORY PANEL ── */
@@ -232,6 +292,71 @@ body.manager-view .card:has(.card-title:contains("Users")),
 body.manager-view .card:has(.card-title:contains("Role Permissions")) {
     display: none !important;
 }
+
+/* ── WALLET FEATURE ── */
+.wallet-hero{background:linear-gradient(135deg,var(--royal) 0%,var(--royal-mid) 100%);border-radius:14px;padding:24px;color:#fff;margin-bottom:14px;position:relative;overflow:hidden;}
+.wallet-hero::after{content:'';position:absolute;top:-40px;right:-40px;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,0.05);}
+.wallet-hero::before{content:'';position:absolute;bottom:-30px;left:60px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.04);}
+.wh-label{font-size:11px;font-weight:600;opacity:0.65;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;}
+.wh-points{font-size:42px;font-weight:700;letter-spacing:-0.03em;line-height:1;}
+.wh-pts-label{font-size:13px;opacity:0.6;margin-top:4px;}
+.wh-ugx{font-size:18px;font-weight:600;margin-top:12px;color:rgba(255,255,255,0.85);}
+.wh-meta{display:flex;gap:20px;margin-top:18px;padding-top:16px;border-top:0.5px solid rgba(255,255,255,0.15);}
+.wh-stat{text-align:center;}
+.wh-stat-val{font-size:16px;font-weight:700;}
+.wh-stat-lbl{font-size:10px;opacity:0.55;margin-top:2px;}
+.wh-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;margin-top:14px;}
+.progress-wrap{margin:10px 0;}
+.progress-label{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:6px;}
+.pbar-wallet{height:8px;background:rgba(255,255,255,0.15);border-radius:4px;overflow:hidden;}
+.pfill-wallet{height:100%;border-radius:4px;background:var(--gold-mid);transition:width 0.6s ease;}
+.earner-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--brd);}
+.earner-row:last-child{border-bottom:none;}
+.earner-rank{width:24px;font-size:12px;font-weight:700;color:var(--txt3);text-align:center;}
+.earner-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;}
+.earner-info{flex:1;}
+.earner-name{font-size:12.5px;font-weight:500;}
+.earner-pts{font-size:11px;color:var(--txt3);}
+.earner-bar-wrap{width:100px;}
+.earner-bar{height:5px;background:var(--bg2);border-radius:3px;overflow:hidden;}
+.earner-bar-fill{height:100%;border-radius:3px;background:var(--royal);}
+.earner-ugx{font-size:12px;font-weight:600;color:var(--royal);text-align:right;min-width:60px;}
+.tl-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;}
+.tl-earn{background:#EAF3DE;}
+.tl-redeem{background:var(--gold-light);}
+.tl-amount.earn{color:#1D9E75;}
+.tl-amount.redeem{color:var(--gold);}
+.step-circle{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:12px;font-weight:700;}
+.sc-done{background:#1D9E75;color:#fff;}
+.sc-active{background:var(--royal);color:#fff;}
+.sc-todo{background:var(--bg2);color:var(--txt3);border:0.5px solid var(--brd2);}
+.step{flex:1;position:relative;text-align:center;padding:0 4px;}
+.step:not(:last-child)::after{content:'';position:absolute;top:16px;right:-4px;width:8px;height:2px;background:var(--brd2);z-index:1;}
+.step-label{font-size:10.5px;color:var(--txt2);line-height:1.3;}
+.wallet-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(3px);}
+.wallet-modal{background:var(--bg);border-radius:18px;width:90%;max-width:440px;overflow:hidden;}
+.wallet-modal-hdr{background:var(--royal);padding:20px 24px;color:#fff;}
+.wallet-modal-hdr h3{font-size:16px;font-weight:700;margin:0;}
+.wallet-modal-hdr p{font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;}
+.wallet-modal-body{padding:22px 24px;}
+.wallet-modal-footer{display:flex;gap:8px;padding:0 24px 22px;}
+@keyframes float1 {
+  0%,100%{transform:translateY(0) translateX(0);}
+  33%{transform:translateY(-18px) translateX(8px);}
+  66%{transform:translateY(10px) translateX(-6px);}
+}
+@keyframes float2 {
+  0%,100%{transform:translateY(0) translateX(0);}
+  33%{transform:translateY(14px) translateX(-10px);}
+  66%{transform:translateY(-20px) translateX(5px);}
+}
+@keyframes float3 {
+  0%,100%{transform:translateY(0) translateX(0);}
+  50%{transform:translateY(-15px) translateX(12px);}
+}
+@media(min-width:900px){
+  #login-tagline{display:block!important;}
+}
 </style>
 </head>
 <body>
@@ -242,9 +367,50 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
   <p id="loading-msg">Connecting to Kingdom Trading...</p>
 </div>
 
-<div class="login-wrap hidden" id="login-screen">
-  <div class="login-card">
-<img src="data:image/png;base64,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" alt="Kingdom Trading" style="width:160px;margin:0 auto 14px;display:block;"/>
+
+<div class="login-wrap hidden" id="login-screen" style="position:relative;overflow:hidden;">
+
+  <!-- VIDEO BACKGROUND -->
+  <video autoplay muted loop playsinline id="login-bg-video"
+    style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;filter:brightness(0.45) saturate(1.2);">
+    <source src="https://1x6cnxfzh3.ucarecd.net/6ada0210-3eab-47f7-be6d-0ba026903b72/fave.mp4 " type="video/mp4"/>
+    
+  </video>
+
+  <!-- OVERLAY GRADIENT -->
+  <div style="position:absolute;inset:0;z-index:1;
+    background:linear-gradient(135deg,rgba(10,28,60,0.75) 0%,rgba(26,58,107,0.55) 50%,rgba(184,134,11,0.25) 100%);"></div>
+
+  <!-- ANIMATED PARTICLES (pure CSS) -->
+  <div style="position:absolute;inset:0;z-index:1;overflow:hidden;">
+    <div style="position:absolute;width:2px;height:2px;background:rgba(255,255,255,0.6);border-radius:50%;top:15%;left:20%;animation:float1 8s ease-in-out infinite;"></div>
+    <div style="position:absolute;width:3px;height:3px;background:rgba(212,160,23,0.7);border-radius:50%;top:40%;left:75%;animation:float2 10s ease-in-out infinite;"></div>
+    <div style="position:absolute;width:2px;height:2px;background:rgba(255,255,255,0.5);border-radius:50%;top:70%;left:35%;animation:float3 7s ease-in-out infinite;"></div>
+    <div style="position:absolute;width:4px;height:4px;background:rgba(212,160,23,0.4);border-radius:50%;top:25%;left:60%;animation:float1 12s ease-in-out infinite reverse;"></div>
+    <div style="position:absolute;width:2px;height:2px;background:rgba(255,255,255,0.4);border-radius:50%;top:80%;left:80%;animation:float2 9s ease-in-out infinite reverse;"></div>
+    <div style="position:absolute;width:3px;height:3px;background:rgba(212,160,23,0.5);border-radius:50%;top:55%;left:10%;animation:float3 11s ease-in-out infinite;"></div>
+  </div>
+
+  <!-- BRANDING TEXT (top left) -->
+  <div style="position:absolute;top:28px;left:32px;z-index:3;display:flex;align-items:center;gap:10px;">
+    <div style="width:36px;height:36px;background:var(--gold-mid);border-radius:9px;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,0.3);">
+      <span style="color:#fff;font-size:11px;font-weight:700;">KTL</span>
+    </div>
+    <div>
+      <div style="color:#fff;font-size:13px;font-weight:700;letter-spacing:0.04em;">Kingdom Trading Ltd</div>
+      <div style="color:rgba(255,255,255,0.5);font-size:10px;letter-spacing:0.08em;text-transform:uppercase;">Sales Listing Platform</div>
+    </div>
+  </div>
+
+  <!-- TAGLINE (bottom left) -->
+  <div style="position:absolute;bottom:32px;left:32px;z-index:3;display:none;" id="login-tagline">
+    <div style="color:rgba(255,255,255,0.9);font-size:22px;font-weight:700;letter-spacing:-0.02em;line-height:1.3;text-shadow:0 2px 12px rgba(0,0,0,0.4);">Empowering Kingdom's Trading<br>Sales Force</div>
+    <div style="color:rgba(255,255,255,0.5);font-size:12px;margin-top:8px;letter-spacing:0.03em;">Real-time listings · Smart insights · Instant rewards</div>
+  </div>
+
+  <!-- LOGIN CARD -->
+  <div class="login-card" style="position:relative;z-index:2;backdrop-filter:blur(18px) saturate(1.4);background:rgba(255,255,255,0.92);box-shadow:0 24px 64px rgba(0,0,0,0.35),0 0 0 0.5px rgba(255,255,255,0.2);border:none;">
+    <img src="data:image/png;base64,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" alt="Kingdom Trading" style="width:160px;margin:0 auto 14px;display:block;"/>
     <div class="login-title">KTLSALES</div>
     <div class="login-sub">Kingdom Trading Ltd · Sales System</div>
     <div class="err-msg" id="login-err"></div>
@@ -490,6 +656,183 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
           </div>
         </div>
       </div>
+
+      <!-- WALLET -->
+      <div class="screen" id="screen-wallet">
+
+        <!-- REP VIEW -->
+        <div id="wallet-view-rep">
+
+          <div class="wallet-hero">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;position:relative;z-index:1;">
+              <div>
+                <div class="wh-label">My Wallet Balance</div>
+                <div class="wh-points" id="wallet-hero-pts">—</div>
+                <div class="wh-pts-label">points earned</div>
+                <div class="wh-ugx" id="wallet-hero-ugx">= UGX —</div>
+                <div class="wh-badge">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="7"/><path d="M8 5v3l2 2"/></svg>
+                  <span id="wallet-tracking-date">Tracking...</span>
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:10px;opacity:0.55;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Tier</div>
+                <div style="background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px 14px;text-align:center;">
+                  <div style="font-size:18px;font-weight:700;">Standard</div>
+                  <div style="font-size:10px;opacity:0.6;margin-top:2px;">10 pts / item</div>
+                </div>
+              </div>
+            </div>
+            <div style="position:relative;z-index:1;margin-top:18px;">
+              <div class="progress-label">
+                <span style="font-size:11px;opacity:0.7;">Progress to redemption (500 pts = UGX 50,000)</span>
+                <span style="font-size:11px;font-weight:600;" id="wallet-progress-label">— / 500</span>
+              </div>
+              <div class="pbar-wallet">
+                <div class="pfill-wallet" id="wallet-progress-fill" style="width:0%;"></div>
+              </div>
+              <div style="font-size:10px;opacity:0.55;margin-top:5px;" id="wallet-progress-sub">Loading...</div>
+            </div>
+            <div class="wh-meta" style="position:relative;z-index:1;">
+              <div class="wh-stat"><div class="wh-stat-val" id="wallet-stat-items">—</div><div class="wh-stat-lbl">Items listed</div></div>
+              <div class="wh-stat"><div class="wh-stat-val" id="wallet-stat-redemptions">0</div><div class="wh-stat-lbl">Redemptions</div></div>
+              <div class="wh-stat"><div class="wh-stat-val" id="wallet-stat-redeemed">UGX 0</div><div class="wh-stat-lbl">Total redeemed</div></div>
+              <div class="wh-stat"><div class="wh-stat-val" id="wallet-stat-stores">—</div><div class="wh-stat-lbl">Stores visited</div></div>
+            </div>
+          </div>
+
+          <div class="alert aw" id="wallet-alert-not-eligible" style="margin-bottom:14px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;margin-top:1px;"><circle cx="8" cy="8" r="7"/><path d="M8 5v3M8 11v.5"/></svg>
+            <span id="wallet-alert-text">Loading your wallet...</span>
+          </div>
+
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">How rewards work</span></div>
+            <div style="display:flex;gap:0;" class="steps-row">
+              <div class="step"><div class="step-circle sc-done">1</div><div class="step-label">List items for a store</div></div>
+              <div class="step"><div class="step-circle sc-done">2</div><div class="step-label">Store purchases the item</div></div>
+              <div class="step"><div class="step-circle sc-done">3</div><div class="step-label">Item appears in Listed Items</div></div>
+              <div class="step"><div class="step-circle sc-active">4</div><div class="step-label">Earn 10 pts per item = UGX 1,000</div></div>
+              <div class="step"><div class="step-circle sc-todo">5</div><div class="step-label">Reach 500 pts → redeem UGX 50,000+</div></div>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:12px;padding-top:12px;border-top:0.5px solid var(--brd);flex-wrap:wrap;">
+              <div style="flex:1;min-width:140px;background:var(--bg2);border-radius:9px;padding:12px;text-align:center;">
+                <div style="font-size:20px;font-weight:700;color:var(--royal);">10 pts</div>
+                <div style="font-size:11px;color:var(--txt3);margin-top:3px;">per confirmed listed item</div>
+              </div>
+              <div style="flex:1;min-width:140px;background:var(--bg2);border-radius:9px;padding:12px;text-align:center;">
+                <div style="font-size:20px;font-weight:700;color:#1D9E75;">= UGX 1,000</div>
+                <div style="font-size:11px;color:var(--txt3);margin-top:3px;">per 10 points</div>
+              </div>
+              <div style="flex:1;min-width:140px;background:var(--gold-light);border-radius:9px;padding:12px;text-align:center;border:0.5px solid rgba(212,160,23,0.3);">
+                <div style="font-size:20px;font-weight:700;color:var(--gold);">500 pts min</div>
+                <div style="font-size:11px;color:var(--txt2);margin-top:3px;">to redeem (UGX 50,000)</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div class="card">
+              <div class="card-hdr">
+                <span class="card-title">Recent earnings</span>
+                <span class="badge bg" id="wallet-earnings-badge">Loading...</span>
+              </div>
+              <div id="wallet-recent-earnings"><div class="empty-state">Loading...</div></div>
+              <div style="text-align:center;padding-top:10px;">
+                <button class="btn btn-sm" onclick="loadWalletEarningsAll()">View all earnings →</button>
+              </div>
+            </div>
+
+            <div class="card" id="wallet-redeem-card">
+              <div class="card-hdr"><span class="card-title">Redeem earnings</span></div>
+              <div id="wallet-redeem-body">
+                <div style="text-align:center;padding:12px 0 8px;">
+                  <div style="width:60px;height:60px;border-radius:50%;background:var(--bg2);border:0.5px solid var(--brd2);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:24px;">🔒</div>
+                  <div style="font-size:13px;font-weight:600;margin-bottom:6px;">Not yet eligible</div>
+                  <div style="font-size:12px;color:var(--txt2);line-height:1.6;max-width:220px;margin:0 auto;">You need <strong>500 points</strong> to redeem.</div>
+                </div>
+                <div style="margin:14px 0;background:var(--bg2);border-radius:9px;padding:12px;">
+                  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span style="color:var(--txt2);">Current balance</span><span style="font-weight:600;" id="redeem-current-pts">— pts</span></div>
+                  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span style="color:var(--txt2);">Minimum to redeem</span><span style="font-weight:600;">500 pts</span></div>
+                  <div style="display:flex;justify-content:space-between;font-size:12px;padding-top:6px;border-top:0.5px solid var(--brd);"><span style="color:var(--txt2);">Still needed</span><span style="font-weight:700;color:#A32D2D;" id="redeem-still-needed">— pts</span></div>
+                </div>
+                <button class="btn" style="width:100%;justify-content:center;padding:12px 24px;font-size:13px;font-weight:600;border-radius:10px;opacity:0.4;cursor:not-allowed;" disabled id="wallet-payout-btn-locked">Request Payout</button>
+                <div style="text-align:center;font-size:10.5px;color:var(--txt3);margin-top:8px;">Payment sent to your registered mobile number</div>
+              </div>
+
+              <div id="wallet-eligible-body" style="display:none;">
+                <div style="background:#E1F5EE;border-radius:9px;padding:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
+                  <div>
+                    <div style="font-size:11px;font-weight:600;color:#085041;text-transform:uppercase;letter-spacing:0.06em;">Available to redeem</div>
+                    <div style="font-size:28px;font-weight:700;color:#085041;letter-spacing:-0.03em;" id="wallet-eligible-ugx">UGX —</div>
+                    <div style="font-size:11px;color:#0F6E56;margin-top:2px;" id="wallet-eligible-pts">— points confirmed</div>
+                  </div>
+                  <button class="btn btn-green" style="padding:12px 20px;font-size:13px;font-weight:600;border-radius:10px;" onclick="openWalletRedeemModal()">Request Payout →</button>
+                </div>
+                <div style="font-size:11.5px;color:var(--txt2);line-height:1.6;display:flex;gap:8px;">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;margin-top:2px;"><circle cx="8" cy="8" r="7"/><path d="M8 5v3M8 11v.5"/></svg>
+                  Payment will be sent via mobile money to your registered number. The KTL accounts team (0763371564) will confirm your payout.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div><!-- end wallet-view-rep -->
+
+        <!-- ADMIN / MANAGER VIEW -->
+        <div id="wallet-view-admin" style="display:none;">
+
+          <div class="metrics-grid">
+            <div class="mc" style="background:linear-gradient(135deg,#5B8DEF,#4A6FD4);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Total Points Issued</div>
+              <div class="mc-val" id="wadmin-total-pts" style="color:#fff;">—</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.6);">All reps combined</div>
+            </div>
+            <div class="mc" style="background:linear-gradient(135deg,#4DB896,#2E9E75);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Total Redeemed</div>
+              <div class="mc-val" id="wadmin-total-redeemed" style="color:#fff;">UGX 0</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.6);">0 redemptions</div>
+            </div>
+            <div class="mc" style="background:linear-gradient(135deg,#F5A623,#E8891A);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Pending Payouts</div>
+              <div class="mc-val" id="wadmin-pending" style="color:#fff;">0</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.6);">Requests to approve</div>
+            </div>
+            <div class="mc" style="background:linear-gradient(135deg,#F06B6B,#E04545);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Reps Eligible</div>
+              <div class="mc-val" id="wadmin-eligible" style="color:#fff;">0</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.6);">Have 500+ points</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div class="card">
+              <div class="card-hdr"><span class="card-title">Top earners — leaderboard</span><span class="badge bgold" id="wadmin-leaderboard-month">—</span></div>
+              <div id="wadmin-leaderboard-list"><div class="empty-state">Loading...</div></div>
+            </div>
+
+            <div class="card">
+              <div class="card-hdr"><span class="card-title">Payout requests</span><span class="badge br" id="wadmin-payout-badge">0 pending</span></div>
+              <div id="wadmin-payout-requests"><div class="empty-state" style="padding:30px 20px;">
+                <div style="font-size:28px;margin-bottom:10px;">📭</div>
+                <div style="font-weight:600;font-size:13px;margin-bottom:5px;">No payout requests</div>
+                <div style="font-size:12px;color:var(--txt2);line-height:1.6;">Requests appear here when a sales rep submits a redemption.</div>
+              </div></div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:14px;">
+            <div class="card-hdr"><span class="card-title">All representatives — wallet overview</span><button class="btn btn-sm btn-gold" onclick="exportWalletCSV()">↓ Export CSV</button></div>
+            <!-- Desktop table (hidden on mobile) -->
+            <div style="overflow-x:auto;" id="wadmin-table-wrap">
+              <table><thead><tr><th>Rep</th><th>Items confirmed</th><th>Points</th><th>UGX Value</th><th>Redeemed</th><th>Balance</th><th>Eligible?</th><th></th></tr></thead>
+              <tbody id="wadmin-reps-tbody"><tr><td colspan="8" style="text-align:center;padding:20px;">Loading...</td></tr></tbody></table>
+            </div>
+            <!-- Mobile cards (hidden on desktop) -->
+            <div id="wadmin-reps-cards" style="display:none;"></div>
+          </div>
+        </div><!-- end wallet-view-admin -->
+
+      </div><!-- end screen-wallet -->
 
       <!-- TARGETS -->
       <div class="screen" id="screen-targets">
@@ -775,6 +1118,84 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
     </div>
   </div>
 </div>
+<!-- WALLET REDEEM MODAL -->
+<div id="wallet-redeem-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:999;align-items:center;justify-content:center;backdrop-filter:blur(3px);">
+  <div class="wallet-modal">
+    <div class="wallet-modal-hdr">
+      <h3>Request Payout</h3>
+      <p>Your confirmed earnings will be sent via mobile money</p>
+    </div>
+    <div class="wallet-modal-body">
+      <div style="display:flex;gap:0;margin-bottom:20px;">
+        <div style="flex:1;text-align:center;">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--royal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin:0 auto 5px;" id="wm-step1-circle">1</div>
+          <div style="font-size:10.5px;color:var(--royal);font-weight:600;" id="wm-step1-lbl">Enter number</div>
+        </div>
+        <div style="flex:0 0 40px;display:flex;align-items:center;justify-content:center;padding-bottom:20px;"><div style="height:2px;width:100%;background:var(--brd2);"></div></div>
+        <div style="flex:1;text-align:center;" id="wm-step2-indicator">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--bg2);color:var(--txt3);border:0.5px solid var(--brd2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin:0 auto 5px;">2</div>
+          <div style="font-size:10.5px;color:var(--txt3);">Confirm amount</div>
+        </div>
+        <div style="flex:0 0 40px;display:flex;align-items:center;justify-content:center;padding-bottom:20px;"><div style="height:2px;width:100%;background:var(--brd2);"></div></div>
+        <div style="flex:1;text-align:center;" id="wm-step3-indicator">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--bg2);color:var(--txt3);border:0.5px solid var(--brd2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin:0 auto 5px;">3</div>
+          <div style="font-size:10.5px;color:var(--txt3);">Done!</div>
+        </div>
+      </div>
+
+      <div id="wm-step1">
+        <div style="background:#E1F5EE;border-radius:9px;padding:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:11px;color:#085041;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Payout amount</div>
+            <div style="font-size:24px;font-weight:700;color:#085041;" id="wm-payout-amount">UGX —</div>
+            <div style="font-size:11px;color:#0F6E56;" id="wm-payout-pts">— points will be deducted</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10.5px;color:#0F6E56;">Remaining after</div>
+            <div style="font-size:16px;font-weight:700;color:#085041;">0 pts</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:11px;">
+          <label style="font-size:11.5px;font-weight:600;color:var(--txt2);">Your mobile money number</label>
+          <input class="fin" type="tel" id="wm-phone" placeholder="e.g. 0712 345 678" style="font-size:16px;letter-spacing:0.05em;"/>
+          <div style="font-size:10.5px;color:var(--txt3);margin-top:3px;">Enter the number where you want to receive payment</div>
+        </div>
+        <div class="alert ai">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;margin-top:1px;"><circle cx="8" cy="8" r="7"/><path d="M8 5v3M8 11v.5"/></svg>
+          After you submit, the KTL accounts team (0763371564) will receive a notification and confirm your payout.
+        </div>
+      </div>
+
+      <div id="wm-step2" style="display:none;">
+        <div style="background:var(--bg2);border-radius:10px;padding:14px;margin-bottom:16px;">
+          <div style="font-size:11.5px;font-weight:600;color:var(--txt2);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em;">Confirm your payout</div>
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0;border-bottom:0.5px solid var(--brd);"><span style="color:var(--txt2);">Send to</span><span style="font-weight:600;" id="wm-confirm-number">—</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0;border-bottom:0.5px solid var(--brd);"><span style="color:var(--txt2);">Amount</span><span style="font-weight:700;color:#1D9E75;" id="wm-confirm-amount">UGX —</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0;border-bottom:0.5px solid var(--brd);"><span style="color:var(--txt2);">Points deducted</span><span id="wm-confirm-pts">—</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0;"><span style="color:var(--txt2);">Approved by</span><span>KTL Accounts (0763371564)</span></div>
+        </div>
+        <div class="alert aw">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;margin-top:1px;"><circle cx="8" cy="8" r="7"/><path d="M8 5v3M8 11v.5"/></svg>
+          Once submitted, the KTL accounts team will be notified and will process your payment within a few minutes.
+        </div>
+      </div>
+
+      <div id="wm-step3" style="display:none;text-align:center;padding:10px 0;">
+        <div style="width:60px;height:60px;border-radius:50%;background:#E1F5EE;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:28px;">✓</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px;">Request submitted!</div>
+        <div style="font-size:12.5px;color:var(--txt2);line-height:1.7;max-width:280px;margin:0 auto;">Your payout request has been sent. The KTL accounts team will process it shortly.</div>
+        <div style="margin:16px auto;background:#E1F5EE;border-radius:9px;padding:12px;max-width:260px;">
+          <div style="font-size:11px;color:#085041;">Expected payment to</div>
+          <div style="font-size:15px;font-weight:600;color:#085041;" id="wm-success-number">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="wallet-modal-footer" id="wm-footer">
+      <button class="btn" style="flex:1;justify-content:center;" onclick="closeWalletRedeemModal()">Cancel</button>
+      <button class="btn btn-green" style="flex:2;justify-content:center;padding:12px 24px;font-size:13px;font-weight:600;border-radius:10px;" id="wm-next-btn" onclick="walletModalNext()">Continue →</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const SUPABASE_URL  = 'https://bccqhwsbhgssoapiqljy.supabase.co';
@@ -836,6 +1257,7 @@ const NAV = [
   {id:'clients',   label:'Clients',           sec:'Main',           icon:'M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z'},
   {id:'orders',    label:'Place Listing',     sec:'Main',           icon:'M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zm1 3h6M5 7h6M5 10h3'},
   {id:'targets',   label:'Targets',           sec:'Performance',    icon:'M8 1a7 7 0 100 14A7 7 0 008 1zm0 4a3 3 0 100 6 3 3 0 000-6zm0 2a1 1 0 100 2 1 1 0 000-2z'},
+  {id:'wallet',    label:'My Wallet',         sec:'Performance',    icon:'M8 1a7 7 0 100 14A7 7 0 008 1zm0 3v4l3 2'},
   {id:'reports',   label:'Reports',           sec:'Performance',    icon:'M2 12h3v2H2zM6 8h3v6H6zM10 4h3v10h-3z', managerOnly:true},
   {id:'admin', label:'User Management', sec:'Administration', icon:'M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z', managerOnly:true},
   {id:'team',      label:'Sales Team',        sec:'Administration', icon:'M2 8a3 3 0 100-6 3 3 0 000 6zm8 0a3 3 0 100-6 3 3 0 000 6zm-1 6s-1 0-1-1 1-4 5-4h2c4 0 5 3 5 4s-1 1-1 1H9zm-7 0s-1 0-1-1c0-.5.3-2 2-3', managerOnly:true},
@@ -985,6 +1407,7 @@ if (screen==='admin' && !canManage()) return;
   else if (screen==='reports') loadReports();
   else if (screen==='admin') loadAdmin();
   else if (screen==='team') loadTeamScreen();
+  else if (screen==='wallet') loadWalletScreen();
 }
 
 function openDrawer(){document.getElementById('drawer').classList.add('open');document.getElementById('drawer-ov').classList.add('open');}
@@ -3729,6 +4152,419 @@ async function checkAllSyncResume() {
     }
   } catch(e) {}
 }
+// ─── WALLET SCREEN ────────────────────────────────────────────────────────────
+let _walletStep = 1;
+let _walletPoints = 0;
+const WALLET_POINTS_PER_ITEM = 10;
+const WALLET_MIN_REDEEM = 500;
+const WALLET_UGX_PER_POINT = 100; // 10 pts = UGX 1,000 → 1 pt = UGX 100
+
+function goTo_wallet_hook(screen) {
+  if (screen === 'wallet') loadWalletScreen();
+}
+
+async function loadWalletScreen() {
+  const month = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+  document.getElementById('wadmin-leaderboard-month') && (document.getElementById('wadmin-leaderboard-month').textContent = month);
+
+  if (isSalesRep()) {
+    document.getElementById('wallet-view-rep').style.display = 'block';
+    document.getElementById('wallet-view-admin').style.display = 'none';
+    await loadRepWallet();
+  } else {
+    document.getElementById('wallet-view-rep').style.display = 'none';
+    document.getElementById('wallet-view-admin').style.display = 'block';
+    await loadAdminWallet();
+  }
+}
+
+async function loadRepWallet() {
+  // Count confirmed listed items for this rep
+  const { data: repOrders } = await sb
+    .from('orders')
+    .select('id, item_count, order_date, client_name, created_at')
+    .eq('created_by', currentUser.id)
+    .in('status', ['submitted', 'fulfilled', 'partial'])
+    .order('created_at', { ascending: false });
+
+  const orders = repOrders || [];
+  let totalItems = 0;
+  orders.forEach(o => { totalItems += Number(o.item_count || 0); });
+
+  const points = totalItems * WALLET_POINTS_PER_ITEM;
+  _walletPoints = points;
+  const ugxValue = points * WALLET_UGX_PER_POINT;
+  const pct = Math.min(100, Math.round((points / WALLET_MIN_REDEEM) * 100));
+  const needed = Math.max(0, WALLET_MIN_REDEEM - points);
+
+  // Count unique stores
+  const uniqueStores = new Set(orders.map(o => o.client_name).filter(Boolean)).size;
+
+  // Tracking start date
+  const trackingDate = orders.length > 0
+    ? new Date(orders[orders.length - 1].created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' })
+    : new Date().toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  // Update hero
+  document.getElementById('wallet-hero-pts').textContent = points.toLocaleString();
+  document.getElementById('wallet-hero-ugx').textContent = `= UGX ${ugxValue.toLocaleString()}`;
+  document.getElementById('wallet-tracking-date').textContent = `Tracking from ${trackingDate}`;
+  document.getElementById('wallet-progress-label').textContent = `${points} / ${WALLET_MIN_REDEEM}`;
+  document.getElementById('wallet-progress-fill').style.width = pct + '%';
+  document.getElementById('wallet-progress-sub').textContent = needed > 0
+    ? `${needed} more points needed to redeem`
+    : 'You are eligible to redeem!';
+  document.getElementById('wallet-stat-items').textContent = totalItems;
+  document.getElementById('wallet-stat-stores').textContent = uniqueStores;
+
+  // Alert text
+  const alertEl = document.getElementById('wallet-alert-not-eligible');
+  const alertText = document.getElementById('wallet-alert-text');
+  if (points >= WALLET_MIN_REDEEM) {
+    alertEl.className = 'alert ag';
+    alertEl.querySelector('svg').setAttribute('stroke', 'currentColor');
+    alertText.innerHTML = `🎉 You have <strong>${points} points (UGX ${ugxValue.toLocaleString()})</strong> — you are eligible to request a payout!`;
+  } else {
+    alertEl.className = 'alert aw';
+    alertText.innerHTML = `You need <strong>${WALLET_MIN_REDEEM} points (UGX ${(WALLET_MIN_REDEEM * WALLET_UGX_PER_POINT).toLocaleString()})</strong> to redeem. You currently have ${points} points — ${needed} more to go! Keep listing items.`;
+  }
+
+  // Redeem card
+  document.getElementById('redeem-current-pts').textContent = `${points} pts`;
+  document.getElementById('redeem-still-needed').textContent = `${needed} pts`;
+
+  if (points >= WALLET_MIN_REDEEM) {
+    document.getElementById('wallet-redeem-body').style.display = 'none';
+    document.getElementById('wallet-eligible-body').style.display = 'block';
+    document.getElementById('wallet-eligible-ugx').textContent = `UGX ${ugxValue.toLocaleString()}`;
+    document.getElementById('wallet-eligible-pts').textContent = `${points} points confirmed`;
+    document.getElementById('wm-payout-amount').textContent = `UGX ${ugxValue.toLocaleString()}`;
+    document.getElementById('wm-payout-pts').textContent = `${points} points will be deducted`;
+    document.getElementById('wm-confirm-amount').textContent = `UGX ${ugxValue.toLocaleString()}`;
+    document.getElementById('wm-confirm-pts').textContent = `${points} pts`;
+  } else {
+    document.getElementById('wallet-redeem-body').style.display = 'block';
+    document.getElementById('wallet-eligible-body').style.display = 'none';
+  }
+
+  // Recent earnings — show last 3 orders with items
+  const recent = orders.slice(0, 3);
+  if (recent.length === 0) {
+    document.getElementById('wallet-recent-earnings').innerHTML = '<div class="empty-state">No confirmed listings yet.</div>';
+    document.getElementById('wallet-earnings-badge').textContent = '+0 pts this month';
+  } else {
+    // Fetch items for recent orders
+    const recentIds = recent.map(o => o.id);
+    const { data: recentItems } = await sb.from('order_items').select('*').in('order_id', recentIds).limit(20);
+    const itemsMap = {};
+    (recentItems || []).forEach(i => {
+      if (!itemsMap[i.order_id]) itemsMap[i.order_id] = [];
+      itemsMap[i.order_id].push(i);
+    });
+
+    let earningsHtml = '';
+    recent.forEach(o => {
+      const items = itemsMap[o.id] || [];
+      const ptsEarned = (Number(o.item_count || 0)) * WALLET_POINTS_PER_ITEM;
+      const dateStr = new Date(o.created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
+      earningsHtml += `
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
+          <div class="tl-icon tl-earn">✓</div>
+          <div style="flex:1;">
+            <div style="font-size:12.5px;font-weight:500;">${o.client_name || '—'} — ${o.item_count || 0} items</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:2px;">${dateStr} · Listed items confirmed</div>
+          </div>
+          <div class="tl-amount earn" style="font-size:13px;font-weight:600;">+${ptsEarned} pts</div>
+        </div>`;
+    });
+    document.getElementById('wallet-recent-earnings').innerHTML = earningsHtml;
+
+    // Calculate this month's points
+    const thisMonth = new Date().toISOString().slice(0, 7);
+    const monthItems = orders
+      .filter(o => (o.created_at || '').startsWith(thisMonth))
+      .reduce((s, o) => s + Number(o.item_count || 0), 0);
+    document.getElementById('wallet-earnings-badge').textContent = `+${monthItems * WALLET_POINTS_PER_ITEM} pts this month`;
+  }
+}
+
+async function loadWalletEarningsAll() {
+  const { data: allOrders } = await sb
+    .from('orders')
+    .select('id, item_count, order_date, client_name, created_at')
+    .eq('created_by', currentUser.id)
+    .in('status', ['submitted', 'fulfilled', 'partial'])
+    .order('created_at', { ascending: false });
+
+  const orders = allOrders || [];
+  if (orders.length === 0) {
+    document.getElementById('wallet-recent-earnings').innerHTML = '<div class="empty-state">No confirmed listings yet.</div>';
+    return;
+  }
+  let html = '';
+  orders.forEach(o => {
+    const ptsEarned = Number(o.item_count || 0) * WALLET_POINTS_PER_ITEM;
+    const dateStr = new Date(o.created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
+    html += `
+      <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
+        <div class="tl-icon tl-earn">✓</div>
+        <div style="flex:1;">
+          <div style="font-size:12.5px;font-weight:500;">${o.client_name || '—'} — ${o.item_count || 0} items</div>
+          <div style="font-size:11px;color:var(--txt3);margin-top:2px;">${dateStr} · Listed items confirmed</div>
+        </div>
+        <div class="tl-amount earn" style="font-size:13px;font-weight:600;">+${ptsEarned} pts</div>
+      </div>`;
+  });
+  document.getElementById('wallet-recent-earnings').innerHTML = html;
+}
+
+async function loadAdminWallet() {
+  const { data: allUsers } = await sb.from('users').select('id,full_name,email,role').order('full_name');
+  const reps = (allUsers || []).filter(u => u.role === 'sales_rep' && u.is_active !== false);
+
+  const { data: allOrders } = await sb
+    .from('orders')
+    .select('id, item_count, created_by, client_name, client_id')
+    .in('status', ['submitted', 'fulfilled', 'partial']);
+
+  const orders = allOrders || [];
+  const repStats = {};
+  reps.forEach(u => {
+    repStats[u.id] = { name: u.full_name, items: 0, points: 0, ugx: 0, redeemed: 0, stores: new Set() };
+  });
+  orders.forEach(o => {
+    if (o.created_by && repStats[o.created_by]) {
+      const items = Number(o.item_count || 0);
+      repStats[o.created_by].items += items;
+      repStats[o.created_by].points += items * WALLET_POINTS_PER_ITEM;
+      repStats[o.created_by].ugx += items * WALLET_POINTS_PER_ITEM * WALLET_UGX_PER_POINT;
+      if (o.client_name) repStats[o.created_by].stores.add(o.client_name);
+    }
+  });
+
+  const repList = Object.entries(repStats).sort((a, b) => b[1].points - a[1].points);
+  const totalPoints = repList.reduce((s, [, r]) => s + r.points, 0);
+  const eligibleCount = repList.filter(([, r]) => r.points >= WALLET_MIN_REDEEM).length;
+
+  document.getElementById('wadmin-total-pts').textContent = totalPoints.toLocaleString();
+  document.getElementById('wadmin-eligible').textContent = eligibleCount;
+  document.getElementById('wadmin-leaderboard-month').textContent =
+    new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  // ── Leaderboard ──
+  const avColors = [
+    {bg:'var(--royal-light)',txt:'var(--royal)'},
+    {bg:'#EAF3DE',txt:'#3B6D11'},
+    {bg:'#FAEEDA',txt:'#854F0B'},
+    {bg:'#FBEAF0',txt:'#993556'},
+    {bg:'#E1F5EE',txt:'#0F6E56'},
+  ];
+  const medals = ['🥇','🥈','🥉'];
+  const maxPts = repList[0]?.[1]?.points || 1;
+
+  if (repList.length === 0) {
+    document.getElementById('wadmin-leaderboard-list').innerHTML = '<div class="empty-state">No reps found.</div>';
+  } else {
+    document.getElementById('wadmin-leaderboard-list').innerHTML = repList.slice(0, 8).map(([repId, s], i) => {
+      const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+      const barPct = maxPts > 0 ? Math.round((s.points / maxPts) * 100) : 0;
+      const ci = i % 5;
+      const eligible = s.points >= WALLET_MIN_REDEEM;
+      return `<div class="earner-row">
+        <div class="earner-rank">${medals[i] || i + 1}</div>
+        <div class="earner-av" style="background:${avColors[ci].bg};color:${avColors[ci].txt};">${initials}</div>
+        <div class="earner-info">
+          <div class="earner-name">${s.name}</div>
+          <div class="earner-pts">${s.points} pts · ${s.items} item${s.items !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="earner-bar-wrap">
+          <div class="earner-bar">
+            <div class="earner-bar-fill" style="width:${barPct}%;background:${eligible ? '#1D9E75' : 'var(--royal)'};"></div>
+          </div>
+        </div>
+        <div class="earner-ugx" style="color:${eligible ? '#1D9E75' : 'var(--royal)'};">${s.ugx > 0 ? s.ugx.toLocaleString() : '0'}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Desktop table ──
+  const tbody = document.getElementById('wadmin-reps-tbody');
+  // ── Mobile cards ──
+  const cardsEl = document.getElementById('wadmin-reps-cards');
+
+  if (repList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;">No sales reps found.</td></tr>';
+    cardsEl.innerHTML = '<div class="empty-state">No sales reps found.</div>';
+  } else {
+    // Desktop rows
+    tbody.innerHTML = repList.map(([repId, s]) => {
+      const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+      const isEligible = s.points >= WALLET_MIN_REDEEM;
+      const shortfall = WALLET_MIN_REDEEM - s.points;
+      return `<tr>
+        <td><div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--royal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">${initials}</div>
+          ${s.name}
+        </div></td>
+        <td>${s.items}</td>
+        <td style="font-weight:600;color:var(--royal);">${s.points}</td>
+        <td>UGX ${s.ugx.toLocaleString()}</td>
+        <td>UGX ${s.redeemed.toLocaleString()}</td>
+        <td style="font-weight:600;">UGX ${s.ugx.toLocaleString()}</td>
+        <td>${isEligible
+          ? '<span class="badge bg">Eligible ✓</span>'
+          : `<span class="badge br">${shortfall} pts short</span>`}
+        </td>
+        <td><button class="btn btn-sm ${isEligible ? 'btn-green' : ''}"
+          ${isEligible
+            ? `onclick="adminApproveWalletPayout('${repId}','${s.name.replace(/'/g,"\\'")}',${s.ugx},${s.points})"`
+            : 'style="opacity:0.4;" disabled'}>
+          Pay out
+        </button></td>
+      </tr>`;
+    }).join('');
+
+    // Mobile rep cards
+    cardsEl.innerHTML = repList.map(([repId, s], i) => {
+      const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+      const isEligible = s.points >= WALLET_MIN_REDEEM;
+      const shortfall = WALLET_MIN_REDEEM - s.points;
+      const pct = Math.min(100, Math.round((s.points / WALLET_MIN_REDEEM) * 100));
+      const ci = i % 5;
+      return `
+        <div style="padding:14px 0;border-bottom:0.5px solid var(--brd);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div style="width:42px;height:42px;border-radius:50%;background:${avColors[ci].bg};color:${avColors[ci].txt};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">${initials}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div>
+              <div style="font-size:10.5px;color:var(--txt3);margin-top:1px;">${s.items} item${s.items!==1?'s':''} confirmed</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:17px;font-weight:700;color:${isEligible?'#1D9E75':'var(--royal)'};">${s.points}<span style="font-size:11px;font-weight:500;"> pts</span></div>
+              <div style="font-size:10px;color:var(--txt3);">UGX ${s.ugx.toLocaleString()}</div>
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--txt3);margin-bottom:4px;">
+              <span>Progress to 500 pts</span>
+              <span style="font-weight:600;color:${isEligible?'#1D9E75':'var(--royal)'};">${pct}%</span>
+            </div>
+            <div style="height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;border-radius:3px;background:${isEligible?'#1D9E75':'var(--royal)'};transition:width 0.4s;"></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            ${isEligible
+              ? `<span class="badge bg" style="font-size:11px;">✓ Eligible for payout</span>
+                 <button class="btn btn-sm btn-green" onclick="adminApproveWalletPayout('${repId}','${s.name.replace(/'/g,"\\'")}',${s.ugx},${s.points})" style="white-space:nowrap;padding:6px 14px;">Pay out →</button>`
+              : `<span class="badge br" style="font-size:11px;">Needs ${shortfall} more pts</span>
+                 <button class="btn btn-sm" style="opacity:0.4;cursor:not-allowed;white-space:nowrap;" disabled>Pay out</button>`
+            }
+          </div>
+        </div>`;
+    }).join('');
+  }
+}
+
+function exportWalletCSV() {
+  if (isSalesRep()) return;
+  const tbody = document.getElementById('wadmin-reps-tbody');
+  if (!tbody) return;
+  const rows = [['Rep', 'Items Confirmed', 'Points', 'UGX Value', 'Redeemed', 'Balance', 'Eligible']];
+  tbody.querySelectorAll('tr').forEach(tr => {
+    const cells = [...tr.querySelectorAll('td')].map(td => td.innerText.trim());
+    if (cells.length > 1) rows.push(cells.slice(0, 7));
+  });
+  const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'KTL_Wallet_Summary.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function adminApproveWalletPayout(repId, repName, ugxAmount, points) {
+  showConfirmDialog({
+    icon: '💰',
+    title: 'Approve Payout',
+    message: `Approve payout of <strong>UGX ${ugxAmount.toLocaleString()}</strong> (${points} pts) for <strong>${repName}</strong>? This action is recorded and cannot be undone.`,
+    confirmLabel: 'Approve & Record',
+    confirmStyle: 'background:#1D9E75;color:#fff;border:none;',
+    onConfirm: async () => {
+      // Record in payout_requests table if it exists, else just alert
+      try {
+        await sb.from('payout_requests').insert({
+          rep_id: repId, rep_name: repName, amount_ugx: ugxAmount,
+          points_used: points, status: 'approved', approved_by: currentUser?.id,
+          approved_at: new Date().toISOString()
+        });
+      } catch (e) { /* table may not exist yet */ }
+      alert(`✅ Payout approved for ${repName}. Please complete the mobile money transfer manually via 0763371564.`);
+      await loadAdminWallet();
+    }
+  });
+}
+
+// ─── WALLET REDEEM MODAL ──────────────────────────────────────────────────────
+function openWalletRedeemModal() {
+  _walletStep = 1;
+  document.getElementById('wallet-redeem-modal').style.display = 'flex';
+  document.getElementById('wm-step1').style.display = 'block';
+  document.getElementById('wm-step2').style.display = 'none';
+  document.getElementById('wm-step3').style.display = 'none';
+  document.getElementById('wm-footer').style.display = 'flex';
+  document.getElementById('wm-next-btn').textContent = 'Continue →';
+  document.getElementById('wm-phone').value = '';
+  document.getElementById('wm-phone').style.borderColor = '';
+}
+
+function closeWalletRedeemModal() {
+  document.getElementById('wallet-redeem-modal').style.display = 'none';
+  _walletStep = 1;
+}
+
+function walletModalNext() {
+  if (_walletStep === 1) {
+    const num = document.getElementById('wm-phone').value.trim();
+    if (!num) {
+      document.getElementById('wm-phone').focus();
+      document.getElementById('wm-phone').style.borderColor = '#A32D2D';
+      return;
+    }
+    document.getElementById('wm-phone').style.borderColor = '';
+    document.getElementById('wm-confirm-number').textContent = num;
+    document.getElementById('wm-success-number').textContent = num;
+    document.getElementById('wm-step1').style.display = 'none';
+    document.getElementById('wm-step2').style.display = 'block';
+    document.getElementById('wm-next-btn').textContent = 'Submit Request';
+    // Activate step 2 indicator
+    const s2 = document.getElementById('wm-step2-indicator');
+    s2.querySelector('div').style.cssText = 'width:28px;height:28px;border-radius:50%;background:var(--royal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin:0 auto 5px;';
+    s2.querySelectorAll('div')[1].style.cssText = 'font-size:10.5px;color:var(--royal);font-weight:600;';
+    _walletStep = 2;
+  } else if (_walletStep === 2) {
+    // Save payout request to Supabase
+    sb.from('payout_requests').insert({
+      rep_id: currentUser?.id, rep_name: currentUser?.full_name,
+      mobile_number: document.getElementById('wm-confirm-number').textContent,
+      amount_ugx: _walletPoints * WALLET_UGX_PER_POINT,
+      points_used: _walletPoints, status: 'pending',
+      requested_at: new Date().toISOString()
+    }).then(() => {}).catch(() => {});
+    document.getElementById('wm-step2').style.display = 'none';
+    document.getElementById('wm-step3').style.display = 'block';
+    document.getElementById('wm-footer').innerHTML = '<button class="btn btn-green" style="flex:1;justify-content:center;padding:12px 24px;font-size:13px;font-weight:600;border-radius:10px;" onclick="closeWalletRedeemModal()">Done</button>';
+    const s3 = document.getElementById('wm-step3-indicator');
+    s3.querySelector('div').style.cssText = 'width:28px;height:28px;border-radius:50%;background:#1D9E75;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin:0 auto 5px;';
+    _walletStep = 3;
+  }
+}
+
+document.getElementById('wallet-redeem-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeWalletRedeemModal();
+});
+
 </script>
 </body>
 </html>
