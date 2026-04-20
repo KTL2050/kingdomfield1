@@ -997,8 +997,8 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                 <select class="fin" id="brand-assign-brand" style="flex:1;">
                   <option value="">— Select brand —</option>
                   <option value="UBL">UBL</option>
-                  <option value="AWIBI">AWIBI</option>
-                  <option value="AWINA">AWINA</option>
+                  <option value="AIWIBI">AIWIBI</option>
+                  <option value="AIWINA">AIWINA</option>
                 </select>
                 <button class="btn btn-sm btn-royal" onclick="assignBrandToSelectedClients()" style="white-space:nowrap;flex-shrink:0;">Assign to All Selected</button>
               </div>
@@ -1020,7 +1020,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                 <option value="t250">T250 — UBL</option>
                 <option value="slobs">SLOBS — UBL</option>
                 <option value="new_items">NEW ITEMS — UBL</option>
-                <option value="awibi_awina">AWIBI / AWINA</option>
+                <option value="aiwibi_awina">AIWIBI / AIWINA</option>
               </select>
               <button class="btn btn-sm btn-royal" onclick="showAddSkuForm()">+ Add SKU</button>
               <button class="btn btn-sm" onclick="showBulkSkuImport()">↑ Bulk Import</button>
@@ -1039,7 +1039,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                   <option value="t250">T250 (UBL)</option>
                   <option value="slobs">SLOBS (UBL)</option>
                   <option value="new_items">NEW ITEMS (UBL)</option>
-                  <option value="awibi_awina">AWIBI / AWINA</option>
+                  <option value="aiwibi_awina">AIWIBI / AIWINA</option>
                 </select>
               </div>
               <div class="fg"><label class="flbl">SKU</label><input class="fin" id="add-sku-code" placeholder="e.g. AG0001"/></div>
@@ -1058,7 +1058,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                 <option value="t250">T250 (UBL)</option>
                 <option value="slobs">SLOBS (UBL)</option>
                 <option value="new_items">NEW ITEMS (UBL)</option>
-                <option value="awibi_awina">AWIBI / AWINA</option>
+                <option value="aiwibi_awina">AIWIBI / AIWINA</option>
               </select>
               <label class="flbl">Paste SKUs (one per line — optionally: SKU,Item Name)</label>
               <textarea class="fin" id="bulk-sku-text" rows="8" placeholder="AG0001,UBL Detergent 1kg&#10;AG0002,UBL Powder 500g&#10;AG0003" style="resize:vertical;font-family:'SF Mono','Courier New',monospace;font-size:12px;margin-top:4px;"></textarea>
@@ -1216,14 +1216,14 @@ let lastSavedListingClient = '';
 // ─── BRAND / LISTING TABLE CONFIG ─────────────────────────────────────────────
 const BRAND_TABLE_MAP = {
   'UBL':   ['t250', 'slobs', 'new_items'],
-  'AWIBI': ['awibi_awina'],
-  'AWINA': ['awibi_awina'],
+  'AIWIBI': ['aiwibi_awina'],
+  'AIWINA': ['aiwibi_awina'],
 };
 const TABLE_META = {
   t250:        { label: 'T250',        badgeClass: 'bb'    },
   slobs:       { label: 'SLOBS',       badgeClass: 'ba'    },
   new_items:   { label: 'NEW ITEMS',   badgeClass: 'bg'    },
-  awibi_awina: { label: 'AWIBI/AWINA', badgeClass: 'bgold' },
+  aiwibi_awina: { label: 'AIWIBI/AIWINA', badgeClass: 'bgold' },
 };
 let _skuCache       = {};
 let _clientBrandCache = {};
@@ -1828,7 +1828,7 @@ async function loadListableItems(clientId) {
   const client = allClients.find(c=>c.id===id);
   const clientBrands = await getClientBrands(id);
   if (clientBrands.length===0) {
-    tableEl.innerHTML = `<div style="padding:30px 20px;text-align:center;"><div style="font-size:28px;margin-bottom:10px;">🏷️</div><div style="font-weight:600;font-size:13px;margin-bottom:6px;">No brands assigned to this client</div><div style="font-size:12px;color:var(--txt3);line-height:1.6;">${canAdmin() ? `<button class="btn btn-sm btn-royal" onclick="goTo('admin')">Go to Admin → Assign Brands</button>` : 'Ask your admin to assign brands to this client.'}</div></div>`;
+    tableEl.innerHTML = `<div style="padding:30px 20px;text-align:center;"><div style="font-size:28px;margin-bottom:10px;">🏷️</div><div style="font-weight:600;font-size:13px;margin-bottom:6px;">No brands assigned to this client</div><div style="font-size:12px;color:var(--txt3);">${canAdmin() ? `<button class="btn btn-sm btn-royal" onclick="goTo('admin')">Go to Admin → Assign Brands</button>` : 'Ask your admin to assign brands to this client.'}</div></div>`;
     return;
   }
   const tablesToQuery = new Set();
@@ -1844,6 +1844,24 @@ async function loadListableItems(clientId) {
     tableEl.innerHTML = `<div style="padding:30px 20px;text-align:center;"><div style="font-size:28px;margin-bottom:10px;">📋</div><div style="font-weight:600;font-size:13px;margin-bottom:6px;">Listing tables are empty</div></div>`;
     return;
   }
+
+  // ── BUILD ROBUST PRODUCT LOOKUP (SKU + name fallback) ──
+  const productBySku  = {};
+  const productByName = {};
+  allProducts.forEach(p => {
+    if (p.sku)  productBySku[p.sku.trim().toLowerCase()]   = p;
+    if (p.name) productByName[p.name.trim().toLowerCase()] = p;
+  });
+
+  function findProduct(skuRow) {
+    const skuKey  = skuRow.sku.trim().toLowerCase();
+    const nameKey = (skuRow.item_name || '').trim().toLowerCase();
+    return productBySku[skuKey]
+        || productByName[skuKey]      // sometimes SKU col holds the name
+        || (nameKey ? productBySku[nameKey] || productByName[nameKey] : null)
+        || null;
+  }
+
   const clientObj = allClients.find(c=>c.id===id);
   const zohoId2 = clientObj?.zoho_customer_id;
   let histData, histError;
@@ -1856,52 +1874,57 @@ async function loadListableItems(clientId) {
     histData = r.data; histError = r.error;
   }
   if (histError) { tableEl.innerHTML=`<div style="padding:20px;text-align:center;color:#A32D2D;">Error loading history: ${histError.message}</div>`; return; }
-const purchasedCodes   = new Set();
+
+  const purchasedCodes   = new Set();
   const purchasedItemIds = new Set();
   (histData||[]).forEach(r=>{
     if (r.item_code) purchasedCodes.add(r.item_code.trim().toLowerCase());
     if (r.item_id)   purchasedItemIds.add(String(r.item_id).trim());
+    if (r.item_name) purchasedCodes.add(r.item_name.trim().toLowerCase());
   });
 
   // Also exclude SKUs already saved in KTLSALES listings for this client
   try {
     const { data: pastOrders } = await sb.from('orders')
-      .select('id')
-      .eq('client_id', String(id))
-      .in('status', ['submitted', 'fulfilled', 'partial']);
+      .select('id').eq('client_id', String(id)).in('status', ['submitted', 'fulfilled', 'partial']);
     if (pastOrders && pastOrders.length > 0) {
-      const pastOrderIds = pastOrders.map(o => o.id);
       const { data: pastItems } = await sb.from('order_items')
-        .select('sku, product_id')
-        .in('order_id', pastOrderIds);
+        .select('sku, product_id').in('order_id', pastOrders.map(o => o.id));
       (pastItems || []).forEach(item => {
         if (item.sku)        purchasedCodes.add(item.sku.trim().toLowerCase());
         if (item.product_id) purchasedItemIds.add(String(item.product_id).trim());
       });
     }
-  } catch(e) {
-    console.warn('Could not load past listing items:', e.message);
-  }
+  } catch(e) { console.warn('Could not load past listing items:', e.message); }
 
   const neverPurchased = uniqueSkuRows.filter(skuRow=>{
-    const codeBought = purchasedCodes.has(skuRow.sku.trim().toLowerCase());
-    const product    = allProducts.find(p=>p.sku?.trim().toLowerCase()===skuRow.sku.trim().toLowerCase());
+    const product    = findProduct(skuRow);
+    const codeBought = purchasedCodes.has(skuRow.sku.trim().toLowerCase())
+                    || purchasedCodes.has((skuRow.item_name||'').trim().toLowerCase());
     const idBought   = product && purchasedItemIds.has(String(product.id).trim());
     return !codeBought && !idBought;
   });
+
   const enriched = neverPurchased.map(skuRow=>{
-    const product = allProducts.find(p=>p.sku?.trim().toLowerCase()===skuRow.sku.trim().toLowerCase());
+    const product = findProduct(skuRow);
     return {
-      sku: skuRow.sku, item_name: skuRow.item_name || product?.name || '—', _table: skuRow._table,
-      product_id: product?.id || null, available_stock: product?.stock_on_hand ?? product?.available_stock ?? null, rate: product?.rate ?? null, in_catalogue: !!product,
+      sku:             skuRow.sku,
+      item_name:       skuRow.item_name || product?.name || '—',
+      _table:          skuRow._table,
+      product_id:      product?.id   ?? null,
+      available_stock: product ? (product.stock_on_hand ?? product.available_stock ?? 0) : null,
+      rate:            product?.rate ?? null,
+      in_catalogue:    !!product,
     };
   });
+
   const inCatalogue    = enriched.filter(e=>e.in_catalogue);
   const notInCatalogue = enriched.filter(e=>!e.in_catalogue);
-  const brandColors  = {UBL:'bb', AWIBI:'bgold', AWINA:'bg'};
+  const brandColors  = {UBL:'bb', AIWIBI:'bgold', AIWINA:'bg'};
   const brandBadges  = clientBrands.map(b=>`<span class="badge ${brandColors[b]||'bb'}">${b}</span>`).join(' ');
   const tableNames   = [...tablesToQuery].map(t=>TABLE_META[t]?.label||t).join(', ');
   const tableBadge = t => { const m = TABLE_META[t]; if(!m) return `<span class="badge bb">${t}</span>`; return `<span class="badge ${m.badgeClass}" style="font-size:9.5px;">${m.label}</span>`; };
+
   tableEl.innerHTML = `
     <div style="margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <span style="font-size:11.5px;font-weight:600;color:var(--txt2);">Brands stocked:</span>
@@ -1918,23 +1941,57 @@ const purchasedCodes   = new Set();
         <option value="">All tables</option>
         ${[...tablesToQuery].map(t=>`<option value="${t}">${TABLE_META[t]?.label||t}</option>`).join('')}
       </select>
-      <div style="font-size:11px;color:var(--txt3);white-space:nowrap;"><strong style="color:var(--royal);">${inCatalogue.length}</strong> to list · <strong style="color:var(--txt3);">${notInCatalogue.length}</strong> not in catalogue</div>
+      <div style="font-size:11px;color:var(--txt3);white-space:nowrap;"><strong style="color:var(--royal);">${inCatalogue.length}</strong> to list · <strong style="color:var(--txt3);">${notInCatalogue.length}</strong> not matched in Zoho catalogue</div>
     </div>
     ${inCatalogue.length===0
       ? `<div style="padding:24px;text-align:center;"><div style="font-size:28px;margin-bottom:8px;">🎉</div><div style="font-weight:600;font-size:13px;margin-bottom:5px;">All listing SKUs purchased!</div></div>`
       : `<div style="overflow-x:auto;"><table id="listable-table"><thead><tr><th>SKU</th><th>Product</th><th>Table</th><th>Stock</th><th></th></tr></thead><tbody id="listable-tbody">${renderListableRows(inCatalogue, id)}</tbody></table></div>`
     }
-    ${notInCatalogue.length>0 ? `<div style="margin-top:14px;"><div class="alert aw" style="font-size:11.5px;"><span style="flex-shrink:0;">●</span><span><strong>${notInCatalogue.length} SKU${notInCatalogue.length>1?'s':''}</strong> in listing tables but not yet in catalogue.</span></div></div>` : ''}`;
-  window._listableItems = inCatalogue;
+    ${notInCatalogue.length>0 ? `
+      <div style="margin-top:14px;">
+        <div class="alert aw" style="font-size:11.5px;margin-bottom:8px;">
+          <span style="flex-shrink:0;">⚠️</span>
+          <span><strong>${notInCatalogue.length} SKU${notInCatalogue.length>1?'s':''}</strong> in your listing tables could not be matched to a Zoho product. This usually means the SKU in your listing table doesn't exactly match the SKU in Zoho. <strong>To fix: go to Admin → SKU Listing Tables → edit the SKU to match exactly what Zoho uses.</strong></span>
+        </div>
+        <details style="cursor:pointer;">
+          <summary style="font-size:11.5px;font-weight:600;color:var(--txt2);padding:6px 0;">Show unmatched SKUs (${notInCatalogue.length})</summary>
+          <div style="overflow-x:auto;margin-top:8px;">
+          <table style="font-size:12px;">
+            <thead><tr><th>SKU in listing table</th><th>Item name in listing table</th><th>Table</th><th>Fix needed</th></tr></thead>
+            <tbody>
+              ${notInCatalogue.map(e=>`<tr style="background:var(--bg2);">
+                <td class="mono">${e.sku}</td>
+                <td style="color:var(--txt2);">${e.item_name||'—'}</td>
+                <td>${tableBadge(e._table)}</td>
+                <td style="font-size:10.5px;color:#854F0B;">SKU not found in Zoho products — check spelling/format</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+          </div>
+        </details>
+      </div>` : ''}`;
+  window._listableItems = enriched;
   window._listableClientId = id;
   window._listableTableBadge = tableBadge;
 }
 
 function renderListableRows(items, clientId) {
-  if (!items||items.length===0) return '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--txt3);">No items match your filters.</td></tr>';
+  if (!items||items.length===0) return '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--txt3);">No items match your filters.</td></tr>';
   const tableBadge = window._listableTableBadge || (t=>`<span class="badge bb">${t}</span>`);
   return items.map(e=>{
     const stock = e.available_stock??0;
+    
+    if (!e.in_catalogue) {
+      // SKU is in listing table but not in products catalogue
+      return `<tr style="opacity:0.65;background:var(--bg2);">
+        <td class="mono">${e.sku}</td>
+        <td style="font-weight:500;">${(e.item_name||'').slice(0,42)}<br><span style="font-size:10px;color:#854F0B;">⚠ Not in product catalogue — sync from Zoho to add</span></td>
+        <td>${tableBadge(e._table)}</td>
+        <td><span class="badge ba">Not in catalogue</span></td>
+        <td><span style="font-size:10.5px;color:var(--txt3);">Sync needed</span></td>
+      </tr>`;
+    }
+    
     const stockBadge = stock<=0 ? `<span class="badge br"><span class="stock-dot si-out"></span>No stock</span>` : stock<10 ? `<span class="badge ba"><span class="stock-dot si-low"></span>Low (${stock})</span>` : `<span class="badge bg"><span class="stock-dot si-in"></span>${stock} avail.</span>`;
     const actionBtn = stock>0 && e.product_id ? `<button class="btn btn-sm btn-royal" onclick="goToListingForClient('${clientId}','${e.product_id}')">List</button>` : `<span style="font-size:10.5px;color:var(--txt3);">Out of stock</span>`;
     return `<tr><td class="mono">${e.sku}</td><td style="font-weight:500;">${(e.item_name||'').slice(0,42)}</td><td>${tableBadge(e._table)}</td><td>${stockBadge}</td><td>${actionBtn}</td></tr>`;
@@ -2093,12 +2150,12 @@ async function loadClientProducts(preselectedProductId=null){
         already_bought:  codeBought || idBought,
       };
     })
-    .filter(e=>e.in_catalogue && !e.already_bought);
+    .filter(e=>!e.already_bought);
 
   _listingScreenItems = enriched;
 
   // 5. Build info banner
-  const brandColors = {UBL:'bb',AWIBI:'bgold',AWINA:'bg'};
+  const brandColors = {UBL:'bb', AIWIBI:'bgold', AIWINA:'bg'};
   const brandBadges = clientBrands.map(b=>`<span class="badge ${brandColors[b]||'bb'}">${b}</span>`).join(' ');
   const tableBadges = [...tablesToQuery].map(t=>{
     const m=TABLE_META[t];
@@ -2894,7 +2951,7 @@ async function assignBrandToSelectedClients() {
   }
 
   // Show result summary
-  const colors = { UBL: 'bb', AWIBI: 'bgold', AWINA: 'bg' };
+  const colors = { UBL: 'bb', AIWIBI: 'bgold', AIWINA: 'bg' };
   view.innerHTML = `
     <div style="margin-bottom:10px;">
       <div style="font-size:12px;font-weight:600;color:var(--txt2);margin-bottom:8px;">
@@ -2940,15 +2997,95 @@ async function removeBrandFromClient(clientId, brand) {
 async function loadSkuListView() {
   const tableName = document.getElementById('sku-list-view-type')?.value; if(!tableName) return;
   invalidateSkuCache(tableName);
-  const el = document.getElementById('sku-list-view');
-  el.innerHTML = '<div class="empty-state">Loading...</div>';
+  const el = document.getElementById('sku-list-view'); el.innerHTML = '<div class="empty-state">Loading...</div>';
   const { data, error } = await sb.from(tableName).select('*').order('sku');
   if (error) { el.innerHTML=`<div class="empty-state" style="color:#A32D2D;">Error: ${error.message}</div>`; return; }
   const rows = data||[];
   if (rows.length===0) { el.innerHTML=`<div class="empty-state">No SKUs in <strong>${TABLE_META[tableName]?.label||tableName}</strong> yet.</div>`; return; }
-  el.innerHTML = `<div style="overflow-x:auto;margin-top:8px;"><table><thead><tr><th>SKU</th><th>Item Name</th><th>Added</th><th></th></tr></thead>
-    <tbody>${rows.map(r=>`<tr><td class="mono">${r.sku}</td><td>${r.item_name||'—'}</td><td style="font-size:11px;color:var(--txt3);">${r.created_at?new Date(r.created_at).toLocaleDateString():'—'}</td><td><button class="btn btn-sm btn-danger" onclick="deleteSkuFromList('${tableName}','${r.id}','${r.sku}')">Remove</button></td></tr>`).join('')}</tbody></table></div>
-  <div style="font-size:11px;color:var(--txt3);margin-top:8px;">${rows.length} SKUs in this list</div>`;
+  el.innerHTML = `
+    <div style="overflow-x:auto;margin-top:8px;">
+      <table>
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Item Name</th>
+            <th>Added</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(r=>`
+            <tr id="sku-row-${r.id}">
+              <td class="mono">${r.sku}</td>
+              <td>
+                <div id="sku-name-display-${r.id}" style="display:flex;align-items:center;gap:6px;">
+                  <span style="color:${r.item_name ? 'var(--txt)' : 'var(--txt3)'};">${r.item_name||'— click to add name'}</span>
+                  <button onclick="startEditSkuName('${r.id}','${(r.item_name||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}')"
+                    style="background:none;border:none;cursor:pointer;color:var(--royal);font-size:11px;padding:2px 6px;border-radius:5px;opacity:0.7;white-space:nowrap;"
+                    title="Edit name">✏️ Edit</button>
+                </div>
+                <div id="sku-name-edit-${r.id}" style="display:none;align-items:center;gap:6px;">
+                  <input id="sku-name-input-${r.id}" type="text" value="${r.item_name||''}"
+                    placeholder="Enter item name..."
+                    style="flex:1;padding:5px 9px;border:1px solid var(--royal);border-radius:7px;font-size:12.5px;font-family:inherit;outline:none;min-width:180px;"
+                    onkeydown="if(event.key==='Enter')saveSkuName('${tableName}','${r.id}');if(event.key==='Escape')cancelEditSkuName('${r.id}')"/>
+                  <button onclick="saveSkuName('${tableName}','${r.id}')"
+                    style="padding:5px 11px;background:var(--royal);color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;">Save</button>
+                  <button onclick="cancelEditSkuName('${r.id}')"
+                    style="padding:5px 9px;background:transparent;border:0.5px solid var(--brd2);border-radius:7px;cursor:pointer;font-size:12px;color:var(--txt2);white-space:nowrap;">Cancel</button>
+                </div>
+              </td>
+              <td style="font-size:11px;color:var(--txt3);">${r.created_at?new Date(r.created_at).toLocaleDateString():'—'}</td>
+              <td><button class="btn btn-sm btn-danger" onclick="deleteSkuFromList('${tableName}','${r.id}','${r.sku}')">Remove</button></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:11px;color:var(--txt3);margin-top:8px;">${rows.length} SKUs in this list</div>`;
+}
+
+function startEditSkuName(id, currentName) {
+  document.getElementById(`sku-name-display-${id}`).style.display = 'none';
+  const editRow = document.getElementById(`sku-name-edit-${id}`);
+  editRow.style.display = 'flex';
+  const input = document.getElementById(`sku-name-input-${id}`);
+  input.value = currentName;
+  input.focus();
+  input.select();
+}
+
+function cancelEditSkuName(id) {
+  document.getElementById(`sku-name-display-${id}`).style.display = 'flex';
+  document.getElementById(`sku-name-edit-${id}`).style.display = 'none';
+}
+
+async function saveSkuName(tableName, id) {
+  const input = document.getElementById(`sku-name-input-${id}`);
+  const newName = input.value.trim();
+  const saveBtn = input.nextElementSibling;
+  const origText = saveBtn.textContent;
+  saveBtn.textContent = '...'; saveBtn.disabled = true;
+
+  const { error } = await sb.from(tableName).update({ item_name: newName || null }).eq('id', id);
+
+  if (error) {
+    alert('Error saving name: ' + error.message);
+    saveBtn.textContent = origText; saveBtn.disabled = false;
+    return;
+  }
+
+  invalidateSkuCache(tableName);
+
+  // Update display in-place without full reload
+  const displayEl = document.getElementById(`sku-name-display-${id}`);
+  displayEl.querySelector('span').textContent = newName || '— click to add name';
+  displayEl.querySelector('span').style.color = newName ? 'var(--txt)' : 'var(--txt3)';
+
+  // Update the edit button's onclick to use the new name
+  displayEl.querySelector('button').setAttribute('onclick',
+    `startEditSkuName('${id}','${newName.replace(/'/g,"\\'")}')`);
+
+  cancelEditSkuName(id);
 }
 function showAddSkuForm(){document.getElementById('add-sku-form').classList.remove('hidden');document.getElementById('bulk-sku-form').classList.add('hidden');document.getElementById('add-sku-form').scrollIntoView({behavior:'smooth'});}
 function showBulkSkuImport(){document.getElementById('bulk-sku-form').classList.remove('hidden');document.getElementById('add-sku-form').classList.add('hidden');document.getElementById('bulk-sku-form').scrollIntoView({behavior:'smooth'});}
@@ -4179,112 +4316,158 @@ async function loadWalletScreen() {
 }
 
 async function loadRepWallet() {
-  // Count confirmed listed items for this rep
+  // Get all submitted/fulfilled listings by this rep
   const { data: repOrders } = await sb
     .from('orders')
-    .select('id, item_count, order_date, client_name, created_at')
+    .select('id, item_count, order_date, client_name, created_at, client_id')
     .eq('created_by', currentUser.id)
     .in('status', ['submitted', 'fulfilled', 'partial'])
     .order('created_at', { ascending: false });
 
   const orders = repOrders || [];
-  let totalItems = 0;
-  orders.forEach(o => { totalItems += Number(o.item_count || 0); });
-
-  const points = totalItems * WALLET_POINTS_PER_ITEM;
+  
+  let totalConfirmedItems = 0;
+  const confirmedByOrder = {};
+  const confirmedStores = new Set();
+  
+  // For each order, check which items appear in "Listed Items" (Zoho purchases)
+  for (const order of orders) {
+    const clientId = order.client_id;
+    if (!clientId) continue;
+    
+    // Get items listed in this order
+    const { data: listedItems } = await sb
+      .from('order_items')
+      .select('sku, product_id, product_name')
+      .eq('order_id', order.id);
+    
+    if (!listedItems || listedItems.length === 0) continue;
+    
+    const listedSkus = new Set(listedItems.map(i => (i.sku || '').trim().toLowerCase()).filter(Boolean));
+    
+    // Get Zoho purchase history for this client (this populates "Listed Items" tab)
+    const client = allClients.find(c => c.id === clientId);
+    const zohoId = client?.zoho_customer_id;
+    let histData = [];
+    
+    if (zohoId) {
+      const r = await sb.from('invoice_line_items')
+        .select('item_code').eq('customer_id', zohoId);
+      if (!r.error) histData = r.data || [];
+    }
+    if (!zohoId || histData.length === 0) {
+      const r = await sb.from('invoice_line_items')
+        .select('item_code').ilike('customer_name', client?.name || '');
+      if (!r.error) histData = r.data || [];
+    }
+    
+    const purchasedCodes = new Set(
+      histData.map(r => (r.item_code || '').trim().toLowerCase()).filter(Boolean)
+    );
+    
+    // Count how many listed SKUs appear in "Listed Items" (Zoho purchases)
+    let confirmedCount = 0;
+    listedSkus.forEach(sku => {
+      if (purchasedCodes.has(sku)) confirmedCount++;
+    });
+    
+    confirmedByOrder[order.id] = confirmedCount;
+    totalConfirmedItems += confirmedCount;
+    
+    if (confirmedCount > 0 && client?.name) {
+      confirmedStores.add(client.name);
+    }
+  }
+  
+  const points = totalConfirmedItems * 10;  // 10 points per confirmed item
   _walletPoints = points;
-  const ugxValue = points * WALLET_UGX_PER_POINT;
-  const pct = Math.min(100, Math.round((points / WALLET_MIN_REDEEM) * 100));
-  const needed = Math.max(0, WALLET_MIN_REDEEM - points);
-
-  // Count unique stores
-  const uniqueStores = new Set(orders.map(o => o.client_name).filter(Boolean)).size;
-
-  // Tracking start date
-  const trackingDate = orders.length > 0
-    ? new Date(orders[orders.length - 1].created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' })
-    : new Date().toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
-
-  // Update hero
+  const ugxValue = points * 100;  // 10 points = UGX 1,000, so 1 point = UGX 100
+  const pct = Math.min(100, Math.round((points / 500) * 100));
+  const needed = Math.max(0, 500 - points);
+  
+  // Unique stores with confirmed purchases
+  const uniqueStores = confirmedStores.size;
+  
+  // Tracking start date (first order with confirmed purchase)
+  let trackingDate = new Date().toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
+  for (const order of orders) {
+    if (confirmedByOrder[order.id] > 0) {
+      trackingDate = new Date(order.created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
+      break;
+    }
+  }
+  
+  // Update hero UI
   document.getElementById('wallet-hero-pts').textContent = points.toLocaleString();
   document.getElementById('wallet-hero-ugx').textContent = `= UGX ${ugxValue.toLocaleString()}`;
   document.getElementById('wallet-tracking-date').textContent = `Tracking from ${trackingDate}`;
-  document.getElementById('wallet-progress-label').textContent = `${points} / ${WALLET_MIN_REDEEM}`;
+  document.getElementById('wallet-progress-label').textContent = `${points} / 500`;
   document.getElementById('wallet-progress-fill').style.width = pct + '%';
   document.getElementById('wallet-progress-sub').textContent = needed > 0
-    ? `${needed} more points needed to redeem`
+    ? `${needed} more points needed to redeem (earn 10 points per item when store purchases it)`
     : 'You are eligible to redeem!';
-  document.getElementById('wallet-stat-items').textContent = totalItems;
+  document.getElementById('wallet-stat-items').textContent = totalConfirmedItems;
   document.getElementById('wallet-stat-stores').textContent = uniqueStores;
-
+  
   // Alert text
   const alertEl = document.getElementById('wallet-alert-not-eligible');
   const alertText = document.getElementById('wallet-alert-text');
-  if (points >= WALLET_MIN_REDEEM) {
+  if (points >= 500) {
     alertEl.className = 'alert ag';
-    alertEl.querySelector('svg').setAttribute('stroke', 'currentColor');
-    alertText.innerHTML = `🎉 You have <strong>${points} points (UGX ${ugxValue.toLocaleString()})</strong> — you are eligible to request a payout!`;
+    alertText.innerHTML = `🎉 You have <strong>${points} points (UGX ${ugxValue.toLocaleString()})</strong> from ${totalConfirmedItems} confirmed purchased items — you are eligible to request a payout!`;
   } else {
     alertEl.className = 'alert aw';
-    alertText.innerHTML = `You need <strong>${WALLET_MIN_REDEEM} points (UGX ${(WALLET_MIN_REDEEM * WALLET_UGX_PER_POINT).toLocaleString()})</strong> to redeem. You currently have ${points} points — ${needed} more to go! Keep listing items.`;
+    alertText.innerHTML = `📋 You need <strong>500 points (UGX 50,000)</strong> to redeem. You currently have ${points} points from ${totalConfirmedItems} confirmed purchased items — ${needed} more to go!<br><br>✅ Items earn 10 points ONLY when they appear in the <strong>"Listed Items" tab</strong> (store actually purchases them).`;
   }
-
+  
   // Redeem card
   document.getElementById('redeem-current-pts').textContent = `${points} pts`;
   document.getElementById('redeem-still-needed').textContent = `${needed} pts`;
-
-  if (points >= WALLET_MIN_REDEEM) {
+  
+  if (points >= 500) {
     document.getElementById('wallet-redeem-body').style.display = 'none';
     document.getElementById('wallet-eligible-body').style.display = 'block';
     document.getElementById('wallet-eligible-ugx').textContent = `UGX ${ugxValue.toLocaleString()}`;
-    document.getElementById('wallet-eligible-pts').textContent = `${points} points confirmed`;
-    document.getElementById('wm-payout-amount').textContent = `UGX ${ugxValue.toLocaleString()}`;
-    document.getElementById('wm-payout-pts').textContent = `${points} points will be deducted`;
-    document.getElementById('wm-confirm-amount').textContent = `UGX ${ugxValue.toLocaleString()}`;
-    document.getElementById('wm-confirm-pts').textContent = `${points} pts`;
+    document.getElementById('wallet-eligible-pts').textContent = `${points} points from ${totalConfirmedItems} confirmed purchases`;
   } else {
     document.getElementById('wallet-redeem-body').style.display = 'block';
     document.getElementById('wallet-eligible-body').style.display = 'none';
   }
-
-  // Recent earnings — show last 3 orders with items
-  const recent = orders.slice(0, 3);
-  if (recent.length === 0) {
-    document.getElementById('wallet-recent-earnings').innerHTML = '<div class="empty-state">No confirmed listings yet.</div>';
+  
+  // Recent earnings - show only orders with confirmed purchases
+  const earnedOrders = orders.filter(o => (confirmedByOrder[o.id] || 0) > 0).slice(0, 5);
+  
+  if (earnedOrders.length === 0) {
+    document.getElementById('wallet-recent-earnings').innerHTML = 
+      '<div class="empty-state">📭 No confirmed purchases yet. Items earn 10 points EACH once they appear in the <strong>"Listed Items" tab</strong> (store purchases them).</div>';
     document.getElementById('wallet-earnings-badge').textContent = '+0 pts this month';
   } else {
-    // Fetch items for recent orders
-    const recentIds = recent.map(o => o.id);
-    const { data: recentItems } = await sb.from('order_items').select('*').in('order_id', recentIds).limit(20);
-    const itemsMap = {};
-    (recentItems || []).forEach(i => {
-      if (!itemsMap[i.order_id]) itemsMap[i.order_id] = [];
-      itemsMap[i.order_id].push(i);
-    });
-
     let earningsHtml = '';
-    recent.forEach(o => {
-      const items = itemsMap[o.id] || [];
-      const ptsEarned = (Number(o.item_count || 0)) * WALLET_POINTS_PER_ITEM;
+    earnedOrders.forEach(o => {
+      const confirmed = confirmedByOrder[o.id] || 0;
+      const ptsEarned = confirmed * 10;
       const dateStr = new Date(o.created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
       earningsHtml += `
         <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
           <div class="tl-icon tl-earn">✓</div>
           <div style="flex:1;">
-            <div style="font-size:12.5px;font-weight:500;">${o.client_name || '—'} — ${o.item_count || 0} items</div>
-            <div style="font-size:11px;color:var(--txt3);margin-top:2px;">${dateStr} · Listed items confirmed</div>
+            <div style="font-size:12.5px;font-weight:500;">${o.client_name || '—'} — ${confirmed} item${confirmed !== 1 ? 's' : ''} purchased by store</div>
+            <div style="font-size:11px;color:var(--txt3);margin-top:2px;">${dateStr} · Appeared in "Listed Items" tab</div>
           </div>
           <div class="tl-amount earn" style="font-size:13px;font-weight:600;">+${ptsEarned} pts</div>
         </div>`;
     });
     document.getElementById('wallet-recent-earnings').innerHTML = earningsHtml;
-
-    // Calculate this month's points
+    
+    // This month's confirmed points
     const thisMonth = new Date().toISOString().slice(0, 7);
-    const monthItems = orders
-      .filter(o => (o.created_at || '').startsWith(thisMonth))
-      .reduce((s, o) => s + Number(o.item_count || 0), 0);
-    document.getElementById('wallet-earnings-badge').textContent = `+${monthItems * WALLET_POINTS_PER_ITEM} pts this month`;
+    let monthPts = 0;
+    for (const order of orders) {
+      if ((order.created_at || '').startsWith(thisMonth) && (confirmedByOrder[order.id] || 0) > 0) {
+        monthPts += (confirmedByOrder[order.id] || 0) * 10;
+      }
+    }
+    document.getElementById('wallet-earnings-badge').textContent = `+${monthPts} pts this month`;
   }
 }
 
@@ -4302,37 +4485,7 @@ async function loadWalletEarningsAll() {
     return;
   }
   let html = '';
-  orders.forEach(o => {
-    const ptsEarned = Number(o.item_count || 0) * WALLET_POINTS_PER_ITEM;
-    const dateStr = new Date(o.created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
-    html += `
-      <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
-        <div class="tl-icon tl-earn">✓</div>
-        <div style="flex:1;">
-          <div style="font-size:12.5px;font-weight:500;">${o.client_name || '—'} — ${o.item_count || 0} items</div>
-          <div style="font-size:11px;color:var(--txt3);margin-top:2px;">${dateStr} · Listed items confirmed</div>
-        </div>
-        <div class="tl-amount earn" style="font-size:13px;font-weight:600;">+${ptsEarned} pts</div>
-      </div>`;
-  });
-  document.getElementById('wallet-recent-earnings').innerHTML = html;
-}
-
-async function loadAdminWallet() {
-  const { data: allUsers } = await sb.from('users').select('id,full_name,email,role').order('full_name');
-  const reps = (allUsers || []).filter(u => u.role === 'sales_rep' && u.is_active !== false);
-
-  const { data: allOrders } = await sb
-    .from('orders')
-    .select('id, item_count, created_by, client_name, client_id')
-    .in('status', ['submitted', 'fulfilled', 'partial']);
-
-  const orders = allOrders || [];
-  const repStats = {};
-  reps.forEach(u => {
-    repStats[u.id] = { name: u.full_name, items: 0, points: 0, ugx: 0, redeemed: 0, stores: new Set() };
-  });
-  orders.forEach(o => {
+orders.forEach(o => {
     if (o.created_by && repStats[o.created_by]) {
       const items = Number(o.item_count || 0);
       repStats[o.created_by].items += items;
@@ -4341,17 +4494,115 @@ async function loadAdminWallet() {
       if (o.client_name) repStats[o.created_by].stores.add(o.client_name);
     }
   });
+  document.getElementById('wallet-recent-earnings').innerHTML = html;
+}
 
+async function loadAdminWallet() {
+  const { data: allUsers } = await sb.from('users').select('id,full_name,email,role').order('full_name');
+  const reps = (allUsers || []).filter(u => u.role === 'sales_rep' && u.is_active !== false);
+
+  // Get ALL orders by ALL reps
+  const { data: allOrders } = await sb
+    .from('orders')
+    .select('id, item_count, created_by, client_name, client_id, created_at, order_date')
+    .in('status', ['submitted', 'fulfilled', 'partial']);
+
+  const orders = allOrders || [];
+  
+  // Initialize rep stats
+  const repStats = {};
+  reps.forEach(u => {
+    repStats[u.id] = { 
+      name: u.full_name, 
+      items: 0, 
+      points: 0, 
+      ugx: 0, 
+      redeemed: 0, 
+      stores: new Set()
+    };
+  });
+  
+  // Group orders by rep
+  const ordersByRep = {};
+  orders.forEach(o => {
+    if (o.created_by) {
+      if (!ordersByRep[o.created_by]) ordersByRep[o.created_by] = [];
+      ordersByRep[o.created_by].push(o);
+    }
+  });
+  
+  // For each rep, calculate ONLY items that appear in "Listed Items" (Zoho purchases)
+  for (const [repId, repOrders] of Object.entries(ordersByRep)) {
+    if (!repStats[repId]) continue;
+    
+    let totalConfirmedItems = 0;
+    
+    for (const order of repOrders) {
+      const clientId = order.client_id;
+      if (!clientId) continue;
+      
+      // Get items listed in this order
+      const { data: listedItems } = await sb
+        .from('order_items')
+        .select('sku, product_id')
+        .eq('order_id', order.id);
+      
+      if (!listedItems || listedItems.length === 0) continue;
+      
+      const listedSkus = new Set(listedItems.map(i => (i.sku || '').trim().toLowerCase()).filter(Boolean));
+      
+      // Get Zoho purchase history for this client (this populates "Listed Items" tab)
+      const client = allClients.find(c => c.id === clientId);
+      const zohoId = client?.zoho_customer_id;
+      let histData = [];
+      
+      if (zohoId) {
+        const r = await sb.from('invoice_line_items')
+          .select('item_code').eq('customer_id', zohoId);
+        if (!r.error) histData = r.data || [];
+      }
+      if (!zohoId || histData.length === 0) {
+        const r = await sb.from('invoice_line_items')
+          .select('item_code').ilike('customer_name', client?.name || '');
+        if (!r.error) histData = r.data || [];
+      }
+      
+      const purchasedCodes = new Set(
+        histData.map(r => (r.item_code || '').trim().toLowerCase()).filter(Boolean)
+      );
+      
+      // Count how many listed SKUs appear in "Listed Items" (Zoho purchases)
+      let confirmedCount = 0;
+      listedSkus.forEach(sku => {
+        if (purchasedCodes.has(sku)) confirmedCount++;
+      });
+      
+      totalConfirmedItems += confirmedCount;
+      if (confirmedCount > 0 && client?.name) {
+        repStats[repId].stores.add(client.name);
+      }
+    }
+    
+    // Calculate points based on items that appear in "Listed Items" tab only
+    repStats[repId].items = totalConfirmedItems;
+    repStats[repId].points = totalConfirmedItems * 10;  // 10 points per confirmed item
+    repStats[repId].ugx = repStats[repId].points * 100; // 100 UGX per point = 1,000 UGX per item
+  }
+  
+  // Sort by points descending
   const repList = Object.entries(repStats).sort((a, b) => b[1].points - a[1].points);
   const totalPoints = repList.reduce((s, [, r]) => s + r.points, 0);
-  const eligibleCount = repList.filter(([, r]) => r.points >= WALLET_MIN_REDEEM).length;
-
+  const eligibleCount = repList.filter(([, r]) => r.points >= 500).length;
+  const totalRedeemed = repList.reduce((s, [, r]) => s + (r.redeemed || 0), 0);
+  
+  // Update metrics cards
   document.getElementById('wadmin-total-pts').textContent = totalPoints.toLocaleString();
+  document.getElementById('wadmin-total-redeemed').textContent = `UGX ${totalRedeemed.toLocaleString()}`;
   document.getElementById('wadmin-eligible').textContent = eligibleCount;
   document.getElementById('wadmin-leaderboard-month').textContent =
     new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-
-  // ── Leaderboard ──
+  
+  // Leaderboard
   const avColors = [
     {bg:'var(--royal-light)',txt:'var(--royal)'},
     {bg:'#EAF3DE',txt:'#3B6D11'},
@@ -4361,7 +4612,7 @@ async function loadAdminWallet() {
   ];
   const medals = ['🥇','🥈','🥉'];
   const maxPts = repList[0]?.[1]?.points || 1;
-
+  
   if (repList.length === 0) {
     document.getElementById('wadmin-leaderboard-list').innerHTML = '<div class="empty-state">No reps found.</div>';
   } else {
@@ -4369,38 +4620,37 @@ async function loadAdminWallet() {
       const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
       const barPct = maxPts > 0 ? Math.round((s.points / maxPts) * 100) : 0;
       const ci = i % 5;
-      const eligible = s.points >= WALLET_MIN_REDEEM;
+      const eligible = s.points >= 500;
       return `<div class="earner-row">
         <div class="earner-rank">${medals[i] || i + 1}</div>
         <div class="earner-av" style="background:${avColors[ci].bg};color:${avColors[ci].txt};">${initials}</div>
         <div class="earner-info">
           <div class="earner-name">${s.name}</div>
-          <div class="earner-pts">${s.points} pts · ${s.items} item${s.items !== 1 ? 's' : ''}</div>
+          <div class="earner-pts">${s.points} pts · ${s.items} item${s.items !== 1 ? 's' : ''} confirmed in "Listed Items"</div>
         </div>
         <div class="earner-bar-wrap">
           <div class="earner-bar">
             <div class="earner-bar-fill" style="width:${barPct}%;background:${eligible ? '#1D9E75' : 'var(--royal)'};"></div>
           </div>
         </div>
-        <div class="earner-ugx" style="color:${eligible ? '#1D9E75' : 'var(--royal)'};">${s.ugx > 0 ? s.ugx.toLocaleString() : '0'}</div>
+        <div class="earner-ugx" style="color:${eligible ? '#1D9E75' : 'var(--royal)'};">UGX ${s.ugx.toLocaleString()}</div>
       </div>`;
     }).join('');
   }
-
-  // ── Desktop table ──
+  
+  // Desktop table
   const tbody = document.getElementById('wadmin-reps-tbody');
-  // ── Mobile cards ──
   const cardsEl = document.getElementById('wadmin-reps-cards');
-
+  
   if (repList.length === 0) {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;">No sales reps found.</td></tr>';
     cardsEl.innerHTML = '<div class="empty-state">No sales reps found.</div>';
   } else {
-    // Desktop rows
     tbody.innerHTML = repList.map(([repId, s]) => {
       const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-      const isEligible = s.points >= WALLET_MIN_REDEEM;
-      const shortfall = WALLET_MIN_REDEEM - s.points;
+      const isEligible = s.points >= 500;
+      const shortfall = 500 - s.points;
+      const balance = s.ugx;
       return `<tr>
         <td><div style="display:flex;align-items:center;gap:8px;">
           <div style="width:28px;height:28px;border-radius:50%;background:var(--royal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">${initials}</div>
@@ -4409,8 +4659,8 @@ async function loadAdminWallet() {
         <td>${s.items}</td>
         <td style="font-weight:600;color:var(--royal);">${s.points}</td>
         <td>UGX ${s.ugx.toLocaleString()}</td>
-        <td>UGX ${s.redeemed.toLocaleString()}</td>
-        <td style="font-weight:600;">UGX ${s.ugx.toLocaleString()}</td>
+        <td>UGX ${(s.redeemed || 0).toLocaleString()}</td>
+        <td style="font-weight:600;">UGX ${balance.toLocaleString()}</td>
         <td>${isEligible
           ? '<span class="badge bg">Eligible ✓</span>'
           : `<span class="badge br">${shortfall} pts short</span>`}
@@ -4423,13 +4673,13 @@ async function loadAdminWallet() {
         </button></td>
       </tr>`;
     }).join('');
-
-    // Mobile rep cards
+    
+    // Mobile cards
     cardsEl.innerHTML = repList.map(([repId, s], i) => {
       const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-      const isEligible = s.points >= WALLET_MIN_REDEEM;
-      const shortfall = WALLET_MIN_REDEEM - s.points;
-      const pct = Math.min(100, Math.round((s.points / WALLET_MIN_REDEEM) * 100));
+      const isEligible = s.points >= 500;
+      const shortfall = 500 - s.points;
+      const pct = Math.min(100, Math.round((s.points / 500) * 100));
       const ci = i % 5;
       return `
         <div style="padding:14px 0;border-bottom:0.5px solid var(--brd);">
@@ -4437,7 +4687,7 @@ async function loadAdminWallet() {
             <div style="width:42px;height:42px;border-radius:50%;background:${avColors[ci].bg};color:${avColors[ci].txt};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">${initials}</div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div>
-              <div style="font-size:10.5px;color:var(--txt3);margin-top:1px;">${s.items} item${s.items!==1?'s':''} confirmed</div>
+              <div style="font-size:10.5px;color:var(--txt3);margin-top:1px;">${s.items} item${s.items!==1?'s':''} confirmed in "Listed Items"</div>
             </div>
             <div style="text-align:right;flex-shrink:0;">
               <div style="font-size:17px;font-weight:700;color:${isEligible?'#1D9E75':'var(--royal)'};">${s.points}<span style="font-size:11px;font-weight:500;"> pts</span></div>
