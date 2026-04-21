@@ -1645,10 +1645,10 @@ async function selectClient(clientId) {
         <button class="btn btn-sm btn-royal" onclick="goToListingForClient('${client.id}')">New Listing</button>
       </div>
 <div class="tabs">
-        <div class="tab active" onclick="swTab(this,'tc-products')">Product History</div>
-        <div class="tab" onclick="swTab(this,'tc-listable');loadListableItems('${client.id}')">Listing Items Pending</div>
-        <div class="tab" onclick="swTab(this,'tc-listings');loadClientListings('${client.id}')">Past Listings</div>
-        <div class="tab" onclick="swTab(this,'tc-listed');loadListedItems('${client.id}')">Listed Items</div>
+        <div class="tab active" onclick="swTab(this,'tc-products')">Purchase History</div>
+        <div class="tab" onclick="swTab(this,'tc-listable');loadListableItems('${client.id}')"> Recommended Listing</div>
+        <div class="tab" onclick="swTab(this,'tc-listings');loadClientListings('${client.id}')">Submitted Listings</div>
+        <div class="tab" onclick="swTab(this,'tc-listed');loadListedItems('${client.id}')">Successful Listing</div>
       </div>
       <div class="tc active" id="tc-products">
         <div class="date-range-strip">
