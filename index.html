@@ -1204,6 +1204,9 @@ const EDGE_FN_URL   = 'https://bccqhwsbhgssoapiqljy.supabase.co/functions/v1/syn
 const ZOHO_WEBHOOK_URL = 'https://bccqhwsbhgssoapiqljy.supabase.co/functions/v1/zoho-webhook';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
+function normalizeSku(s) {
+  return (s || '').replace(/[\u00A0\u200B\u200C\u200D\uFEFF\r\n\t]/g, '').trim().toLowerCase();
+}
 let currentUser = null, currentScreen = 'dashboard';
 let allClients = [], allProducts = [], orderItems = {};
 let selectedClientId = null, currentDetailClientId = null;
@@ -1442,10 +1445,32 @@ function populateClientDropdowns() {
 }
 
 async function loadProducts() {
-  const { data } = await sb.from('products').select('*').order('name');
-  allProducts = data || [];
+  let allData = [];
+  let from = 0;
+  const pageSize = 1000;
+  
+  while (true) {
+    const { data, error } = await sb
+      .from('products')
+      .select('*')
+      .order('name')
+      .range(from, from + pageSize - 1);
+    
+    if (error) { console.error('Error loading products:', error); break; }
+    if (!data || data.length === 0) break;
+    
+    allData = allData.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  
+  allProducts = allData;
+  
   const el = document.getElementById('t-product');
-  if (el) el.innerHTML = '<option value="">Select product</option>' + allProducts.map(p=>`<option value="${p.id}">${p.sku} — ${p.name}</option>`).join('');
+  if (el) el.innerHTML = '<option value="">Select product</option>' + 
+    allProducts.map(p => `<option value="${p.id}">${p.sku} — ${p.name.slice(0,40)}</option>`).join('');
+    
+  console.log(`✅ Loaded ${allProducts.length} products total`);
 }
 
 // ─── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -1846,21 +1871,25 @@ async function loadListableItems(clientId) {
   }
 
   // ── BUILD ROBUST PRODUCT LOOKUP (SKU + name fallback) ──
-  const productBySku  = {};
-  const productByName = {};
-  allProducts.forEach(p => {
-    if (p.sku)  productBySku[p.sku.trim().toLowerCase()]   = p;
-    if (p.name) productByName[p.name.trim().toLowerCase()] = p;
-  });
+function normalizeSku(s) {
+  return (s || '').replace(/[\u00A0\u200B\u200C\u200D\uFEFF\r\n\t]/g, '').trim().toLowerCase();
+}
 
-  function findProduct(skuRow) {
-    const skuKey  = skuRow.sku.trim().toLowerCase();
-    const nameKey = (skuRow.item_name || '').trim().toLowerCase();
-    return productBySku[skuKey]
-        || productByName[skuKey]      // sometimes SKU col holds the name
-        || (nameKey ? productBySku[nameKey] || productByName[nameKey] : null)
-        || null;
-  }
+const productBySku  = {};
+const productByName = {};
+allProducts.forEach(p => {
+  if (p.sku)  productBySku[normalizeSku(p.sku)]   = p;
+  if (p.name) productByName[normalizeSku(p.name)] = p;
+});
+
+function findProduct(skuRow) {
+  const skuKey  = normalizeSku(skuRow.sku);
+  const nameKey = normalizeSku(skuRow.item_name || '');
+  return productBySku[skuKey]
+      || productByName[skuKey]
+      || (nameKey ? productBySku[nameKey] || productByName[nameKey] : null)
+      || null;
+}
 
   const clientObj = allClients.find(c=>c.id===id);
   const zohoId2 = clientObj?.zoho_customer_id;
@@ -2136,7 +2165,7 @@ async function loadClientProducts(preselectedProductId=null){
   // 4. Build enriched list — only in-catalogue + never-purchased
   const enriched = uniqueSkuRows
     .map(skuRow=>{
-      const product = allProducts.find(p=>p.sku?.trim().toLowerCase()===skuRow.sku.trim().toLowerCase());
+      const product = allProducts.find(p => normalizeSku(p.sku) === normalizeSku(skuRow.sku));
       const codeBought = purchasedCodes.has(skuRow.sku.trim().toLowerCase());
       const idBought   = product && purchasedItemIds.has(String(product.id).trim());
       return{
