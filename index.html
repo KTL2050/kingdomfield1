@@ -1747,7 +1747,7 @@ async function loadClientSalesHistory(clientId) {
     itemMap[key].invoices.add(r.invoice_id);
     if (r.line_date > itemMap[key].last_order) itemMap[key].last_order = r.line_date;
   });
-  const items = Object.values(itemMap).sort((a,b)=>b.total_amount-a.total_amount);
+  const items = Object.values(itemMap).sort((a,b)=>new Date(b.last_order)-new Date(a.last_order));
   const totalSpend     = items.reduce((s,i)=>s+i.total_amount,0);
   const uniqueInvoices = new Set(rows.map(r=>r.invoice_id)).size;
 tableEl.innerHTML = `
