@@ -1716,21 +1716,37 @@ async function loadClientSalesHistory(clientId) {
   if (!client) { tableEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3);">Client not found.</div>'; return; }
   const zohoId = client.zoho_customer_id;
   let data, error;
-  if (zohoId) {
-    const r = await sb.from('invoice_line_items')
-      .select('item_id,item_code,item_name,quantity,line_total,unit_price,line_date,invoice_id')
-      .eq('customer_id', zohoId)
-      .gte('line_date', fromVal).lte('line_date', toVal)
-      .order('line_date', {ascending:false});
-    data = r.data; error = r.error;
+if (zohoId) {
+    let allRows = [], from = 0, pageSize = 1000;
+    while (true) {
+      const r = await sb.from('invoice_line_items')
+        .select('item_id,item_code,item_name,quantity,line_total,unit_price,line_date,invoice_id')
+        .eq('customer_id', zohoId)
+        .gte('line_date', fromVal).lte('line_date', toVal)
+        .order('line_date', {ascending:false})
+        .range(from, from + pageSize - 1);
+      if (r.error) { error = r.error; break; }
+      allRows = allRows.concat(r.data || []);
+      if (!r.data || r.data.length < pageSize) break;
+      from += pageSize;
+    }
+    data = allRows;
   }
   if (!zohoId || (!error && (!data || data.length === 0))) {
-    const r = await sb.from('invoice_line_items')
-      .select('item_id,item_code,item_name,quantity,line_total,unit_price,line_date,invoice_id')
-      .ilike('customer_name', client.name)
-      .gte('line_date', fromVal).lte('line_date', toVal)
-      .order('line_date', {ascending:false});
-    data = r.data; error = r.error;
+    let allRows = [], from = 0, pageSize = 1000;
+    while (true) {
+      const r = await sb.from('invoice_line_items')
+        .select('item_id,item_code,item_name,quantity,line_total,unit_price,line_date,invoice_id')
+        .ilike('customer_name', client.name)
+        .gte('line_date', fromVal).lte('line_date', toVal)
+        .order('line_date', {ascending:false})
+        .range(from, from + pageSize - 1);
+      if (r.error) { error = r.error; break; }
+      allRows = allRows.concat(r.data || []);
+      if (!r.data || r.data.length < pageSize) break;
+      from += pageSize;
+    }
+    data = allRows;
   }
   if (error) { tableEl.innerHTML=`<div style="padding:20px;text-align:center;color:#A32D2D;">Error: ${error.message}</div>`; return; }
   const rows = data||[];
