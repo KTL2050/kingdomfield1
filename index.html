@@ -685,8 +685,8 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
             </div>
             <div style="position:relative;z-index:1;margin-top:18px;">
               <div class="progress-label">
-                <span style="font-size:11px;opacity:0.7;">Progress to redemption (500 pts = UGX 500,000)</span>
-                <span style="font-size:11px;font-weight:600;" id="wallet-progress-label">— / 500</span>
+                <span style="font-size:11px;opacity:0.7;">Progress to redemption (50 pts = UGX 50,000)</span>
+                <span style="font-size:11px;font-weight:600;" id="wallet-progress-label">— / 50</span>
               </div>
               <div class="pbar-wallet">
                 <div class="pfill-wallet" id="wallet-progress-fill" style="width:0%;"></div>
@@ -4433,7 +4433,7 @@ async function loadRepWallet() {
   document.getElementById('wallet-progress-label').textContent = `${points} / 500`;
   document.getElementById('wallet-progress-fill').style.width = pct + '%';
   document.getElementById('wallet-progress-sub').textContent = needed > 0
-    ? `${needed} more points needed to redeem (earn 10 points per item when store purchases it)`
+    ? `${needed} more points needed to redeem (earn 1 points per item when store purchases it)`
     : 'You are eligible to redeem!';
   document.getElementById('wallet-stat-items').textContent = totalConfirmedItems;
   document.getElementById('wallet-stat-stores').textContent = uniqueStores;
@@ -4446,7 +4446,7 @@ async function loadRepWallet() {
     alertText.innerHTML = `🎉 You have <strong>${points} points (UGX ${ugxValue.toLocaleString()})</strong> from ${totalConfirmedItems} confirmed purchased items — you are eligible to request a payout!`;
   } else {
     alertEl.className = 'alert aw';
-    alertText.innerHTML = `📋 You need <strong>500 points (UGX 500,000)</strong> to redeem. You currently have ${points} points from ${totalConfirmedItems} confirmed purchased items — ${needed} more to go!<br><br>✅ Items earn 10 points ONLY when they appear in the <strong>"Listed Items" tab</strong> (store actually purchases them).`;
+    alertText.innerHTML = `📋 You need <strong>50 points (UGX 50,000)</strong> to redeem. You currently have ${points} points from ${totalConfirmedItems} confirmed purchased items — ${needed} more to go!<br><br>✅ Items earn 1 points ONLY when they appear in the <strong>"Listed Items" tab</strong> (store actually purchases them).`;
   }
   
   // Redeem card
@@ -4468,7 +4468,7 @@ async function loadRepWallet() {
   
   if (earnedOrders.length === 0) {
     document.getElementById('wallet-recent-earnings').innerHTML = 
-      '<div class="empty-state">📭 No confirmed purchases yet. Items earn 10 points EACH once they appear in the <strong>"Listed Items" tab</strong> (store purchases them).</div>';
+      '<div class="empty-state">📭 No confirmed purchases yet. Items earn 1 points EACH once they appear in the <strong>"Listed Items" tab</strong> (store purchases them).</div>';
     document.getElementById('wallet-earnings-badge').textContent = '+0 pts this month';
   } else {
     let earningsHtml = '';
