@@ -1020,7 +1020,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                 <option value="t250">T250 — UBL</option>
                 <option value="slobs">SLOBS — UBL</option>
                 <option value="new_items">NEW ITEMS — UBL</option>
-                <option value="aiwibi_awina">AIWIBI / AIWINA</option>
+                <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
               </select>
               <button class="btn btn-sm btn-royal" onclick="showAddSkuForm()">+ Add SKU</button>
               <button class="btn btn-sm" onclick="showBulkSkuImport()">↑ Bulk Import</button>
@@ -1039,7 +1039,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                   <option value="t250">T250 (UBL)</option>
                   <option value="slobs">SLOBS (UBL)</option>
                   <option value="new_items">NEW ITEMS (UBL)</option>
-                  <option value="aiwibi_awina">AIWIBI / AIWINA</option>
+                  <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
                 </select>
               </div>
               <div class="fg"><label class="flbl">SKU</label><input class="fin" id="add-sku-code" placeholder="e.g. AG0001"/></div>
@@ -1058,7 +1058,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                 <option value="t250">T250 (UBL)</option>
                 <option value="slobs">SLOBS (UBL)</option>
                 <option value="new_items">NEW ITEMS (UBL)</option>
-                <option value="aiwibi_awina">AIWIBI / AIWINA</option>
+                <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
               </select>
               <label class="flbl">Paste SKUs (one per line — optionally: SKU,Item Name)</label>
               <textarea class="fin" id="bulk-sku-text" rows="8" placeholder="AG0001,UBL Detergent 1kg&#10;AG0002,UBL Powder 500g&#10;AG0003" style="resize:vertical;font-family:'SF Mono','Courier New',monospace;font-size:12px;margin-top:4px;"></textarea>
@@ -1219,14 +1219,14 @@ let lastSavedListingClient = '';
 // ─── BRAND / LISTING TABLE CONFIG ─────────────────────────────────────────────
 const BRAND_TABLE_MAP = {
   'UBL':   ['t250', 'slobs', 'new_items'],
-  'AIWIBI': ['aiwibi_awina'],
-  'AIWINA': ['aiwibi_awina'],
+  'AIWIBI': ['aiwibi_aiwina'],
+  'AIWINA': ['aiwibi_aiwina'],
 };
 const TABLE_META = {
   t250:        { label: 'T250',        badgeClass: 'bb'    },
   slobs:       { label: 'SLOBS',       badgeClass: 'ba'    },
   new_items:   { label: 'NEW ITEMS',   badgeClass: 'bg'    },
-  aiwibi_awina: { label: 'AIWIBI/AIWINA', badgeClass: 'bgold' },
+  aiwibi_aiwina: { label: 'AIWIBI/AIWINA', badgeClass: 'bgold' },
 };
 let _skuCache       = {};
 let _clientBrandCache = {};
