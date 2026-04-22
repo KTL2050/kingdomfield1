@@ -4322,7 +4322,7 @@ async function checkAllSyncResume() {
 let _walletStep = 1;
 let _walletPoints = 0;
 const WALLET_POINTS_PER_ITEM = 1;
-const WALLET_MIN_REDEEM = 500;
+const WALLET_MIN_REDEEM = 50;
 const WALLET_UGX_PER_POINT = 1000; // 1 pt = UGX 1,000
 
 function goTo_wallet_hook(screen) {
@@ -4411,8 +4411,8 @@ async function loadRepWallet() {
   const points = totalConfirmedItems * 1;  // 1 point per confirmed item
   _walletPoints = points;
   const ugxValue = points * 1000;  // 1 point = UGX 1,000
-  const pct = Math.min(100, Math.round((points / 500) * 100));
-  const needed = Math.max(0, 500 - points);
+  const pct = Math.min(100, Math.round((points / 50) * 100));
+  const needed = Math.max(0, 50 - points);
   
   // Unique stores with confirmed purchases
   const uniqueStores = confirmedStores.size;
@@ -4430,10 +4430,10 @@ async function loadRepWallet() {
   document.getElementById('wallet-hero-pts').textContent = points.toLocaleString();
   document.getElementById('wallet-hero-ugx').textContent = `= UGX ${ugxValue.toLocaleString()}`;
   document.getElementById('wallet-tracking-date').textContent = `Tracking from ${trackingDate}`;
-  document.getElementById('wallet-progress-label').textContent = `${points} / 500`;
+  document.getElementById('wallet-progress-label').textContent = `${points} / 50`;
   document.getElementById('wallet-progress-fill').style.width = pct + '%';
   document.getElementById('wallet-progress-sub').textContent = needed > 0
-    ? `${needed} more points needed to redeem (earn 1 points per item when store purchases it)`
+    ? `${needed} more points needed to redeem (earn 1 point per item when store purchases it)`
     : 'You are eligible to redeem!';
   document.getElementById('wallet-stat-items').textContent = totalConfirmedItems;
   document.getElementById('wallet-stat-stores').textContent = uniqueStores;
@@ -4621,7 +4621,7 @@ async function loadAdminWallet() {
   // Sort by points descending
   const repList = Object.entries(repStats).sort((a, b) => b[1].points - a[1].points);
   const totalPoints = repList.reduce((s, [, r]) => s + r.points, 0);
-  const eligibleCount = repList.filter(([, r]) => r.points >= 500).length;
+  const eligibleCount = repList.filter(([, r]) => r.points >= 50).length;
   const totalRedeemed = repList.reduce((s, [, r]) => s + (r.redeemed || 0), 0);
   
   // Update metrics cards
@@ -4678,7 +4678,7 @@ async function loadAdminWallet() {
     tbody.innerHTML = repList.map(([repId, s]) => {
       const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
       const isEligible = s.points >= 500;
-      const shortfall = 500 - s.points;
+      const shortfall = 50 - s.points;
       const balance = s.ugx;
       return `<tr>
         <td><div style="display:flex;align-items:center;gap:8px;">
@@ -4708,7 +4708,7 @@ async function loadAdminWallet() {
       const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
       const isEligible = s.points >= 500;
       const shortfall = 500 - s.points;
-      const pct = Math.min(100, Math.round((s.points / 500) * 100));
+      const pct = Math.min(100, Math.round((s.points / 50) * 100));
       const ci = i % 5;
       return `
         <div style="padding:14px 0;border-bottom:0.5px solid var(--brd);">
