@@ -4446,7 +4446,7 @@ async function loadRepWallet() {
     alertText.innerHTML = `🎉 You have <strong>${points} points (UGX ${ugxValue.toLocaleString()})</strong> from ${totalConfirmedItems} confirmed purchased items — you are eligible to request a payout!`;
   } else {
     alertEl.className = 'alert aw';
-    alertText.innerHTML = `📋 You need <strong>500 points (UGX 50,000)</strong> to redeem. You currently have ${points} points from ${totalConfirmedItems} confirmed purchased items — ${needed} more to go!<br><br>✅ Items earn 1 points ONLY when they appear in the <strong>"Listed Items" tab</strong> (store actually purchases them).`;
+    alertText.innerHTML = `📋 You need <strong>50 points (UGX 5,000)</strong> to redeem. You currently have ${points} points from ${totalConfirmedItems} confirmed purchased items — ${needed} more to go!<br><br>✅ Items earn 1 points ONLY when they appear in the <strong>"Listed Items" tab</strong> (store actually purchases them).`;
   }
   
   // Redeem card
