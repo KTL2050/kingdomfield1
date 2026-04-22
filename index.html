@@ -685,7 +685,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
             </div>
             <div style="position:relative;z-index:1;margin-top:18px;">
               <div class="progress-label">
-                <span style="font-size:11px;opacity:0.7;">Progress to redemption (500 pts = UGX 50,000)</span>
+                <span style="font-size:11px;opacity:0.7;">Progress to redemption (500 pts = UGX 500,000)</span>
                 <span style="font-size:11px;font-weight:600;" id="wallet-progress-label">— / 500</span>
               </div>
               <div class="pbar-wallet">
@@ -712,21 +712,21 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
               <div class="step"><div class="step-circle sc-done">1</div><div class="step-label">List items for a store</div></div>
               <div class="step"><div class="step-circle sc-done">2</div><div class="step-label">Store purchases the item</div></div>
               <div class="step"><div class="step-circle sc-done">3</div><div class="step-label">Item appears in Listed Items</div></div>
-              <div class="step"><div class="step-circle sc-active">4</div><div class="step-label">Earn 10 pts per item = UGX 1,000</div></div>
-              <div class="step"><div class="step-circle sc-todo">5</div><div class="step-label">Reach 500 pts → redeem UGX 50,000+</div></div>
+              <div class="step"><div class="step-circle sc-active">4</div><div class="step-label">Earn 10 pts per item = UGX 10,000</div></div>
+              <div class="step"><div class="step-circle sc-todo">5</div><div class="step-label">Reach 500 pts → redeem UGX 500,000+</div></div>
             </div>
             <div style="display:flex;gap:10px;margin-top:12px;padding-top:12px;border-top:0.5px solid var(--brd);flex-wrap:wrap;">
               <div style="flex:1;min-width:140px;background:var(--bg2);border-radius:9px;padding:12px;text-align:center;">
-                <div style="font-size:20px;font-weight:700;color:var(--royal);">10 pts</div>
-                <div style="font-size:11px;color:var(--txt3);margin-top:3px;">per confirmed listed item</div>
+              <div style="font-size:20px;font-weight:700;color:var(--royal);">10 pts</div>
+              <div style="font-size:11px;color:var(--txt3);margin-top:3px;">per confirmed listed item = UGX 10,000</div>
               </div>
               <div style="flex:1;min-width:140px;background:var(--bg2);border-radius:9px;padding:12px;text-align:center;">
                 <div style="font-size:20px;font-weight:700;color:#1D9E75;">= UGX 1,000</div>
-                <div style="font-size:11px;color:var(--txt3);margin-top:3px;">per 10 points</div>
+                <div style="font-size:11px;color:var(--txt3);margin-top:3px;">per point</div>
               </div>
               <div style="flex:1;min-width:140px;background:var(--gold-light);border-radius:9px;padding:12px;text-align:center;border:0.5px solid rgba(212,160,23,0.3);">
                 <div style="font-size:20px;font-weight:700;color:var(--gold);">500 pts min</div>
-                <div style="font-size:11px;color:var(--txt2);margin-top:3px;">to redeem (UGX 50,000)</div>
+                <div style="font-size:11px;color:var(--txt2);margin-top:3px;">to redeem (UGX 500,000)</div>
               </div>
             </div>
           </div>
@@ -749,7 +749,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                 <div style="text-align:center;padding:12px 0 8px;">
                   <div style="width:60px;height:60px;border-radius:50%;background:var(--bg2);border:0.5px solid var(--brd2);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:24px;">🔒</div>
                   <div style="font-size:13px;font-weight:600;margin-bottom:6px;">Not yet eligible</div>
-                  <div style="font-size:12px;color:var(--txt2);line-height:1.6;max-width:220px;margin:0 auto;">You need <strong>500 points</strong> to redeem.</div>
+                  <div style="font-size:12px;color:var(--txt2);line-height:1.6;max-width:220px;margin:0 auto;">You need <strong>500 points (UGX 500,000)</strong> to redeem.</div>
                 </div>
                 <div style="margin:14px 0;background:var(--bg2);border-radius:9px;padding:12px;">
                   <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span style="color:var(--txt2);">Current balance</span><span style="font-weight:600;" id="redeem-current-pts">— pts</span></div>
@@ -4323,7 +4323,7 @@ let _walletStep = 1;
 let _walletPoints = 0;
 const WALLET_POINTS_PER_ITEM = 10;
 const WALLET_MIN_REDEEM = 500;
-const WALLET_UGX_PER_POINT = 100; // 10 pts = UGX 1,000 → 1 pt = UGX 100
+const WALLET_UGX_PER_POINT = 1000; // 1 pt = UGX 1,000
 
 function goTo_wallet_hook(screen) {
   if (screen === 'wallet') loadWalletScreen();
@@ -4410,7 +4410,7 @@ async function loadRepWallet() {
   
   const points = totalConfirmedItems * 10;  // 10 points per confirmed item
   _walletPoints = points;
-  const ugxValue = points * 100;  // 10 points = UGX 1,000, so 1 point = UGX 100
+  const ugxValue = points * 1000;  // 1 point = UGX 1,000
   const pct = Math.min(100, Math.round((points / 500) * 100));
   const needed = Math.max(0, 500 - points);
   
@@ -4615,7 +4615,7 @@ async function loadAdminWallet() {
     // Calculate points based on items that appear in "Listed Items" tab only
     repStats[repId].items = totalConfirmedItems;
     repStats[repId].points = totalConfirmedItems * 10;  // 10 points per confirmed item
-    repStats[repId].ugx = repStats[repId].points * 100; // 100 UGX per point = 1,000 UGX per item
+    repStats[repId].ugx = repStats[repId].points * 1000; // 1,000 UGX per point
   }
   
   // Sort by points descending
