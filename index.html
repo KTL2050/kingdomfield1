@@ -3709,55 +3709,39 @@ async function loadListedItems(clientId) {
   tableEl.innerHTML = `<div style="padding:24px;text-align:center;color:var(--txt3);">
     <div style="font-size:20px;margin-bottom:8px;">⏳</div>Loading confirmed listed items...</div>`;
 
-  // 1. Get all submitted/fulfilled listings for this client
   const { data: pastOrders, error: ordErr } = await sb
     .from('orders')
     .select('id, order_ref, order_date')
     .eq('client_id', String(clientId))
     .in('status', ['submitted', 'fulfilled', 'partial']);
 
-  if (ordErr) {
-    tableEl.innerHTML = `<div style="padding:20px;text-align:center;color:#A32D2D;">Error: ${ordErr.message}</div>`;
-    return;
-  }
-
+  if (ordErr) { tableEl.innerHTML = `<div style="padding:20px;text-align:center;color:#A32D2D;">Error: ${ordErr.message}</div>`; return; }
   if (!pastOrders || pastOrders.length === 0) {
-    tableEl.innerHTML = `
-      <div style="padding:32px 20px;text-align:center;">
-        <div style="font-size:32px;margin-bottom:10px;">📋</div>
-        <div style="font-weight:600;font-size:13px;margin-bottom:5px;">No past listings yet</div>
-        <div style="font-size:12px;color:var(--txt3);line-height:1.6;">
-          Once a sales rep submits a listing for this store, purchased items will appear here.
-        </div>
-      </div>`;
+    tableEl.innerHTML = `<div style="padding:32px 20px;text-align:center;"><div style="font-size:32px;margin-bottom:10px;">📋</div><div style="font-weight:600;font-size:13px;margin-bottom:5px;">No past listings yet</div></div>`;
     return;
   }
 
-  // 2. Get ALL items from those listings
   const orderIds = pastOrders.map(o => o.id);
+  const orderMap = {};
+  pastOrders.forEach(o => { orderMap[o.id] = { ref: o.order_ref, date: o.order_date }; });
+
   const { data: listedItems, error: itemErr } = await sb
     .from('order_items')
     .select('sku, product_name, product_id, unit_price, order_id')
     .in('order_id', orderIds);
 
   if (itemErr || !listedItems || listedItems.length === 0) {
-    tableEl.innerHTML = `<div style="padding:32px 20px;text-align:center;">
-      <div style="font-size:32px;margin-bottom:10px;">📭</div>
-      <div style="font-weight:600;font-size:13px;">No items found in past listings</div>
-    </div>`;
+    tableEl.innerHTML = `<div style="padding:32px 20px;text-align:center;"><div style="font-size:32px;">📭</div><div style="font-weight:600;font-size:13px;">No items found in past listings</div></div>`;
     return;
   }
 
-  const orderMap = {};
-  pastOrders.forEach(o => { orderMap[o.id] = { ref: o.order_ref, date: o.order_date }; });
-
-  // Build map: normalizedSku → listing info  +  normalizedName → listing info
+  // Build lookup maps
   const listedBySkuKey  = {};
   const listedByNameKey = {};
   listedItems.forEach(item => {
     const skuKey  = normalizeSku(item.sku || '');
     const nameKey = normalizeSku(item.product_name || '');
-    const entry   = {
+    const entry = {
       sku: item.sku,
       product_name: item.product_name,
       unit_price: item.unit_price,
@@ -3768,7 +3752,6 @@ async function loadListedItems(clientId) {
     if (nameKey) listedByNameKey[nameKey] = entry;
   });
 
-  // 3. Get Zoho purchase history — item_code AND item_name for dual-matching
   const client = allClients.find(c => c.id === clientId);
   const zohoId = client?.zoho_customer_id;
   let histData = [];
@@ -3786,23 +3769,28 @@ async function loadListedItems(clientId) {
     if (!r.error) histData = r.data || [];
   }
 
-  // 4. Cross-reference with DUAL matching: try item_code first, then item_name
-  const confirmedMap = {}; // key → { listingInfo, purchaseInfo }
+  // Cross-reference with dual matching + collect misses for debug
+  const confirmedMap = {};
+  const missedRows = [];
 
   histData.forEach(row => {
     const codeKey = normalizeSku(row.item_code || '');
     const nameKey = normalizeSku(row.item_name  || '');
 
-    // Try matching by item_code against listed SKUs
     let listingEntry = (codeKey && listedBySkuKey[codeKey])  ? listedBySkuKey[codeKey]
                      : (codeKey && listedByNameKey[codeKey]) ? listedByNameKey[codeKey]
                      : (nameKey && listedBySkuKey[nameKey])  ? listedBySkuKey[nameKey]
                      : (nameKey && listedByNameKey[nameKey]) ? listedByNameKey[nameKey]
                      : null;
 
-    if (!listingEntry) return;
+    if (!listingEntry) {
+      // Only track rows where EITHER the code OR name looks like it could match something listed
+      const listedSkuKeys = Object.keys(listedBySkuKey);
+      const mightMatch = listedSkuKeys.some(k => k && (codeKey.includes(k) || k.includes(codeKey)));
+      missedRows.push({ item_code: row.item_code, item_name: row.item_name, codeKey, nameKey });
+      return;
+    }
 
-    // Use the listed SKU as the dedupe key
     const dedupeKey = normalizeSku(listingEntry.sku || '');
     if (!confirmedMap[dedupeKey] || row.line_date > confirmedMap[dedupeKey].purchase_date) {
       confirmedMap[dedupeKey] = {
@@ -3820,16 +3808,24 @@ async function loadListedItems(clientId) {
 
   const totalListed = Object.keys(listedBySkuKey).length;
 
-  if (confirmedItems.length === 0) {
+  // ── DEBUG PANEL: show what's in order_items vs what's in invoice_line_items ──
+  const listedSkusList = Object.keys(listedBySkuKey).sort();
+  const zohoCodesList  = [...new Set(histData.map(r => normalizeSku(r.item_code || '')).filter(Boolean))].sort();
+  
+  // Find listed SKUs that have NO match in Zoho codes
+  const unmatched = listedSkusList.filter(sk => 
+    !zohoCodesList.includes(sk) &&
+    !Object.keys(listedByNameKey).some(nk => zohoCodesList.includes(nk))
+  );
+
+  if (confirmedItems.length === 0 && totalListed > 0) {
     tableEl.innerHTML = `
-      <div style="padding:32px 20px;text-align:center;">
-        <div style="font-size:32px;margin-bottom:10px;">⏳</div>
-        <div style="font-weight:600;font-size:13px;margin-bottom:5px;">No purchases confirmed yet</div>
-        <div style="font-size:12px;color:var(--txt3);line-height:1.6;max-width:340px;margin:0 auto;">
-          The rep has listed <strong>${totalListed} SKU${totalListed !== 1 ? 's' : ''}</strong> for this store,
-          but none have been confirmed in Zoho invoices yet.<br><br>
-          Items appear here after the next Zoho sync once the store purchases them.
-        </div>
+      <div style="padding:14px;background:#FAEEDA;border-radius:9px;margin-bottom:12px;font-size:12px;color:#854F0B;border:0.5px solid #FAC775;">
+        <strong>🔍 Debug: 0 matches found</strong><br>
+        Listed SKUs in order_items (${listedSkusList.length}): <span style="font-family:monospace;font-size:11px;">${listedSkusList.slice(0,20).join(', ')}</span><br><br>
+        Zoho item_codes in invoice_line_items (${zohoCodesList.length}): <span style="font-family:monospace;font-size:11px;">${zohoCodesList.slice(0,20).join(', ')}</span><br><br>
+        <strong>These listed SKUs have no matching Zoho item_code or item_name:</strong><br>
+        <span style="font-family:monospace;font-size:11px;">${unmatched.slice(0,30).join(', ') || 'none'}</span>
       </div>`;
     return;
   }
@@ -3850,18 +3846,14 @@ async function loadListedItems(clientId) {
         <div style="font-size:10px;color:#1D9E75;text-align:right;margin-top:2px;font-weight:600;">${convPct}% conversion</div>
       </div>
     </div>
+    ${unmatched.length > 0 ? `
+    <div style="padding:8px 14px;background:#FDF3D0;border-bottom:0.5px solid #FAC775;font-size:11px;color:#854F0B;">
+      ⚠ ${unmatched.length} listed SKUs couldn't be matched to Zoho invoice codes: 
+      <span style="font-family:monospace;">${unmatched.slice(0,10).join(', ')}${unmatched.length>10?'…':''}</span>
+    </div>` : ''}
     <div style="overflow-x:auto;">
     <table>
-      <thead>
-        <tr>
-          <th>SKU</th>
-          <th>Product</th>
-          <th>Listed in</th>
-          <th>Purchased On</th>
-          <th style="text-align:right;">Qty</th>
-          <th style="text-align:right;">Price (UGX)</th>
-        </tr>
-      </thead>
+      <thead><tr><th>SKU</th><th>Product</th><th>Listed in</th><th>Purchased On</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Price (UGX)</th></tr></thead>
       <tbody>
         ${confirmedItems.map(item => `<tr>
           <td class="mono">${item.sku || '—'}</td>
