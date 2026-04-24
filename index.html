@@ -3771,7 +3771,6 @@ async function loadListedItems(clientId) {
   const productByName   = {};
   allProducts.forEach(p => {
     if (p.zoho_item_id) productByZohoId[String(p.zoho_item_id).trim()] = p;
-    if (p.item_id)      productByZohoId[String(p.item_id).trim()]      = p;
     if (p.sku)          productBySku[normalizeSku(p.sku)]              = p;
     if (p.name)         productByName[normalizeSku(p.name)]            = p;
   });
