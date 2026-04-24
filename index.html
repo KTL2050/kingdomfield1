@@ -3780,7 +3780,7 @@ async function loadListedItems(clientId) {
   const zohoId = client?.zoho_customer_id;
   let histData = [];
 
-  if (zohoId) {
+if (zohoId) {
     const r = await sb.from('invoice_line_items')
       .select('item_id, item_code, item_name, line_date, invoice_id, quantity, unit_price')
       .eq('customer_id', zohoId);
@@ -3817,21 +3817,18 @@ async function loadListedItems(clientId) {
     if (!listingEntry && nameKey) listingEntry = listedByNameKey[nameKey];
 
     // Strategy 3: item_code is a Zoho numeric ID → resolve via products table
-    if (!listingEntry && itemCodeStr) {
-      const product = productByZohoId[itemCodeStr];
+    if (!listingEntry && itemIdStr) {
+      const product = productByZohoId[itemIdStr];
       if (product) {
-        // Try matching via product_id
         listingEntry = listedByProductId[String(product.id)];
-        // Or via SKU
         if (!listingEntry) listingEntry = listedBySkuKey[normalizeSku(product.sku || '')];
-        // Or via name
         if (!listingEntry) listingEntry = listedByNameKey[normalizeSku(product.name || '')];
       }
     }
 
     // Strategy 4: item_id field → resolve via products table
-    if (!listingEntry && itemIdStr) {
-      const product = productByZohoId[itemIdStr];
+   if (!listingEntry && itemCodeStr && itemCodeStr.length > 10) {
+      const product = productByZohoId[itemCodeStr];
       if (product) {
         listingEntry = listedByProductId[String(product.id)];
         if (!listingEntry) listingEntry = listedBySkuKey[normalizeSku(product.sku || '')];
