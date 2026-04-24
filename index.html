@@ -3716,6 +3716,7 @@ async function loadListedItems(clientId) {
   tableEl.innerHTML = `<div style="padding:24px;text-align:center;color:var(--txt3);">
     <div style="font-size:20px;margin-bottom:8px;">⏳</div>Loading confirmed listed items...</div>`;
 
+  // Step 1: Get all submitted/fulfilled orders for this client
   const { data: pastOrders, error: ordErr } = await sb
     .from('orders')
     .select('id, order_ref, order_date')
@@ -3735,6 +3736,7 @@ async function loadListedItems(clientId) {
   const orderMap = {};
   pastOrders.forEach(o => { orderMap[o.id] = { ref: o.order_ref, date: o.order_date }; });
 
+  // Step 2: Get all items from those orders
   const { data: listedItems, error: itemErr } = await sb
     .from('order_items')
     .select('sku, product_name, product_id, unit_price, order_id')
@@ -3748,104 +3750,217 @@ async function loadListedItems(clientId) {
     return;
   }
 
-  const listedBySkuKey  = {};
+  // Step 3: Build lookup maps for listed items
+  // Key by SKU, by product name, and by product_id
+  const listedBySkuKey = {};
   const listedByNameKey = {};
   const listedByProductId = {};
 
   listedItems.forEach(item => {
-    const skuKey  = normalizeSku(item.sku || '');
-    const nameKey = normalizeSku(item.product_name || '');
     const entry = {
       sku: item.sku,
       product_name: item.product_name,
       unit_price: item.unit_price,
-      order_ref:  orderMap[item.order_id]?.ref  || '—',
+      order_ref: orderMap[item.order_id]?.ref || '—',
       order_date: orderMap[item.order_id]?.date || '—',
     };
-    if (skuKey)           listedBySkuKey[skuKey]       = entry;
-    if (nameKey)          listedByNameKey[nameKey]      = entry;
-    if (item.product_id)  listedByProductId[String(item.product_id)] = entry;
+    if (item.sku) listedBySkuKey[normalizeSku(item.sku)] = entry;
+    if (item.product_name) listedByNameKey[normalizeSku(item.product_name)] = entry;
+    if (item.product_id) listedByProductId[String(item.product_id)] = entry;
   });
 
+  // Step 4: Build product lookup maps
   const productByZohoId = {};
-  const productBySku    = {};
-  const productByName   = {};
+  const productBySku = {};
+  const productByName = {};
   allProducts.forEach(p => {
     if (p.zoho_item_id) productByZohoId[String(p.zoho_item_id).trim()] = p;
-    if (p.sku)          productBySku[normalizeSku(p.sku)]              = p;
-    if (p.name)         productByName[normalizeSku(p.name)]            = p;
+    if (p.sku) productBySku[normalizeSku(p.sku)] = p;
+    if (p.name) productByName[normalizeSku(p.name)] = p;
   });
 
-  const client = allClients.find(c => c.id === clientId);
+  // Step 5: Build a reverse map — for each listed item, find its zoho_item_id
+  // So we can match invoice rows that only have item_id
+  const listedProductZohoIds = new Set();
+  const listedProductZohoIdToEntry = {};
+  listedItems.forEach(item => {
+    // Find product by SKU
+    const product = item.sku ? productBySku[normalizeSku(item.sku)] : null;
+    if (product && product.zoho_item_id) {
+      const zid = String(product.zoho_item_id).trim();
+      listedProductZohoIds.add(zid);
+      listedProductZohoIdToEntry[zid] = {
+        sku: item.sku,
+        product_name: item.product_name,
+        unit_price: item.unit_price,
+        order_ref: orderMap[item.order_id]?.ref || '—',
+        order_date: orderMap[item.order_id]?.date || '—',
+      };
+    }
+    // Also try by product_id
+    if (item.product_id) {
+      const p2 = allProducts.find(p => p.id === item.product_id);
+      if (p2 && p2.zoho_item_id) {
+        const zid = String(p2.zoho_item_id).trim();
+        listedProductZohoIds.add(zid);
+        listedProductZohoIdToEntry[zid] = {
+          sku: item.sku,
+          product_name: item.product_name,
+          unit_price: item.unit_price,
+          order_ref: orderMap[item.order_id]?.ref || '—',
+          order_date: orderMap[item.order_id]?.date || '—',
+        };
+      }
+    }
+  });
+
+  // Step 6: Fetch ALL invoice line items for this client
+  const client = allClients.find(c => String(c.id) === String(clientId));
   const zohoId = client?.zoho_customer_id;
   let histData = [];
 
-  if (zohoId) {
-    const r = await sb.from('invoice_line_items')
-      .select('item_id, item_code, item_name, line_date, invoice_id, quantity, unit_price')
-      .eq('customer_id', zohoId);
-    if (!r.error) histData = r.data || [];
+if (zohoId) {
+    let allRows = [], from = 0, pageSize = 1000;
+    while (true) {
+      const r = await sb.from('invoice_line_items')
+        .select('item_id, item_code, item_name, line_date, invoice_id, quantity, unit_price')
+        .eq('customer_id', zohoId)
+        .order('line_date', { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (r.error) break;
+      allRows = allRows.concat(r.data || []);
+      if (!r.data || r.data.length < pageSize) break;
+      from += pageSize;
+    }
+    histData = allRows;
   }
   if (!zohoId || histData.length === 0) {
-    const r = await sb.from('invoice_line_items')
-      .select('item_id, item_code, item_name, line_date, invoice_id, quantity, unit_price')
-      .ilike('customer_name', client?.name || '');
-    if (!r.error) histData = r.data || [];
+    let allRows = [], from = 0, pageSize = 1000;
+    while (true) {
+      const r = await sb.from('invoice_line_items')
+        .select('item_id, item_code, item_name, line_date, invoice_id, quantity, unit_price')
+        .ilike('customer_name', client?.name || '')
+        .order('line_date', { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (r.error) break;
+      allRows = allRows.concat(r.data || []);
+      if (!r.data || r.data.length < pageSize) break;
+      from += pageSize;
+    }
+    histData = allRows;
   }
 
+  // Step 7: Match each invoice row against listed items using ALL strategies
   const confirmedMap = {};
 
   histData.forEach(row => {
-    const codeKey     = normalizeSku(row.item_code || '');
-    const nameKey     = normalizeSku(row.item_name  || '');
-    const itemIdStr   = String(row.item_id   || '').trim();
+    const invoiceNameKey = normalizeSku(row.item_name || '');
+    const invoiceCodeKey = normalizeSku(row.item_code || '');
+    const itemIdStr = String(row.item_id || '').trim();
     const itemCodeStr = String(row.item_code || '').trim();
 
     let listingEntry = null;
 
-    // Strategy 1: item_name matches listed product name
-    if (!listingEntry && nameKey) listingEntry = listedByNameKey[nameKey];
+    // S1: Invoice item_name exactly matches listed product_name
+    if (!listingEntry && invoiceNameKey) listingEntry = listedByNameKey[invoiceNameKey];
 
-    // Strategy 2: item_name matches listed SKU
-    if (!listingEntry && nameKey) listingEntry = listedBySkuKey[nameKey];
+    // S2: Invoice item_name exactly matches listed SKU
+    if (!listingEntry && invoiceNameKey) listingEntry = listedBySkuKey[invoiceNameKey];
 
-    // Strategy 3: item_code matches listed SKU directly
-    if (!listingEntry && codeKey && !/^\d{10,}$/.test(row.item_code || '')) {
-      listingEntry = listedBySkuKey[codeKey];
-    }
+    // S3: Invoice item_code matches listed SKU
+    if (!listingEntry && invoiceCodeKey) listingEntry = listedBySkuKey[invoiceCodeKey];
 
-    // Strategy 4: resolve item_id → product → match
+    // S4: Invoice item_code matches listed product_name
+    if (!listingEntry && invoiceCodeKey) listingEntry = listedByNameKey[invoiceCodeKey];
+
+    // S5: Invoice item_id matches a zoho_item_id of a listed product
+    if (!listingEntry && itemIdStr) listingEntry = listedProductZohoIdToEntry[itemIdStr];
+
+    // S6: Invoice item_code (as zoho ID) matches a zoho_item_id of a listed product
+    if (!listingEntry && itemCodeStr) listingEntry = listedProductZohoIdToEntry[itemCodeStr];
+
+    // S7: Resolve invoice item_id → product → match listed item by product SKU/name
     if (!listingEntry && itemIdStr) {
       const product = productByZohoId[itemIdStr];
       if (product) {
-        listingEntry = listedByProductId[String(product.id)];
-        if (!listingEntry) listingEntry = listedBySkuKey[normalizeSku(product.sku || '')];
-        if (!listingEntry) listingEntry = listedByNameKey[normalizeSku(product.name || '')];
+        listingEntry = listedByProductId[String(product.id)]
+          || listedBySkuKey[normalizeSku(product.sku || '')]
+          || listedByNameKey[normalizeSku(product.name || '')];
       }
     }
 
-    // Strategy 5: resolve item_code as Zoho item ID → product lookup
+    // S8: Resolve invoice item_code → product → match
     if (!listingEntry && itemCodeStr) {
       const product = productByZohoId[itemCodeStr];
       if (product) {
-        listingEntry = listedByProductId[String(product.id)];
-        if (!listingEntry) listingEntry = listedBySkuKey[normalizeSku(product.sku || '')];
-        if (!listingEntry) listingEntry = listedByNameKey[normalizeSku(product.name || '')];
+        listingEntry = listedByProductId[String(product.id)]
+          || listedBySkuKey[normalizeSku(product.sku || '')]
+          || listedByNameKey[normalizeSku(product.name || '')];
       }
     }
 
-    // Strategy 6: item_code matches listed product name
-    if (!listingEntry && codeKey) listingEntry = listedByNameKey[codeKey];
+    // S9: invoice item_name contains or starts with listed product_name (or vice versa)
+    if (!listingEntry && invoiceNameKey && invoiceNameKey.length > 4) {
+      for (const [key, entry] of Object.entries(listedByNameKey)) {
+        if (key.length > 4 && (invoiceNameKey.includes(key) || key.includes(invoiceNameKey))) {
+          listingEntry = entry;
+          break;
+        }
+      }
+    }
+
+    // S10: invoice item_name fuzzy matches listed SKU
+    if (!listingEntry && invoiceNameKey && invoiceNameKey.length > 4) {
+      for (const [key, entry] of Object.entries(listedBySkuKey)) {
+        if (key.length > 4 && (invoiceNameKey.includes(key) || key.includes(invoiceNameKey))) {
+          listingEntry = entry;
+          break;
+        }
+      }
+    }
+
+    // ── KEY FIX: Match via allProducts as bridge ──
+    // Invoice has item_name like "STORAGE JAR RIBBED WITH LID 800ML"
+    // Listed item has product_name "STORAGE JAR RIBBED WITH LID 800ML" and SKU "KS0000141"
+    // Find product by invoice item_name → get product SKU → match listed item by SKU
+    if (!listingEntry && invoiceNameKey) {
+      // Find product whose name matches the invoice item_name
+      const matchedProduct = productByName[invoiceNameKey]
+        || allProducts.find(p => {
+          const pn = normalizeSku(p.name || '');
+          return pn.length > 4 && (invoiceNameKey.includes(pn) || pn.includes(invoiceNameKey));
+        });
+      if (matchedProduct) {
+        // Now find if this product's SKU is in our listed items
+        listingEntry = listedBySkuKey[normalizeSku(matchedProduct.sku || '')]
+          || listedByProductId[String(matchedProduct.id)]
+          || listedByNameKey[normalizeSku(matchedProduct.name || '')];
+      }
+    }
+
+    // ── KEY FIX 2: Match via allProducts using invoice item_code as product SKU bridge ──
+    // Invoice item_code might be a short code like "AG0005" that maps to a product
+    // whose full SKU "AG0000218" is in our listed items — find via name bridge
+    if (!listingEntry && invoiceCodeKey) {
+      const matchedProduct = productBySku[invoiceCodeKey]
+        || allProducts.find(p => normalizeSku(p.sku || '') === invoiceCodeKey);
+      if (matchedProduct) {
+        listingEntry = listedBySkuKey[normalizeSku(matchedProduct.sku || '')]
+          || listedByProductId[String(matchedProduct.id)]
+          || listedByNameKey[normalizeSku(matchedProduct.name || '')];
+      }
+    }
 
     if (!listingEntry) return;
 
-    const dedupeKey = normalizeSku(listingEntry.sku || '');
-    if (!confirmedMap[dedupeKey] || row.line_date > confirmedMap[dedupeKey].purchase_date) {
+    // Deduplicate: keep the most recent purchase per listed SKU
+    const dedupeKey = normalizeSku(listingEntry.sku || listingEntry.product_name || '');
+    if (!confirmedMap[dedupeKey] || (row.line_date || '') > (confirmedMap[dedupeKey].purchase_date || '')) {
       confirmedMap[dedupeKey] = {
         ...listingEntry,
-        purchase_date:  row.line_date,
-        invoice_id:     row.invoice_id,
-        purchase_qty:   row.quantity,
+        purchase_date: row.line_date,
+        invoice_id: row.invoice_id,
+        purchase_qty: row.quantity,
         purchase_price: row.unit_price,
       };
     }
@@ -3854,21 +3969,32 @@ async function loadListedItems(clientId) {
   const confirmedItems = Object.values(confirmedMap)
     .sort((a, b) => (b.purchase_date || '').localeCompare(a.purchase_date || ''));
 
-  const totalListed = Object.keys(listedBySkuKey).length;
+  const totalListed = listedItems.length;
 
   if (confirmedItems.length === 0) {
+    // Show debug info to help diagnose
+    const sampleInvoice = histData.slice(0, 3).map(r => `${r.item_code}|${r.item_name}|${r.item_id}`).join(', ');
+    const sampleListed = listedItems.slice(0, 3).map(r => `${r.sku}|${r.product_name}`).join(', ');
     tableEl.innerHTML = `
       <div style="padding:32px 20px;text-align:center;">
         <div style="font-size:32px;margin-bottom:10px;">⏳</div>
         <div style="font-weight:600;font-size:13px;margin-bottom:5px;">No purchases confirmed yet</div>
-        <div style="font-size:12px;color:var(--txt3);line-height:1.6;max-width:340px;margin:0 auto;">
-          ${totalListed} SKU${totalListed !== 1 ? 's' : ''} listed but none matched in Zoho invoices yet.
+        <div style="font-size:12px;color:var(--txt3);line-height:1.6;max-width:380px;margin:0 auto;">
+          ${totalListed} item${totalListed !== 1 ? 's' : ''} listed but none matched in Zoho invoices yet.
         </div>
+        ${histData.length > 0 ? `
+        <details style="margin-top:14px;text-align:left;max-width:500px;margin-left:auto;margin-right:auto;">
+          <summary style="font-size:11px;color:var(--txt3);cursor:pointer;">🔍 Debug info (${histData.length} invoice rows found)</summary>
+          <div style="margin-top:8px;font-size:10.5px;color:var(--txt3);background:var(--bg2);padding:10px;border-radius:8px;font-family:monospace;">
+            <div><strong>Invoice rows sample:</strong> ${sampleInvoice}</div>
+            <div style="margin-top:6px;"><strong>Listed items sample:</strong> ${sampleListed}</div>
+          </div>
+        </details>` : `<div style="font-size:11px;color:var(--txt3);margin-top:8px;">⚠️ No invoice records found for this client in the database. Try syncing invoices from Zoho.</div>`}
       </div>`;
     return;
   }
 
-  const convPct = Math.round(confirmedItems.length / totalListed * 100);
+  const convPct = Math.min(100, Math.round(confirmedItems.length / totalListed * 100));
 
   tableEl.innerHTML = `
     <div style="padding:8px 14px;background:linear-gradient(90deg,rgba(29,158,117,0.08),transparent);border-bottom:0.5px solid var(--brd);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -4388,157 +4514,211 @@ async function loadWalletScreen() {
 }
 
 async function loadRepWallet() {
-  // Get all submitted/fulfilled listings by this rep
+  // Step 1: Get all submitted/fulfilled orders by this rep
   const { data: repOrders } = await sb
     .from('orders')
-    .select('id, item_count, order_date, client_name, created_at, client_id')
+    .select('id, item_count, order_date, client_name, created_at, client_id, order_ref')
     .eq('created_by', currentUser.id)
     .in('status', ['submitted', 'fulfilled', 'partial'])
     .order('created_at', { ascending: false });
 
   const orders = repOrders || [];
-  
-  let totalConfirmedItems = 0;
-  const confirmedByOrder = {};
-  const confirmedStores = new Set();
-  
-  // For each order, check which items appear in "Listed Items" (Zoho purchases)
-  for (const order of orders) {
-    const clientId = order.client_id;
-    if (!clientId) continue;
-    
-    // Get items listed in this order
-    const { data: listedItems } = await sb
-      .from('order_items')
-      .select('sku, product_id, product_name')
-      .eq('order_id', order.id);
-    
-    if (!listedItems || listedItems.length === 0) continue;
-    
-    const listedSkus = new Set(listedItems.map(i => (i.sku || '').trim().toLowerCase()).filter(Boolean));
-    
-    // Get Zoho purchase history for this client (this populates "Listed Items" tab)
-    const client = allClients.find(c => c.id === clientId);
+
+  // Step 2: Get ALL order_items for these orders in one query
+  const orderIds = orders.map(o => o.id);
+  if (orderIds.length === 0) {
+    _walletPoints = 0;
+    renderRepWalletUI(0, 0, 0, [], {});
+    return;
+  }
+
+  const { data: allListedItems } = await sb
+    .from('order_items')
+    .select('order_id, sku, product_id, product_name')
+    .in('order_id', orderIds);
+
+  // Group listed items by order
+  const itemsByOrder = {};
+  (allListedItems || []).forEach(item => {
+    if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
+    itemsByOrder[item.order_id].push(item);
+  });
+
+  // Step 3: Build product lookup maps
+  const productBySku = {};
+  const productByName = {};
+  const productById = {};
+  allProducts.forEach(p => {
+    if (p.sku)  productBySku[normalizeSku(p.sku)]   = p;
+    if (p.name) productByName[normalizeSku(p.name)] = p;
+    if (p.id)   productById[String(p.id)]           = p;
+  });
+
+  // Step 4: Get all unique client IDs and fetch their Zoho purchase history ONCE per client
+  const uniqueClientIds = [...new Set(orders.map(o => o.client_id).filter(Boolean))];
+  const purchasedByClient = {}; // clientId -> { codes: Set, names: Set }
+
+  for (const clientId of uniqueClientIds) {
+    const client = allClients.find(c => String(c.id) === String(clientId));
     const zohoId = client?.zoho_customer_id;
     let histData = [];
-    
+
     if (zohoId) {
       const r = await sb.from('invoice_line_items')
-        .select('item_code').eq('customer_id', zohoId);
+        .select('item_code, item_name, item_id')
+        .eq('customer_id', zohoId);
       if (!r.error) histData = r.data || [];
     }
     if (!zohoId || histData.length === 0) {
       const r = await sb.from('invoice_line_items')
-        .select('item_code').ilike('customer_name', client?.name || '');
+        .select('item_code, item_name, item_id')
+        .ilike('customer_name', client?.name || '');
       if (!r.error) histData = r.data || [];
     }
-    
-    const purchasedCodes = new Set(
-      histData.map(r => (r.item_code || '').trim().toLowerCase()).filter(Boolean)
-    );
-    
-    // Count how many listed SKUs appear in "Listed Items" (Zoho purchases)
-    let confirmedCount = 0;
-    listedSkus.forEach(sku => {
-      if (purchasedCodes.has(sku)) confirmedCount++;
+
+    const codes = new Set();
+    const names = new Set();
+    const itemIds = new Set();
+
+    histData.forEach(r => {
+      if (r.item_code) codes.add(normalizeSku(r.item_code));
+      if (r.item_name) names.add(normalizeSku(r.item_name));
+      if (r.item_id)   itemIds.add(String(r.item_id).trim());
     });
-    
-    confirmedByOrder[order.id] = confirmedCount;
-    totalConfirmedItems += confirmedCount;
-    
-    if (confirmedCount > 0 && client?.name) {
-      confirmedStores.add(client.name);
-    }
+
+    purchasedByClient[clientId] = { codes, names, itemIds };
   }
-  
-  const points = totalConfirmedItems * 1;  // 1 point per confirmed item
-  _walletPoints = points;
-  const ugxValue = points * 1000;  // 1 point = UGX 1,000
-  const pct = Math.min(100, Math.round((points / 50) * 100));
-  const needed = Math.max(0, 50 - points);
-  
-  // Unique stores with confirmed purchases
-  const uniqueStores = confirmedStores.size;
-  
-  // Tracking start date (first order with confirmed purchase)
-  let trackingDate = new Date().toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  // Step 5: For each order, count how many listed SKUs were actually purchased
+  const confirmedByOrder = {};
+  const confirmedStores = new Set();
+  let totalConfirmedItems = 0;
+
   for (const order of orders) {
-    if (confirmedByOrder[order.id] > 0) {
-      trackingDate = new Date(order.created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
-      break;
+    const clientId = order.client_id;
+    const listedItems = itemsByOrder[order.id] || [];
+    if (!clientId || listedItems.length === 0) {
+      confirmedByOrder[order.id] = 0;
+      continue;
     }
+
+    const { codes, names, itemIds } = purchasedByClient[clientId] || { codes: new Set(), names: new Set(), itemIds: new Set() };
+
+    let confirmed = 0;
+    for (const item of listedItems) {
+      const skuKey  = normalizeSku(item.sku || '');
+      const nameKey = normalizeSku(item.product_name || '');
+
+      // Match 1: SKU directly in invoice item_code
+      if (skuKey && codes.has(skuKey)) { confirmed++; continue; }
+
+      // Match 2: product_name in invoice item_name
+      if (nameKey && names.has(nameKey)) { confirmed++; continue; }
+
+      // Match 3: SKU in invoice item_name (Zoho sometimes puts SKU as item_name)
+      if (skuKey && names.has(skuKey)) { confirmed++; continue; }
+
+      // Match 4: product_name in invoice item_code
+      if (nameKey && codes.has(nameKey)) { confirmed++; continue; }
+
+      // Match 5: resolve product → check zoho_item_id against invoice item_id
+      const product = (item.product_id ? productById[String(item.product_id)] : null)
+                   || productBySku[skuKey]
+                   || productByName[nameKey];
+      if (product) {
+        if (product.zoho_item_id && itemIds.has(String(product.zoho_item_id).trim())) { confirmed++; continue; }
+
+        // Match 6: product name vs invoice item_name (fuzzy substring)
+        const pNameKey = normalizeSku(product.name || '');
+        if (pNameKey && pNameKey.length > 4) {
+          let matched = false;
+          for (const invoiceName of names) {
+            if (invoiceName.length > 4 && (invoiceName.includes(pNameKey) || pNameKey.includes(invoiceName))) {
+              matched = true; break;
+            }
+          }
+          if (matched) { confirmed++; continue; }
+        }
+      }
+    }
+
+    confirmedByOrder[order.id] = confirmed;
+    totalConfirmedItems += confirmed;
+    if (confirmed > 0 && order.client_name) confirmedStores.add(order.client_name);
   }
-  
-  // Update hero UI
+
+  _walletPoints = totalConfirmedItems;
+  renderRepWalletUI(totalConfirmedItems, confirmedStores.size, orders.length, orders, confirmedByOrder);
+}
+
+function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, orders, confirmedByOrder) {
+  const points  = totalConfirmedItems;
+  const ugxValue = points * 1000;
+  const pct     = Math.min(100, Math.round((points / 50) * 100));
+  const needed  = Math.max(0, 50 - points);
+
+  // Hero
   document.getElementById('wallet-hero-pts').textContent = points.toLocaleString();
   document.getElementById('wallet-hero-ugx').textContent = `= UGX ${ugxValue.toLocaleString()}`;
-  document.getElementById('wallet-tracking-date').textContent = `Tracking from ${trackingDate}`;
+  document.getElementById('wallet-tracking-date').textContent =
+    `Updated ${new Date().toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' })}`;
   document.getElementById('wallet-progress-label').textContent = `${points} / 50`;
   document.getElementById('wallet-progress-fill').style.width = pct + '%';
   document.getElementById('wallet-progress-sub').textContent = needed > 0
-    ? `${needed} more points needed to redeem (earn 1 point per item when store purchases it)`
-    : 'You are eligible to redeem!';
-  document.getElementById('wallet-stat-items').textContent = totalConfirmedItems;
-  document.getElementById('wallet-stat-stores').textContent = uniqueStores;
-  
-  // Alert text
-  const alertEl = document.getElementById('wallet-alert-not-eligible');
+    ? `${needed} more confirmed purchases needed to redeem`
+    : '🎉 You are eligible to redeem!';
+  document.getElementById('wallet-stat-items').textContent   = totalConfirmedItems;
+  document.getElementById('wallet-stat-stores').textContent  = uniqueStores;
+
+  // Alert
+  const alertEl   = document.getElementById('wallet-alert-not-eligible');
   const alertText = document.getElementById('wallet-alert-text');
-  if (points >= 500) {
+  if (points >= 50) {
     alertEl.className = 'alert ag';
-    alertText.innerHTML = `🎉 You have <strong>${points} points (UGX ${ugxValue.toLocaleString()})</strong> from ${totalConfirmedItems} confirmed purchased items — you are eligible to request a payout!`;
+    alertText.innerHTML = `🎉 You have <strong>${points} points (UGX ${ugxValue.toLocaleString()})</strong> from ${totalConfirmedItems} confirmed purchases — you are eligible to request a payout!`;
   } else {
     alertEl.className = 'alert aw';
-    alertText.innerHTML = `📋 You need <strong>50 points (UGX 50,000)</strong> to redeem. You currently have ${points} points from ${totalConfirmedItems} confirmed purchased items — ${needed} more to go!<br><br>✅ Items earn 1 points ONLY when they appear in the <strong>"Listed Items" tab</strong> (store actually purchases them).`;
+    alertText.innerHTML = `You have <strong>${points} points</strong> from ${totalConfirmedItems} confirmed purchased items. Need ${needed} more to reach 50 pts (UGX 50,000).<br><br>✅ Points are earned when a listed item appears in <strong>"Successful Listing"</strong> tab — meaning the store actually bought it.`;
   }
-  
+
   // Redeem card
-  document.getElementById('redeem-current-pts').textContent = `${points} pts`;
+  document.getElementById('redeem-current-pts').textContent  = `${points} pts`;
   document.getElementById('redeem-still-needed').textContent = `${needed} pts`;
-  
   if (points >= 50) {
-    document.getElementById('wallet-redeem-body').style.display = 'none';
+    document.getElementById('wallet-redeem-body').style.display  = 'none';
     document.getElementById('wallet-eligible-body').style.display = 'block';
-    document.getElementById('wallet-eligible-ugx').textContent = `UGX ${ugxValue.toLocaleString()}`;
-    document.getElementById('wallet-eligible-pts').textContent = `${points} points from ${totalConfirmedItems} confirmed purchases`;
+    document.getElementById('wallet-eligible-ugx').textContent   = `UGX ${ugxValue.toLocaleString()}`;
+    document.getElementById('wallet-eligible-pts').textContent   = `${points} points from ${totalConfirmedItems} confirmed purchases`;
   } else {
-    document.getElementById('wallet-redeem-body').style.display = 'block';
+    document.getElementById('wallet-redeem-body').style.display  = 'block';
     document.getElementById('wallet-eligible-body').style.display = 'none';
   }
-  
-  // Recent earnings - show only orders with confirmed purchases
-  const earnedOrders = orders.filter(o => (confirmedByOrder[o.id] || 0) > 0).slice(0, 5);
-  
-  if (earnedOrders.length === 0) {
-    document.getElementById('wallet-recent-earnings').innerHTML = 
-      '<div class="empty-state">📭 No confirmed purchases yet. Items earn 1 points EACH once they appear in the <strong>"Listed Items" tab</strong> (store purchases them).</div>';
+
+  // Recent earnings
+  const earned = orders.filter(o => (confirmedByOrder[o.id] || 0) > 0).slice(0, 8);
+  if (earned.length === 0) {
+    document.getElementById('wallet-recent-earnings').innerHTML =
+      '<div class="empty-state">No confirmed purchases yet. Points are earned once the store purchases your listed items.</div>';
     document.getElementById('wallet-earnings-badge').textContent = '+0 pts this month';
   } else {
-    let earningsHtml = '';
-    earnedOrders.forEach(o => {
-      const confirmed = confirmedByOrder[o.id] || 0;
-      const ptsEarned = confirmed * 10;
+    document.getElementById('wallet-recent-earnings').innerHTML = earned.map(o => {
+      const count   = confirmedByOrder[o.id] || 0;
+      const pts     = count * 1;
       const dateStr = new Date(o.created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
-      earningsHtml += `
-        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
-          <div class="tl-icon tl-earn">✓</div>
-          <div style="flex:1;">
-            <div style="font-size:12.5px;font-weight:500;">${o.client_name || '—'} — ${confirmed} item${confirmed !== 1 ? 's' : ''} purchased by store</div>
-            <div style="font-size:11px;color:var(--txt3);margin-top:2px;">${dateStr} · Appeared in "Listed Items" tab</div>
-          </div>
-          <div class="tl-amount earn" style="font-size:13px;font-weight:600;">+${ptsEarned} pts</div>
-        </div>`;
-    });
-    document.getElementById('wallet-recent-earnings').innerHTML = earningsHtml;
-    
-    // This month's confirmed points
+      return `<div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
+        <div class="tl-icon tl-earn" style="font-size:13px;">✓</div>
+        <div style="flex:1;">
+          <div style="font-size:12.5px;font-weight:500;">${o.client_name || '—'} — ${count} item${count !== 1 ? 's' : ''} confirmed purchased</div>
+          <div style="font-size:11px;color:var(--txt3);margin-top:2px;">${dateStr} · Ref: ${o.order_ref || '—'}</div>
+        </div>
+        <div class="tl-amount earn" style="font-size:13px;font-weight:600;color:#1D9E75;">+${pts} pts</div>
+      </div>`;
+    }).join('');
+
     const thisMonth = new Date().toISOString().slice(0, 7);
-    let monthPts = 0;
-    for (const order of orders) {
-      if ((order.created_at || '').startsWith(thisMonth) && (confirmedByOrder[order.id] || 0) > 0) {
-        monthPts += (confirmedByOrder[order.id] || 0) * 10;
-      }
-    }
+    const monthPts  = orders
+      .filter(o => (o.created_at || '').startsWith(thisMonth) && (confirmedByOrder[o.id] || 0) > 0)
+      .reduce((s, o) => s + (confirmedByOrder[o.id] || 0), 0);
     document.getElementById('wallet-earnings-badge').textContent = `+${monthPts} pts this month`;
   }
 }
@@ -4573,108 +4753,158 @@ async function loadAdminWallet() {
   const { data: allUsers } = await sb.from('users').select('id,full_name,email,role').order('full_name');
   const reps = (allUsers || []).filter(u => u.role === 'sales_rep' && u.is_active !== false);
 
-  // Get ALL orders by ALL reps
   const { data: allOrders } = await sb
     .from('orders')
-    .select('id, item_count, created_by, client_name, client_id, created_at, order_date')
+    .select('id, created_by, client_id, client_name')
     .in('status', ['submitted', 'fulfilled', 'partial']);
 
   const orders = allOrders || [];
-  
-  // Initialize rep stats
+
   const repStats = {};
   reps.forEach(u => {
-    repStats[u.id] = { 
-      name: u.full_name, 
-      items: 0, 
-      points: 0, 
-      ugx: 0, 
-      redeemed: 0, 
-      stores: new Set()
-    };
+    repStats[u.id] = { name: u.full_name, items: 0, points: 0, ugx: 0, redeemed: 0, stores: new Set() };
   });
-  
-  // Group orders by rep
-  const ordersByRep = {};
-  orders.forEach(o => {
-    if (o.created_by) {
-      if (!ordersByRep[o.created_by]) ordersByRep[o.created_by] = [];
-      ordersByRep[o.created_by].push(o);
+
+  if (orders.length === 0) { _renderAdminWalletUI(repStats, Object.entries(repStats)); return; }
+
+  // ── Get ALL order_items in one bulk query ──
+  const allOrderIds = orders.map(o => o.id);
+  const { data: allOrderItems } = await sb
+    .from('order_items')
+    .select('order_id, sku, product_id, product_name')
+    .in('order_id', allOrderIds);
+
+  const itemsByOrder = {};
+  (allOrderItems || []).forEach(item => {
+    if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
+    itemsByOrder[item.order_id].push(item);
+  });
+
+  // ── Get unique client IDs, fetch invoice history ONCE per client ──
+  const uniqueClientIds = [...new Set(orders.map(o => o.client_id).filter(Boolean))];
+  const purchasedByClient = {};
+
+  for (const clientId of uniqueClientIds) {
+    const client = allClients.find(c => String(c.id) === String(clientId));
+    const zohoId = client?.zoho_customer_id;
+    let histData = [];
+
+    if (zohoId) {
+      let allRows = [], from = 0;
+      while (true) {
+        const r = await sb.from('invoice_line_items')
+          .select('item_code, item_name, item_id')
+          .eq('customer_id', zohoId)
+          .range(from, from + 999);
+        if (r.error || !r.data || r.data.length === 0) break;
+        allRows = allRows.concat(r.data);
+        if (r.data.length < 1000) break;
+        from += 1000;
+      }
+      histData = allRows;
     }
-  });
-  
-  // For each rep, calculate ONLY items that appear in "Listed Items" (Zoho purchases)
-  for (const [repId, repOrders] of Object.entries(ordersByRep)) {
-    if (!repStats[repId]) continue;
-    
-    let totalConfirmedItems = 0;
-    
-    for (const order of repOrders) {
-      const clientId = order.client_id;
-      if (!clientId) continue;
-      
-      // Get items listed in this order
-      const { data: listedItems } = await sb
-        .from('order_items')
-        .select('sku, product_id')
-        .eq('order_id', order.id);
-      
-      if (!listedItems || listedItems.length === 0) continue;
-      
-      const listedSkus = new Set(listedItems.map(i => (i.sku || '').trim().toLowerCase()).filter(Boolean));
-      
-      // Get Zoho purchase history for this client (this populates "Listed Items" tab)
-      const client = allClients.find(c => c.id === clientId);
-      const zohoId = client?.zoho_customer_id;
-      let histData = [];
-      
-      if (zohoId) {
-        const r = await sb.from('invoice_line_items')
-          .select('item_code').eq('customer_id', zohoId);
-        if (!r.error) histData = r.data || [];
-      }
-      if (!zohoId || histData.length === 0) {
-        const r = await sb.from('invoice_line_items')
-          .select('item_code').ilike('customer_name', client?.name || '');
-        if (!r.error) histData = r.data || [];
-      }
-      
-      const purchasedCodes = new Set(
-        histData.map(r => (r.item_code || '').trim().toLowerCase()).filter(Boolean)
-      );
-      
-      // Count how many listed SKUs appear in "Listed Items" (Zoho purchases)
-      let confirmedCount = 0;
-      listedSkus.forEach(sku => {
-        if (purchasedCodes.has(sku)) confirmedCount++;
-      });
-      
-      totalConfirmedItems += confirmedCount;
-      if (confirmedCount > 0 && client?.name) {
-        repStats[repId].stores.add(client.name);
+    if (!zohoId || histData.length === 0) {
+      const clientName = client?.name || '';
+      if (clientName) {
+        let allRows = [], from = 0;
+        while (true) {
+          const r = await sb.from('invoice_line_items')
+            .select('item_code, item_name, item_id')
+            .ilike('customer_name', clientName)
+            .range(from, from + 999);
+          if (r.error || !r.data || r.data.length === 0) break;
+          allRows = allRows.concat(r.data);
+          if (r.data.length < 1000) break;
+          from += 1000;
+        }
+        histData = allRows;
       }
     }
-    
-    // Calculate points based on items that appear in "Listed Items" tab only
-    repStats[repId].items = totalConfirmedItems;
-    repStats[repId].points = totalConfirmedItems * 1;  // 1 point per confirmed item
-    repStats[repId].ugx = repStats[repId].points * 1000; // 1,000 UGX per point
+
+    const codes   = new Set();
+    const names   = new Set();
+    const itemIds = new Set();
+    histData.forEach(r => {
+      if (r.item_code) codes.add(normalizeSku(r.item_code));
+      if (r.item_name) names.add(normalizeSku(r.item_name));
+      if (r.item_id)   itemIds.add(String(r.item_id).trim());
+    });
+    purchasedByClient[String(clientId)] = { codes, names, itemIds };
   }
-  
-  // Sort by points descending
+
+  // ── Product lookup maps ──
+  const productBySku  = {};
+  const productByName = {};
+  const productById   = {};
+  allProducts.forEach(p => {
+    if (p.sku)  productBySku[normalizeSku(p.sku)]   = p;
+    if (p.name) productByName[normalizeSku(p.name)] = p;
+    if (p.id)   productById[String(p.id)]           = p;
+  });
+
+  // ── Count confirmed items per order ──
+  for (const order of orders) {
+    const repId    = order.created_by;
+    const clientId = String(order.client_id || '');
+    if (!repId || !repStats[repId] || !clientId) continue;
+
+    const listedItems = itemsByOrder[order.id] || [];
+    if (listedItems.length === 0) continue;
+
+    const { codes, names, itemIds } = purchasedByClient[clientId] || { codes: new Set(), names: new Set(), itemIds: new Set() };
+
+    let confirmed = 0;
+    for (const item of listedItems) {
+      const skuKey  = normalizeSku(item.sku || '');
+      const nameKey = normalizeSku(item.product_name || '');
+
+      // 6 matching strategies — same as Successful Listing tab
+      if (skuKey  && codes.has(skuKey))  { confirmed++; continue; }
+      if (nameKey && names.has(nameKey)) { confirmed++; continue; }
+      if (skuKey  && names.has(skuKey))  { confirmed++; continue; }
+      if (nameKey && codes.has(nameKey)) { confirmed++; continue; }
+
+      const product = (item.product_id ? productById[String(item.product_id)] : null)
+                   || productBySku[skuKey]
+                   || productByName[nameKey];
+      if (product) {
+        if (product.zoho_item_id && itemIds.has(String(product.zoho_item_id).trim())) { confirmed++; continue; }
+
+        // Fuzzy name match (product name vs invoice item_name)
+        const pNameKey = normalizeSku(product.name || '');
+        if (pNameKey && pNameKey.length > 4) {
+          let matched = false;
+          for (const invoiceName of names) {
+            if (invoiceName.length > 4 && (invoiceName.includes(pNameKey) || pNameKey.includes(invoiceName))) {
+              matched = true; break;
+            }
+          }
+          if (matched) { confirmed++; continue; }
+        }
+      }
+    }
+
+    repStats[repId].items  += confirmed;
+    repStats[repId].points += confirmed;
+    repStats[repId].ugx    += confirmed * 1000;
+    if (confirmed > 0 && order.client_name) repStats[repId].stores.add(order.client_name);
+  }
+
   const repList = Object.entries(repStats).sort((a, b) => b[1].points - a[1].points);
-  const totalPoints = repList.reduce((s, [, r]) => s + r.points, 0);
+  _renderAdminWalletUI(repStats, repList);
+}
+
+function _renderAdminWalletUI(repStats, repList) {
+  const totalPoints   = repList.reduce((s, [, r]) => s + r.points, 0);
   const eligibleCount = repList.filter(([, r]) => r.points >= 50).length;
   const totalRedeemed = repList.reduce((s, [, r]) => s + (r.redeemed || 0), 0);
-  
-  // Update metrics cards
-  document.getElementById('wadmin-total-pts').textContent = totalPoints.toLocaleString();
+
+  document.getElementById('wadmin-total-pts').textContent     = totalPoints.toLocaleString();
   document.getElementById('wadmin-total-redeemed').textContent = `UGX ${totalRedeemed.toLocaleString()}`;
-  document.getElementById('wadmin-eligible').textContent = eligibleCount;
+  document.getElementById('wadmin-eligible').textContent      = eligibleCount;
   document.getElementById('wadmin-leaderboard-month').textContent =
     new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-  
-  // Leaderboard
+
   const avColors = [
     {bg:'var(--royal-light)',txt:'var(--royal)'},
     {bg:'#EAF3DE',txt:'#3B6D11'},
@@ -4684,108 +4914,97 @@ async function loadAdminWallet() {
   ];
   const medals = ['🥇','🥈','🥉'];
   const maxPts = repList[0]?.[1]?.points || 1;
-  
-  if (repList.length === 0) {
-    document.getElementById('wadmin-leaderboard-list').innerHTML = '<div class="empty-state">No reps found.</div>';
-  } else {
-    document.getElementById('wadmin-leaderboard-list').innerHTML = repList.slice(0, 8).map(([repId, s], i) => {
-      const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-      const barPct = maxPts > 0 ? Math.round((s.points / maxPts) * 100) : 0;
-      const ci = i % 5;
-      const eligible = s.points >= 500;
-      return `<div class="earner-row">
-        <div class="earner-rank">${medals[i] || i + 1}</div>
-        <div class="earner-av" style="background:${avColors[ci].bg};color:${avColors[ci].txt};">${initials}</div>
-        <div class="earner-info">
-          <div class="earner-name">${s.name}</div>
-          <div class="earner-pts">${s.points} pts · ${s.items} item${s.items !== 1 ? 's' : ''} confirmed in "Listed Items"</div>
-        </div>
-        <div class="earner-bar-wrap">
-          <div class="earner-bar">
-            <div class="earner-bar-fill" style="width:${barPct}%;background:${eligible ? '#1D9E75' : 'var(--royal)'};"></div>
+
+  // Leaderboard
+  document.getElementById('wadmin-leaderboard-list').innerHTML = repList.length === 0
+    ? '<div class="empty-state">No reps found.</div>'
+    : repList.slice(0, 8).map(([repId, s], i) => {
+        const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        const barPct   = maxPts > 0 ? Math.round((s.points / maxPts) * 100) : 0;
+        const ci       = i % 5;
+        const eligible = s.points >= 50;
+        return `<div class="earner-row">
+          <div class="earner-rank">${medals[i] || i + 1}</div>
+          <div class="earner-av" style="background:${avColors[ci].bg};color:${avColors[ci].txt};">${initials}</div>
+          <div class="earner-info">
+            <div class="earner-name">${s.name}</div>
+            <div class="earner-pts">${s.points} pts · ${s.items} item${s.items !== 1 ? 's' : ''} confirmed</div>
           </div>
-        </div>
-        <div class="earner-ugx" style="color:${eligible ? '#1D9E75' : 'var(--royal)'};">UGX ${s.ugx.toLocaleString()}</div>
-      </div>`;
-    }).join('');
-  }
-  
-  // Desktop table
-  const tbody = document.getElementById('wadmin-reps-tbody');
-  const cardsEl = document.getElementById('wadmin-reps-cards');
-  
-  if (repList.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;">No sales reps found.</td></tr>';
-    cardsEl.innerHTML = '<div class="empty-state">No sales reps found.</div>';
-  } else {
-    tbody.innerHTML = repList.map(([repId, s]) => {
-      const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-      const isEligible = s.points >= 500;
-      const shortfall = 50 - s.points;
-      const balance = s.ugx;
-      return `<tr>
-        <td><div style="display:flex;align-items:center;gap:8px;">
-          <div style="width:28px;height:28px;border-radius:50%;background:var(--royal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">${initials}</div>
-          ${s.name}
-        </div></td>
-        <td>${s.items}</td>
-        <td style="font-weight:600;color:var(--royal);">${s.points}</td>
-        <td>UGX ${s.ugx.toLocaleString()}</td>
-        <td>UGX ${(s.redeemed || 0).toLocaleString()}</td>
-        <td style="font-weight:600;">UGX ${balance.toLocaleString()}</td>
-        <td>${isEligible
-          ? '<span class="badge bg">Eligible ✓</span>'
-          : `<span class="badge br">${shortfall} pts short</span>`}
-        </td>
-        <td><button class="btn btn-sm ${isEligible ? 'btn-green' : ''}"
-          ${isEligible
-            ? `onclick="adminApproveWalletPayout('${repId}','${s.name.replace(/'/g,"\\'")}',${s.ugx},${s.points})"`
-            : 'style="opacity:0.4;" disabled'}>
-          Pay out
-        </button></td>
-      </tr>`;
-    }).join('');
-    
-    // Mobile cards
-    cardsEl.innerHTML = repList.map(([repId, s], i) => {
-      const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-      const isEligible = s.points >= 500;
-      const shortfall = 500 - s.points;
-      const pct = Math.min(100, Math.round((s.points / 50) * 100));
-      const ci = i % 5;
-      return `
-        <div style="padding:14px 0;border-bottom:0.5px solid var(--brd);">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-            <div style="width:42px;height:42px;border-radius:50%;background:${avColors[ci].bg};color:${avColors[ci].txt};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">${initials}</div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div>
-              <div style="font-size:10.5px;color:var(--txt3);margin-top:1px;">${s.items} item${s.items!==1?'s':''} confirmed in "Listed Items"</div>
-            </div>
-            <div style="text-align:right;flex-shrink:0;">
-              <div style="font-size:17px;font-weight:700;color:${isEligible?'#1D9E75':'var(--royal)'};">${s.points}<span style="font-size:11px;font-weight:500;"> pts</span></div>
-              <div style="font-size:10px;color:var(--txt3);">UGX ${s.ugx.toLocaleString()}</div>
-            </div>
-          </div>
-          <div style="margin-bottom:10px;">
-            <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--txt3);margin-bottom:4px;">
-              <span>Progress to 500 pts</span>
-              <span style="font-weight:600;color:${isEligible?'#1D9E75':'var(--royal)'};">${pct}%</span>
-            </div>
-            <div style="height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;">
-              <div style="height:100%;width:${pct}%;border-radius:3px;background:${isEligible?'#1D9E75':'var(--royal)'};transition:width 0.4s;"></div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-            ${isEligible
-              ? `<span class="badge bg" style="font-size:11px;">✓ Eligible for payout</span>
-                 <button class="btn btn-sm btn-green" onclick="adminApproveWalletPayout('${repId}','${s.name.replace(/'/g,"\\'")}',${s.ugx},${s.points})" style="white-space:nowrap;padding:6px 14px;">Pay out →</button>`
-              : `<span class="badge br" style="font-size:11px;">Needs ${shortfall} more pts</span>
-                 <button class="btn btn-sm" style="opacity:0.4;cursor:not-allowed;white-space:nowrap;" disabled>Pay out</button>`
-            }
-          </div>
+          <div class="earner-bar-wrap"><div class="earner-bar">
+            <div class="earner-bar-fill" style="width:${barPct}%;background:${eligible?'#1D9E75':'var(--royal)'};"></div>
+          </div></div>
+          <div class="earner-ugx" style="color:${eligible?'#1D9E75':'var(--royal)'};">UGX ${s.ugx.toLocaleString()}</div>
         </div>`;
-    }).join('');
+      }).join('');
+
+  // Desktop table
+  const tbody   = document.getElementById('wadmin-reps-tbody');
+  const cardsEl = document.getElementById('wadmin-reps-cards');
+
+  if (repList.length === 0) {
+    tbody.innerHTML   = '<tr><td colspan="8" style="text-align:center;padding:20px;">No sales reps found.</td></tr>';
+    cardsEl.innerHTML = '<div class="empty-state">No sales reps found.</div>';
+    return;
   }
+
+  tbody.innerHTML = repList.map(([repId, s]) => {
+    const initials  = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const isEligible = s.points >= 50;
+    const shortfall  = Math.max(0, 50 - s.points);
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--royal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">${initials}</div>
+        ${s.name}
+      </div></td>
+      <td>${s.items}</td>
+      <td style="font-weight:600;color:var(--royal);">${s.points}</td>
+      <td>UGX ${s.ugx.toLocaleString()}</td>
+      <td>UGX ${(s.redeemed || 0).toLocaleString()}</td>
+      <td style="font-weight:600;">UGX ${s.ugx.toLocaleString()}</td>
+      <td>${isEligible ? '<span class="badge bg">Eligible ✓</span>' : `<span class="badge br">${shortfall} pts short</span>`}</td>
+      <td><button class="btn btn-sm ${isEligible ? 'btn-green' : ''}"
+        ${isEligible
+          ? `onclick="adminApproveWalletPayout('${repId}','${s.name.replace(/'/g,"\\'")}',${s.ugx},${s.points})"`
+          : 'style="opacity:0.4;" disabled'}>Pay out</button></td>
+    </tr>`;
+  }).join('');
+
+  cardsEl.innerHTML = repList.map(([repId, s], i) => {
+    const initials   = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const isEligible = s.points >= 50;
+    const shortfall  = Math.max(0, 50 - s.points);
+    const pct        = Math.min(100, Math.round((s.points / 50) * 100));
+    const ci         = i % 5;
+    return `<div style="padding:14px 0;border-bottom:0.5px solid var(--brd);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="width:42px;height:42px;border-radius:50%;background:${avColors[ci].bg};color:${avColors[ci].txt};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">${initials}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div>
+          <div style="font-size:10.5px;color:var(--txt3);margin-top:1px;">${s.items} confirmed purchase${s.items!==1?'s':''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:17px;font-weight:700;color:${isEligible?'#1D9E75':'var(--royal)'};">${s.points}<span style="font-size:11px;font-weight:500;"> pts</span></div>
+          <div style="font-size:10px;color:var(--txt3);">UGX ${s.ugx.toLocaleString()}</div>
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--txt3);margin-bottom:4px;">
+          <span>Progress to 50 pts</span>
+          <span style="font-weight:600;color:${isEligible?'#1D9E75':'var(--royal)'};">${pct}%</span>
+        </div>
+        <div style="height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;border-radius:3px;background:${isEligible?'#1D9E75':'var(--royal)'};transition:width 0.4s;"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        ${isEligible
+          ? `<span class="badge bg" style="font-size:11px;">✓ Eligible for payout</span>
+             <button class="btn btn-sm btn-green" onclick="adminApproveWalletPayout('${repId}','${s.name.replace(/'/g,"\\'")}',${s.ugx},${s.points})" style="white-space:nowrap;padding:6px 14px;">Pay out →</button>`
+          : `<span class="badge br" style="font-size:11px;">Needs ${shortfall} more pts</span>
+             <button class="btn btn-sm" style="opacity:0.4;cursor:not-allowed;white-space:nowrap;" disabled>Pay out</button>`}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function exportWalletCSV() {
