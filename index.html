@@ -1920,12 +1920,19 @@ function findProduct(skuRow) {
   }
   if (histError) { tableEl.innerHTML=`<div style="padding:20px;text-align:center;color:#A32D2D;">Error loading history: ${histError.message}</div>`; return; }
 
-  const purchasedCodes   = new Set();
+const purchasedCodes   = new Set();
   const purchasedItemIds = new Set();
   (histData||[]).forEach(r=>{
-    if (r.item_code) purchasedCodes.add(r.item_code.trim().toLowerCase());
-    if (r.item_id)   purchasedItemIds.add(String(r.item_id).trim());
+    // Match by item_name (most reliable — always a readable product name)
     if (r.item_name) purchasedCodes.add(r.item_name.trim().toLowerCase());
+    // Match by item_code IF it looks like a SKU (not a pure numeric Zoho ID)
+    if (r.item_code && !/^\d{10,}$/.test(r.item_code.trim())) {
+      purchasedCodes.add(r.item_code.trim().toLowerCase());
+    }
+    // Always index the raw item_id for ID-based matching
+    if (r.item_id)   purchasedItemIds.add(String(r.item_id).trim());
+    // Also index item_code as a potential Zoho item ID
+    if (r.item_code) purchasedItemIds.add(String(r.item_code).trim());
   });
 
   // Also exclude SKUs already saved in KTLSALES listings for this client
@@ -3802,19 +3809,61 @@ if (zohoId) {
 
   const confirmedMap = {};
 
-  histData.forEach(row => {
-    const codeKey   = normalizeSku(row.item_code || '');
-    const nameKey   = normalizeSku(row.item_name  || '');
-    const itemIdStr = String(row.item_id  || '').trim();
+histData.forEach(row => {
+    const codeKey     = normalizeSku(row.item_code || '');
+    const nameKey     = normalizeSku(row.item_name  || '');
+    const itemIdStr   = String(row.item_id   || '').trim();
     const itemCodeStr = String(row.item_code || '').trim();
 
     let listingEntry = null;
 
-    // Strategy 1: direct SKU match
-    if (!listingEntry && codeKey) listingEntry = listedBySkuKey[codeKey];
-
-    // Strategy 2: direct name match
+    // Strategy 1: item_name matches listed product name (most reliable)
     if (!listingEntry && nameKey) listingEntry = listedByNameKey[nameKey];
+
+    // Strategy 2: item_name matches listed SKU (e.g. item_name="KA0000083")
+    if (!listingEntry && nameKey) listingEntry = listedBySkuKey[nameKey];
+
+    // Strategy 3: item_code matches listed SKU directly (when item_code is a SKU)
+    if (!listingEntry && codeKey && !/^\d{10,}$/.test(row.item_code || '')) {
+      listingEntry = listedBySkuKey[codeKey];
+    }
+
+    // Strategy 4: resolve item_id → product → match via product_id or SKU
+    if (!listingEntry && itemIdStr) {
+      const product = productByZohoId[itemIdStr];
+      if (product) {
+        listingEntry = listedByProductId[String(product.id)];
+        if (!listingEntry) listingEntry = listedBySkuKey[normalizeSku(product.sku || '')];
+        if (!listingEntry) listingEntry = listedByNameKey[normalizeSku(product.name || '')];
+      }
+    }
+
+    // Strategy 5: resolve item_code as a Zoho item ID → product lookup
+    if (!listingEntry && itemCodeStr) {
+      const product = productByZohoId[itemCodeStr];
+      if (product) {
+        listingEntry = listedByProductId[String(product.id)];
+        if (!listingEntry) listingEntry = listedBySkuKey[normalizeSku(product.sku || '')];
+        if (!listingEntry) listingEntry = listedByNameKey[normalizeSku(product.name || '')];
+      }
+    }
+
+    // Strategy 6: item_code matches listed product name
+    if (!listingEntry && codeKey) listingEntry = listedByNameKey[codeKey];
+
+    if (!listingEntry) return;
+
+    const dedupeKey = normalizeSku(listingEntry.sku || '');
+    if (!confirmedMap[dedupeKey] || row.line_date > confirmedMap[dedupeKey].purchase_date) {
+      confirmedMap[dedupeKey] = {
+        ...listingEntry,
+        purchase_date:  row.line_date,
+        invoice_id:     row.invoice_id,
+        purchase_qty:   row.quantity,
+        purchase_price: row.unit_price,
+      };
+    }
+  });
 
     // Strategy 3: item_code is a Zoho numeric ID → resolve via products table
     if (!listingEntry && itemIdStr) {
