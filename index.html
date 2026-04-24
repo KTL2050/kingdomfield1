@@ -3709,7 +3709,7 @@ async function loadListedItems(clientId) {
   tableEl.innerHTML = `<div style="padding:24px;text-align:center;color:var(--txt3);">
     <div style="font-size:20px;margin-bottom:8px;">⏳</div>Loading confirmed listed items...</div>`;
 
-  // 1. Get all SKUs the rep ever listed for this client (from submitted/fulfilled past listings)
+  // 1. Get all submitted/fulfilled listings for this client
   const { data: pastOrders, error: ordErr } = await sb
     .from('orders')
     .select('id, order_ref, order_date')
@@ -3727,13 +3727,13 @@ async function loadListedItems(clientId) {
         <div style="font-size:32px;margin-bottom:10px;">📋</div>
         <div style="font-weight:600;font-size:13px;margin-bottom:5px;">No past listings yet</div>
         <div style="font-size:12px;color:var(--txt3);line-height:1.6;">
-          Once a sales rep submits a listing for this store, purchased items from that listing will appear here.
+          Once a sales rep submits a listing for this store, purchased items will appear here.
         </div>
       </div>`;
     return;
   }
 
-  // 2. Get all items from those listings
+  // 2. Get ALL items from those listings
   const orderIds = pastOrders.map(o => o.id);
   const { data: listedItems, error: itemErr } = await sb
     .from('order_items')
@@ -3748,25 +3748,27 @@ async function loadListedItems(clientId) {
     return;
   }
 
-  // Build a map: sku → listing info (order_ref, order_date)
   const orderMap = {};
   pastOrders.forEach(o => { orderMap[o.id] = { ref: o.order_ref, date: o.order_date }; });
 
-  const listedSkuMap = {}; // sku.toLowerCase() → { product_name, unit_price, order_ref, order_date }
+  // Build map: normalizedSku → listing info  +  normalizedName → listing info
+  const listedBySkuKey  = {};
+  const listedByNameKey = {};
   listedItems.forEach(item => {
-    const key = (item.sku || '').trim().toLowerCase();
-    if (key && !listedSkuMap[key]) {
-      listedSkuMap[key] = {
-        sku: item.sku,
-        product_name: item.product_name,
-        unit_price: item.unit_price,
-        order_ref: orderMap[item.order_id]?.ref || '—',
-        order_date: orderMap[item.order_id]?.date || '—',
-      };
-    }
+    const skuKey  = normalizeSku(item.sku || '');
+    const nameKey = normalizeSku(item.product_name || '');
+    const entry   = {
+      sku: item.sku,
+      product_name: item.product_name,
+      unit_price: item.unit_price,
+      order_ref:  orderMap[item.order_id]?.ref  || '—',
+      order_date: orderMap[item.order_id]?.date || '—',
+    };
+    if (skuKey)  listedBySkuKey[skuKey]   = entry;
+    if (nameKey) listedByNameKey[nameKey] = entry;
   });
 
-  // 3. Get Zoho purchase history for this client
+  // 3. Get Zoho purchase history — item_code AND item_name for dual-matching
   const client = allClients.find(c => c.id === clientId);
   const zohoId = client?.zoho_customer_id;
   let histData = [];
@@ -3784,35 +3786,39 @@ async function loadListedItems(clientId) {
     if (!r.error) histData = r.data || [];
   }
 
-  // 4. Cross-reference: which listed SKUs did the store actually purchase?
-  const purchasedSkuMap = {}; // sku.toLowerCase() → { line_date, invoice_id, quantity, unit_price }
+  // 4. Cross-reference with DUAL matching: try item_code first, then item_name
+  const confirmedMap = {}; // key → { listingInfo, purchaseInfo }
+
   histData.forEach(row => {
-    const key = (row.item_code || '').trim().toLowerCase();
-    if (key) {
-      // Keep the most recent purchase if multiple
-      if (!purchasedSkuMap[key] || row.line_date > purchasedSkuMap[key].line_date) {
-        purchasedSkuMap[key] = {
-          line_date: row.line_date,
-          invoice_id: row.invoice_id,
-          quantity: row.quantity,
-          purchase_price: row.unit_price,
-          item_name: row.item_name,
-        };
-      }
+    const codeKey = normalizeSku(row.item_code || '');
+    const nameKey = normalizeSku(row.item_name  || '');
+
+    // Try matching by item_code against listed SKUs
+    let listingEntry = (codeKey && listedBySkuKey[codeKey])  ? listedBySkuKey[codeKey]
+                     : (codeKey && listedByNameKey[codeKey]) ? listedByNameKey[codeKey]
+                     : (nameKey && listedBySkuKey[nameKey])  ? listedBySkuKey[nameKey]
+                     : (nameKey && listedByNameKey[nameKey]) ? listedByNameKey[nameKey]
+                     : null;
+
+    if (!listingEntry) return;
+
+    // Use the listed SKU as the dedupe key
+    const dedupeKey = normalizeSku(listingEntry.sku || '');
+    if (!confirmedMap[dedupeKey] || row.line_date > confirmedMap[dedupeKey].purchase_date) {
+      confirmedMap[dedupeKey] = {
+        ...listingEntry,
+        purchase_date:  row.line_date,
+        invoice_id:     row.invoice_id,
+        purchase_qty:   row.quantity,
+        purchase_price: row.unit_price,
+      };
     }
   });
 
-  // 5. Filter to only items that appear in BOTH listed AND purchased
-  const confirmedItems = Object.entries(listedSkuMap)
-    .filter(([skuKey]) => !!purchasedSkuMap[skuKey])
-    .map(([skuKey, listingInfo]) => ({
-      ...listingInfo,
-      purchase_date: purchasedSkuMap[skuKey].line_date,
-      invoice_id: purchasedSkuMap[skuKey].invoice_id,
-      purchase_qty: purchasedSkuMap[skuKey].quantity,
-      purchase_price: purchasedSkuMap[skuKey].purchase_price,
-    }))
+  const confirmedItems = Object.values(confirmedMap)
     .sort((a, b) => (b.purchase_date || '').localeCompare(a.purchase_date || ''));
+
+  const totalListed = Object.keys(listedBySkuKey).length;
 
   if (confirmedItems.length === 0) {
     tableEl.innerHTML = `
@@ -3820,26 +3826,28 @@ async function loadListedItems(clientId) {
         <div style="font-size:32px;margin-bottom:10px;">⏳</div>
         <div style="font-weight:600;font-size:13px;margin-bottom:5px;">No purchases confirmed yet</div>
         <div style="font-size:12px;color:var(--txt3);line-height:1.6;max-width:340px;margin:0 auto;">
-          The rep has listed <strong>${Object.keys(listedSkuMap).length} SKU${Object.keys(listedSkuMap).length !== 1 ? 's' : ''}</strong> for this store,
-          but none have been purchased yet according to Zoho invoices.<br><br>
-          Items will appear here automatically after the next Zoho sync once the store makes a purchase.
+          The rep has listed <strong>${totalListed} SKU${totalListed !== 1 ? 's' : ''}</strong> for this store,
+          but none have been confirmed in Zoho invoices yet.<br><br>
+          Items appear here after the next Zoho sync once the store purchases them.
         </div>
       </div>`;
     return;
   }
+
+  const convPct = Math.round(confirmedItems.length / totalListed * 100);
 
   tableEl.innerHTML = `
     <div style="padding:8px 14px;background:linear-gradient(90deg,rgba(29,158,117,0.08),transparent);border-bottom:0.5px solid var(--brd);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span style="font-size:11.5px;color:var(--txt2);">
         <strong style="color:#1D9E75;font-size:14px;">${confirmedItems.length}</strong>
         item${confirmedItems.length !== 1 ? 's' : ''} confirmed purchased
-        <span style="color:var(--txt3);">out of ${Object.keys(listedSkuMap).length} listed</span>
+        <span style="color:var(--txt3);">out of ${totalListed} listed</span>
       </span>
       <div style="margin-left:auto;">
         <div class="pbar" style="width:120px;margin-top:0;">
-          <div class="pfill" style="width:${Math.round(confirmedItems.length/Object.keys(listedSkuMap).length*100)}%;background:#1D9E75;"></div>
+          <div class="pfill" style="width:${convPct}%;background:#1D9E75;"></div>
         </div>
-        <div style="font-size:10px;color:#1D9E75;text-align:right;margin-top:2px;font-weight:600;">${Math.round(confirmedItems.length/Object.keys(listedSkuMap).length*100)}% conversion</div>
+        <div style="font-size:10px;color:#1D9E75;text-align:right;margin-top:2px;font-weight:600;">${convPct}% conversion</div>
       </div>
     </div>
     <div style="overflow-x:auto;">
