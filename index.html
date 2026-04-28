@@ -4989,28 +4989,43 @@ async function loadAdminWallet() {
     const { codes, names, itemIds } = purchasedByClient[clientId] || { codes: new Set(), names: new Set(), itemIds: new Set() };
 
     let confirmed = 0;
+    const orderDate = order.order_date || '';
+
     for (const item of listedItems) {
       const skuKey  = normalizeSku(item.sku || '');
       const nameKey = normalizeSku(item.product_name || '');
 
-      // 6 matching strategies — same as Successful Listing tab
-      if (skuKey  && codes.has(skuKey))  { confirmed++; continue; }
-      if (nameKey && names.has(nameKey)) { confirmed++; continue; }
-      if (skuKey  && names.has(skuKey))  { confirmed++; continue; }
-      if (nameKey && codes.has(nameKey)) { confirmed++; continue; }
-
       const product = (item.product_id ? productById[String(item.product_id)] : null)
                    || productBySku[skuKey]
                    || productByName[nameKey];
-      if (product) {
-        if (product.zoho_item_id && itemIds.has(String(product.zoho_item_id).trim())) { confirmed++; continue; }
 
-        // Fuzzy name match (product name vs invoice item_name)
+      // Helper: check if any purchase date for this key is ON or AFTER the listing date
+      function hasValidPurchase(dates) {
+        if (!orderDate) return false;
+        return (dates || []).some(d => d >= orderDate);
+      }
+
+      // S1: SKU matches invoice item_code
+      if (skuKey && codeDates[skuKey] && hasValidPurchase(codeDates[skuKey])) { confirmed++; continue; }
+      // S2: product name matches invoice item_name
+      if (nameKey && nameDates[nameKey] && hasValidPurchase(nameDates[nameKey])) { confirmed++; continue; }
+      // S3: SKU matches invoice item_name
+      if (skuKey && nameDates[skuKey] && hasValidPurchase(nameDates[skuKey])) { confirmed++; continue; }
+      // S4: product name matches invoice item_code
+      if (nameKey && codeDates[nameKey] && hasValidPurchase(codeDates[nameKey])) { confirmed++; continue; }
+
+      if (product) {
+        // S5: zoho_item_id matches invoice item_id
+        if (product.zoho_item_id) {
+          const zid = String(product.zoho_item_id).trim();
+          if (itemIdDates[zid] && hasValidPurchase(itemIdDates[zid])) { confirmed++; continue; }
+        }
+        // S6: Fuzzy product name vs invoice item_name with date gate
         const pNameKey = normalizeSku(product.name || '');
         if (pNameKey && pNameKey.length > 4) {
           let matched = false;
-          for (const invoiceName of names) {
-            if (invoiceName.length > 4 && (invoiceName.includes(pNameKey) || pNameKey.includes(invoiceName))) {
+          for (const [invoiceName, dates] of Object.entries(nameDates)) {
+            if (invoiceName.length > 4 && (invoiceName.includes(pNameKey) || pNameKey.includes(invoiceName)) && hasValidPurchase(dates)) {
               matched = true; break;
             }
           }
