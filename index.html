@@ -1921,18 +1921,37 @@ function findProduct(skuRow) {
   if (histError) { tableEl.innerHTML=`<div style="padding:20px;text-align:center;color:#A32D2D;">Error loading history: ${histError.message}</div>`; return; }
 
 const purchasedCodes   = new Set();
-  const purchasedItemIds = new Set();
-  (histData||[]).forEach(r=>{
-    // Match by item_name (most reliable — always a readable product name)
-    if (r.item_name) purchasedCodes.add(r.item_name.trim().toLowerCase());
-    // Match by item_code IF it looks like a SKU (not a pure numeric Zoho ID)
-    if (r.item_code && !/^\d{10,}$/.test(r.item_code.trim())) {
-      purchasedCodes.add(r.item_code.trim().toLowerCase());
+const purchasedItemIds = new Set();
+// Date-aware maps: key -> array of purchase dates
+const purchasedCodeDates   = {}; // normKey -> [dates]
+const purchasedItemIdDates = {}; // itemId  -> [dates]
+
+(histData||[]).forEach(r=>{
+    const d = r.line_date || '';
+    if (r.item_name) {
+      const k = r.item_name.trim().toLowerCase();
+      purchasedCodes.add(k);
+      if (!purchasedCodeDates[k]) purchasedCodeDates[k] = [];
+      purchasedCodeDates[k].push(d);
     }
-    // Always index the raw item_id for ID-based matching
-    if (r.item_id)   purchasedItemIds.add(String(r.item_id).trim());
-    // Also index item_code as a potential Zoho item ID
-    if (r.item_code) purchasedItemIds.add(String(r.item_code).trim());
+    if (r.item_code && !/^\d{10,}$/.test(r.item_code.trim())) {
+      const k = r.item_code.trim().toLowerCase();
+      purchasedCodes.add(k);
+      if (!purchasedCodeDates[k]) purchasedCodeDates[k] = [];
+      purchasedCodeDates[k].push(d);
+    }
+    if (r.item_id) {
+      const k = String(r.item_id).trim();
+      purchasedItemIds.add(k);
+      if (!purchasedItemIdDates[k]) purchasedItemIdDates[k] = [];
+      purchasedItemIdDates[k].push(d);
+    }
+    if (r.item_code) {
+      const k = String(r.item_code).trim();
+      purchasedItemIds.add(k);
+      if (!purchasedItemIdDates[k]) purchasedItemIdDates[k] = [];
+      purchasedItemIdDates[k].push(d);
+    }
   });
 
   // Also exclude SKUs already saved in KTLSALES listings for this client
@@ -3853,114 +3872,118 @@ if (zohoId) {
   // Step 7: Match each invoice row against listed items using ALL strategies
   const confirmedMap = {};
 
-  histData.forEach(row => {
+  // Helper: does any purchase date for this key fall ON or AFTER the listing date?
+// listingDate = the order_date of the KTLSALES listing (when the rep submitted it)
+// We use the order dates from pastOrders — map order_id -> order_date
+const orderDateMap = {};
+pastOrders.forEach(o => { orderDateMap[o.id] = o.order_date || ''; });
+
+histData.forEach(row => {
     const invoiceNameKey = normalizeSku(row.item_name || '');
     const invoiceCodeKey = normalizeSku(row.item_code || '');
-    const itemIdStr = String(row.item_id || '').trim();
-    const itemCodeStr = String(row.item_code || '').trim();
+    const itemIdStr      = String(row.item_id   || '').trim();
+    const itemCodeStr    = String(row.item_code || '').trim();
+    const purchaseDate   = row.line_date || '';
 
     let listingEntry = null;
+    let listingDate  = '';
+
+    // Helper: given a candidate entry, check if the purchase happened after listing
+    function qualifies(entry) {
+      if (!entry) return false;
+      // Find the listing date for this item's order
+      // The entry.order_ref maps to an order — get its date
+      const matchedOrder = pastOrders.find(o => o.order_ref === entry.order_ref);
+      const ld = matchedOrder?.order_date || entry.order_date || '';
+      // Purchase must be ON or AFTER the listing date
+      return !ld || purchaseDate >= ld;
+    }
 
     // S1: Invoice item_name exactly matches listed product_name
-    if (!listingEntry && invoiceNameKey) listingEntry = listedByNameKey[invoiceNameKey];
-
+    if (!listingEntry) { const e = listedByNameKey[invoiceNameKey]; if (qualifies(e)) listingEntry = e; }
     // S2: Invoice item_name exactly matches listed SKU
-    if (!listingEntry && invoiceNameKey) listingEntry = listedBySkuKey[invoiceNameKey];
-
+    if (!listingEntry) { const e = listedBySkuKey[invoiceNameKey];  if (qualifies(e)) listingEntry = e; }
     // S3: Invoice item_code matches listed SKU
-    if (!listingEntry && invoiceCodeKey) listingEntry = listedBySkuKey[invoiceCodeKey];
-
+    if (!listingEntry) { const e = listedBySkuKey[invoiceCodeKey];  if (qualifies(e)) listingEntry = e; }
     // S4: Invoice item_code matches listed product_name
-    if (!listingEntry && invoiceCodeKey) listingEntry = listedByNameKey[invoiceCodeKey];
-
+    if (!listingEntry) { const e = listedByNameKey[invoiceCodeKey]; if (qualifies(e)) listingEntry = e; }
     // S5: Invoice item_id matches a zoho_item_id of a listed product
-    if (!listingEntry && itemIdStr) listingEntry = listedProductZohoIdToEntry[itemIdStr];
-
+    if (!listingEntry) { const e = listedProductZohoIdToEntry[itemIdStr];  if (qualifies(e)) listingEntry = e; }
     // S6: Invoice item_code (as zoho ID) matches a zoho_item_id of a listed product
-    if (!listingEntry && itemCodeStr) listingEntry = listedProductZohoIdToEntry[itemCodeStr];
+    if (!listingEntry) { const e = listedProductZohoIdToEntry[itemCodeStr]; if (qualifies(e)) listingEntry = e; }
 
-    // S7: Resolve invoice item_id → product → match listed item by product SKU/name
+    // S7: Resolve invoice item_id → product → match listed item
     if (!listingEntry && itemIdStr) {
       const product = productByZohoId[itemIdStr];
       if (product) {
-        listingEntry = listedByProductId[String(product.id)]
-          || listedBySkuKey[normalizeSku(product.sku || '')]
-          || listedByNameKey[normalizeSku(product.name || '')];
+        const e = listedByProductId[String(product.id)]
+               || listedBySkuKey[normalizeSku(product.sku || '')]
+               || listedByNameKey[normalizeSku(product.name || '')];
+        if (qualifies(e)) listingEntry = e;
       }
     }
-
     // S8: Resolve invoice item_code → product → match
     if (!listingEntry && itemCodeStr) {
       const product = productByZohoId[itemCodeStr];
       if (product) {
-        listingEntry = listedByProductId[String(product.id)]
-          || listedBySkuKey[normalizeSku(product.sku || '')]
-          || listedByNameKey[normalizeSku(product.name || '')];
+        const e = listedByProductId[String(product.id)]
+               || listedBySkuKey[normalizeSku(product.sku || '')]
+               || listedByNameKey[normalizeSku(product.name || '')];
+        if (qualifies(e)) listingEntry = e;
       }
     }
-
-    // S9: invoice item_name contains or starts with listed product_name (or vice versa)
+    // S9: fuzzy item_name vs listed product_name
     if (!listingEntry && invoiceNameKey && invoiceNameKey.length > 4) {
       for (const [key, entry] of Object.entries(listedByNameKey)) {
-        if (key.length > 4 && (invoiceNameKey.includes(key) || key.includes(invoiceNameKey))) {
-          listingEntry = entry;
-          break;
+        if (key.length > 4 && (invoiceNameKey.includes(key) || key.includes(invoiceNameKey)) && qualifies(entry)) {
+          listingEntry = entry; break;
         }
       }
     }
-
-    // S10: invoice item_name fuzzy matches listed SKU
+    // S10: fuzzy item_name vs listed SKU
     if (!listingEntry && invoiceNameKey && invoiceNameKey.length > 4) {
       for (const [key, entry] of Object.entries(listedBySkuKey)) {
-        if (key.length > 4 && (invoiceNameKey.includes(key) || key.includes(invoiceNameKey))) {
-          listingEntry = entry;
-          break;
+        if (key.length > 4 && (invoiceNameKey.includes(key) || key.includes(invoiceNameKey)) && qualifies(entry)) {
+          listingEntry = entry; break;
         }
       }
     }
-
-    // ── KEY FIX: Match via allProducts as bridge ──
-    // Invoice has item_name like "STORAGE JAR RIBBED WITH LID 800ML"
-    // Listed item has product_name "STORAGE JAR RIBBED WITH LID 800ML" and SKU "KS0000141"
-    // Find product by invoice item_name → get product SKU → match listed item by SKU
+    // S11: match via allProducts as bridge (invoice item_name → product → listed SKU)
     if (!listingEntry && invoiceNameKey) {
-      // Find product whose name matches the invoice item_name
       const matchedProduct = productByName[invoiceNameKey]
         || allProducts.find(p => {
           const pn = normalizeSku(p.name || '');
           return pn.length > 4 && (invoiceNameKey.includes(pn) || pn.includes(invoiceNameKey));
         });
       if (matchedProduct) {
-        // Now find if this product's SKU is in our listed items
-        listingEntry = listedBySkuKey[normalizeSku(matchedProduct.sku || '')]
-          || listedByProductId[String(matchedProduct.id)]
-          || listedByNameKey[normalizeSku(matchedProduct.name || '')];
+        const e = listedBySkuKey[normalizeSku(matchedProduct.sku || '')]
+               || listedByProductId[String(matchedProduct.id)]
+               || listedByNameKey[normalizeSku(matchedProduct.name || '')];
+        if (qualifies(e)) listingEntry = e;
       }
     }
-
-    // ── KEY FIX 2: Match via allProducts using invoice item_code as product SKU bridge ──
-    // Invoice item_code might be a short code like "AG0005" that maps to a product
-    // whose full SKU "AG0000218" is in our listed items — find via name bridge
+    // S12: match via allProducts using invoice item_code as product SKU bridge
     if (!listingEntry && invoiceCodeKey) {
       const matchedProduct = productBySku[invoiceCodeKey]
         || allProducts.find(p => normalizeSku(p.sku || '') === invoiceCodeKey);
       if (matchedProduct) {
-        listingEntry = listedBySkuKey[normalizeSku(matchedProduct.sku || '')]
-          || listedByProductId[String(matchedProduct.id)]
-          || listedByNameKey[normalizeSku(matchedProduct.name || '')];
+        const e = listedBySkuKey[normalizeSku(matchedProduct.sku || '')]
+               || listedByProductId[String(matchedProduct.id)]
+               || listedByNameKey[normalizeSku(matchedProduct.name || '')];
+        if (qualifies(e)) listingEntry = e;
       }
     }
 
     if (!listingEntry) return;
 
-    // Deduplicate: keep the most recent purchase per listed SKU
+    // Deduplicate: keep the most recent qualifying purchase per listed SKU
     const dedupeKey = normalizeSku(listingEntry.sku || listingEntry.product_name || '');
-    if (!confirmedMap[dedupeKey] || (row.line_date || '') > (confirmedMap[dedupeKey].purchase_date || '')) {
+    if (!confirmedMap[dedupeKey] || purchaseDate > (confirmedMap[dedupeKey].purchase_date || '')) {
       confirmedMap[dedupeKey] = {
         ...listingEntry,
-        purchase_date: row.line_date,
-        invoice_id: row.invoice_id,
-        purchase_qty: row.quantity,
+        purchase_date:  purchaseDate,
+        invoice_id:     row.invoice_id,
+        purchase_qty:   row.quantity,
         purchase_price: row.unit_price,
       };
     }
@@ -4524,39 +4547,40 @@ async function loadRepWallet() {
 
   const orders = repOrders || [];
 
-  // Step 2: Get ALL order_items for these orders in one query
-  const orderIds = orders.map(o => o.id);
-  if (orderIds.length === 0) {
+  if (orders.length === 0) {
     _walletPoints = 0;
     renderRepWalletUI(0, 0, 0, [], {});
     return;
   }
 
+  // Step 2: Get ALL order_items for these orders in one query
+  const orderIds = orders.map(o => o.id);
   const { data: allListedItems } = await sb
     .from('order_items')
     .select('order_id, sku, product_id, product_name')
     .in('order_id', orderIds);
 
-  // Group listed items by order
   const itemsByOrder = {};
   (allListedItems || []).forEach(item => {
     if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
     itemsByOrder[item.order_id].push(item);
   });
 
-  // Step 3: Build product lookup maps
-  const productBySku = {};
-  const productByName = {};
-  const productById = {};
+  // Step 3: Build product lookup maps ONCE
+  const productBySku    = {};
+  const productByName   = {};
+  const productById     = {};
+  const productByZohoId = {};
   allProducts.forEach(p => {
-    if (p.sku)  productBySku[normalizeSku(p.sku)]   = p;
-    if (p.name) productByName[normalizeSku(p.name)] = p;
-    if (p.id)   productById[String(p.id)]           = p;
+    if (p.sku)          productBySku[normalizeSku(p.sku)]   = p;
+    if (p.name)         productByName[normalizeSku(p.name)] = p;
+    if (p.id)           productById[String(p.id)]           = p;
+    if (p.zoho_item_id) productByZohoId[String(p.zoho_item_id).trim()] = p;
   });
 
-  // Step 4: Get all unique client IDs and fetch their Zoho purchase history ONCE per client
+  // Step 4: Get unique client IDs, fetch invoice history ONCE per client
   const uniqueClientIds = [...new Set(orders.map(o => o.client_id).filter(Boolean))];
-  const purchasedByClient = {}; // clientId -> { codes: Set, names: Set }
+  const purchasedByClient = {}; // clientId -> { codes, names, itemIds }
 
   for (const clientId of uniqueClientIds) {
     const client = allClients.find(c => String(c.id) === String(clientId));
@@ -4564,76 +4588,136 @@ async function loadRepWallet() {
     let histData = [];
 
     if (zohoId) {
-      const r = await sb.from('invoice_line_items')
-        .select('item_code, item_name, item_id')
-        .eq('customer_id', zohoId);
-      if (!r.error) histData = r.data || [];
+      let allRows = [], from = 0;
+      while (true) {
+        const r = await sb.from('invoice_line_items')
+          .select('item_code, item_name, item_id, line_date')
+          .eq('customer_id', zohoId)
+          .range(from, from + 999);
+        if (r.error || !r.data || r.data.length === 0) break;
+        allRows = allRows.concat(r.data);
+        if (r.data.length < 1000) break;
+        from += 1000;
+      }
+      histData = allRows;
     }
     if (!zohoId || histData.length === 0) {
-      const r = await sb.from('invoice_line_items')
-        .select('item_code, item_name, item_id')
-        .ilike('customer_name', client?.name || '');
-      if (!r.error) histData = r.data || [];
+      const clientName = client?.name || '';
+      if (clientName) {
+        let allRows = [], from = 0;
+        while (true) {
+          const r = await sb.from('invoice_line_items')
+            .select('item_code, item_name, item_id, line_date')
+            .ilike('customer_name', clientName)
+            .range(from, from + 999);
+          if (r.error || !r.data || r.data.length === 0) break;
+          allRows = allRows.concat(r.data);
+          if (r.data.length < 1000) break;
+          from += 1000;
+        }
+        histData = allRows;
+      }
     }
 
-    const codes = new Set();
-    const names = new Set();
+const codes   = new Set();
+    const names   = new Set();
     const itemIds = new Set();
-
+    // date-aware maps: key -> earliest purchase date after listing
+    const codeDates   = {}; // normSku -> [dates]
+    const nameDates   = {}; // normName -> [dates]
+    const itemIdDates = {}; // itemId -> [dates]
     histData.forEach(r => {
-      if (r.item_code) codes.add(normalizeSku(r.item_code));
-      if (r.item_name) names.add(normalizeSku(r.item_name));
-      if (r.item_id)   itemIds.add(String(r.item_id).trim());
+      const d = r.line_date || '';
+      if (r.item_code) {
+        const k = normalizeSku(r.item_code);
+        codes.add(k);
+        if (!codeDates[k]) codeDates[k] = [];
+        codeDates[k].push(d);
+      }
+      if (r.item_name) {
+        const k = normalizeSku(r.item_name);
+        names.add(k);
+        if (!nameDates[k]) nameDates[k] = [];
+        nameDates[k].push(d);
+      }
+      if (r.item_id) {
+        const k = String(r.item_id).trim();
+        itemIds.add(k);
+        if (!itemIdDates[k]) itemIdDates[k] = [];
+        itemIdDates[k].push(d);
+      }
     });
-
-    purchasedByClient[clientId] = { codes, names, itemIds };
+    purchasedByClient[String(clientId)] = { codes, names, itemIds, codeDates, nameDates, itemIdDates };
   }
 
-  // Step 5: For each order, count how many listed SKUs were actually purchased
+  // Step 5: Count confirmed items per order using SAME logic as loadAdminWallet
   const confirmedByOrder = {};
-  const confirmedStores = new Set();
+  const confirmedStores  = new Set();
   let totalConfirmedItems = 0;
 
   for (const order of orders) {
-    const clientId = order.client_id;
-    const listedItems = itemsByOrder[order.id] || [];
-    if (!clientId || listedItems.length === 0) {
-      confirmedByOrder[order.id] = 0;
-      continue;
-    }
+    const repId    = currentUser.id;
+    const clientId = String(order.client_id || '');
+    if (!clientId) { confirmedByOrder[order.id] = 0; continue; }
 
-    const { codes, names, itemIds } = purchasedByClient[clientId] || { codes: new Set(), names: new Set(), itemIds: new Set() };
+    const listedItems = itemsByOrder[order.id] || [];
+    if (listedItems.length === 0) { confirmedByOrder[order.id] = 0; continue; }
+
+    const { codes, names, itemIds } =
+      purchasedByClient[clientId] || { codes: new Set(), names: new Set(), itemIds: new Set() };
+
+    const listingDate = order.order_date || '';
+
+    // Helper: does any purchase date for this key fall ON or AFTER the listing date?
+    const afterListing = (datesArr) =>
+      (datesArr || []).some(d => d && (!listingDate || d >= listingDate));
 
     let confirmed = 0;
     for (const item of listedItems) {
       const skuKey  = normalizeSku(item.sku || '');
       const nameKey = normalizeSku(item.product_name || '');
 
-      // Match 1: SKU directly in invoice item_code
-      if (skuKey && codes.has(skuKey)) { confirmed++; continue; }
+      // Strategy 1: item_code matches listed SKU
+      if (skuKey  && codes.has(skuKey)  && afterListing(codeDates[skuKey]))  { confirmed++; continue; }
+      // Strategy 2: item_name matches listed product_name
+      if (nameKey && names.has(nameKey) && afterListing(nameDates[nameKey])) { confirmed++; continue; }
+      // Strategy 3: item_name matches listed SKU
+      if (skuKey  && names.has(skuKey)  && afterListing(nameDates[skuKey]))  { confirmed++; continue; }
+      // Strategy 4: item_code matches listed product_name
+      if (nameKey && codes.has(nameKey) && afterListing(codeDates[nameKey])) { confirmed++; continue; }
 
-      // Match 2: product_name in invoice item_name
-      if (nameKey && names.has(nameKey)) { confirmed++; continue; }
-
-      // Match 3: SKU in invoice item_name (Zoho sometimes puts SKU as item_name)
-      if (skuKey && names.has(skuKey)) { confirmed++; continue; }
-
-      // Match 4: product_name in invoice item_code
-      if (nameKey && codes.has(nameKey)) { confirmed++; continue; }
-
-      // Match 5: resolve product → check zoho_item_id against invoice item_id
+      // Strategy 5 & 6: resolve via product record
       const product = (item.product_id ? productById[String(item.product_id)] : null)
                    || productBySku[skuKey]
                    || productByName[nameKey];
       if (product) {
-        if (product.zoho_item_id && itemIds.has(String(product.zoho_item_id).trim())) { confirmed++; continue; }
-
-        // Match 6: product name vs invoice item_name (fuzzy substring)
+        // Strategy 5: zoho_item_id match
+        const zid = product.zoho_item_id ? String(product.zoho_item_id).trim() : null;
+        if (zid && itemIds.has(zid) && afterListing(itemIdDates[zid])) {
+          confirmed++; continue;
+        }
+        // Strategy 6: fuzzy product name vs invoice item_name
+        const pNameKey = normalizeSku(product.name || '');
+        if (pNameKey && pNameKey.length > 4) {
+          let matched = false;
+          for (const [invoiceName, datesArr] of Object.entries(nameDates)) {
+            if (invoiceName.length > 4 &&
+                (invoiceName.includes(pNameKey) || pNameKey.includes(invoiceName)) &&
+                afterListing(datesArr)) {
+              matched = true; break;
+            }
+          }
+          if (matched) { confirmed++; continue; }
+        }
+      }
+    }
+        // Strategy 6: fuzzy product name vs invoice item_name
         const pNameKey = normalizeSku(product.name || '');
         if (pNameKey && pNameKey.length > 4) {
           let matched = false;
           for (const invoiceName of names) {
-            if (invoiceName.length > 4 && (invoiceName.includes(pNameKey) || pNameKey.includes(invoiceName))) {
+            if (invoiceName.length > 4 &&
+                (invoiceName.includes(pNameKey) || pNameKey.includes(invoiceName))) {
               matched = true; break;
             }
           }
@@ -4645,11 +4729,10 @@ async function loadRepWallet() {
     confirmedByOrder[order.id] = confirmed;
     totalConfirmedItems += confirmed;
     if (confirmed > 0 && order.client_name) confirmedStores.add(order.client_name);
-  }
-
+  
   _walletPoints = totalConfirmedItems;
   renderRepWalletUI(totalConfirmedItems, confirmedStores.size, orders.length, orders, confirmedByOrder);
-}
+
 
 function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, orders, confirmedByOrder) {
   const points  = totalConfirmedItems;
@@ -4793,7 +4876,7 @@ async function loadAdminWallet() {
       let allRows = [], from = 0;
       while (true) {
         const r = await sb.from('invoice_line_items')
-          .select('item_code, item_name, item_id')
+          .select('item_code, item_name, item_id, line_date')
           .eq('customer_id', zohoId)
           .range(from, from + 999);
         if (r.error || !r.data || r.data.length === 0) break;
@@ -4809,7 +4892,7 @@ async function loadAdminWallet() {
         let allRows = [], from = 0;
         while (true) {
           const r = await sb.from('invoice_line_items')
-            .select('item_code, item_name, item_id')
+            .select('item_code, item_name, item_id, line_date')
             .ilike('customer_name', clientName)
             .range(from, from + 999);
           if (r.error || !r.data || r.data.length === 0) break;
@@ -4821,15 +4904,35 @@ async function loadAdminWallet() {
       }
     }
 
-    const codes   = new Set();
+   const codes   = new Set();
     const names   = new Set();
     const itemIds = new Set();
+    // date-aware maps: key -> earliest purchase date after listing
+    const codeDates   = {}; // normSku -> [dates]
+    const nameDates   = {}; // normName -> [dates]
+    const itemIdDates = {}; // itemId -> [dates]
     histData.forEach(r => {
-      if (r.item_code) codes.add(normalizeSku(r.item_code));
-      if (r.item_name) names.add(normalizeSku(r.item_name));
-      if (r.item_id)   itemIds.add(String(r.item_id).trim());
+      const d = r.line_date || '';
+      if (r.item_code) {
+        const k = normalizeSku(r.item_code);
+        codes.add(k);
+        if (!codeDates[k]) codeDates[k] = [];
+        codeDates[k].push(d);
+      }
+      if (r.item_name) {
+        const k = normalizeSku(r.item_name);
+        names.add(k);
+        if (!nameDates[k]) nameDates[k] = [];
+        nameDates[k].push(d);
+      }
+      if (r.item_id) {
+        const k = String(r.item_id).trim();
+        itemIds.add(k);
+        if (!itemIdDates[k]) itemIdDates[k] = [];
+        itemIdDates[k].push(d);
+      }
     });
-    purchasedByClient[String(clientId)] = { codes, names, itemIds };
+    purchasedByClient[String(clientId)] = { codes, names, itemIds, codeDates, nameDates, itemIdDates };
   }
 
   // ── Product lookup maps ──
