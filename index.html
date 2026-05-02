@@ -1665,6 +1665,7 @@ async function selectClient(clientId) {
         <div class="tab" onclick="swTab(this,'tc-listable');loadListableItems('${client.id}')"> Recommended Listing</div>
         <div class="tab" onclick="swTab(this,'tc-listings');loadClientListings('${client.id}')">Submitted Listings</div>
         <div class="tab" onclick="swTab(this,'tc-listed');loadListedItems('${client.id}')">Successful Listing</div>
+        <div class="tab" onclick="swTab(this,'tc-notbought');loadNotBoughtItems('${client.id}')">Not bought (14d)</div>
       </div>
       <div class="tc active" id="tc-products">
         <div class="date-range-strip">
@@ -1695,11 +1696,16 @@ async function selectClient(clientId) {
           <div style="padding:20px;text-align:center;color:var(--txt3);">Click this tab to view past listings...</div>
         </div>
       </div>
-      <div class="tc" id="tc-listed">
-        <div id="client-listed-table">
-          <div style="padding:20px;text-align:center;color:var(--txt3);">Click this tab to view confirmed listed items...</div>
+<div class="tc" id="tc-listed">
+          <div id="client-listed-table">
+            <div style="padding:20px;text-align:center;color:var(--txt3);">Click this tab to view confirmed listed items...</div>
+          </div>
         </div>
-      </div>
+      <div class="tc" id="tc-notbought">
+          <div id="client-notbought-table">
+            <div style="padding:20px;text-align:center;color:var(--txt3);">Click this tab to view items listed but not yet purchased...</div>
+          </div>
+        </div>
     </div>`;
   loadClientSalesHistory(client.id);
 }
