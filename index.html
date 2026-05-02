@@ -201,6 +201,22 @@ tr:hover td{background:var(--bg2);}
   #clients-list{max-height:300px!important;}
   .card-title{font-size:12.5px;}
   .listing-layout > div:last-child{order:-1;}
+
+/* ── MOBILE: reorder Place Listing screen ── */
+@media(max-width:768px){
+  #screen-orders .listing-layout{
+    display:flex;
+    flex-direction:column;
+  }
+  /* Right column (Listing Summary + My Saved Listings) comes AFTER products */
+  #screen-orders .listing-layout > div:last-child{
+    order:3;
+  }
+  /* Left column (Listing Details + Select Products) comes first */
+  #screen-orders .listing-layout > div:first-child{
+    order:1;
+  }
+}
   .mob-bar{height:50px;}
   .mc::after{display:none;}
   .date-range-strip{gap:6px;}
