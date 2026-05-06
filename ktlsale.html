@@ -179,6 +179,9 @@ tr:hover td{background:var(--bg2);}
 .listing-row-new{background:linear-gradient(90deg,rgba(29,158,117,0.06),transparent);}
 
 @media(max-width:768px){
+
+  #clock-right-col { display: none; }
+  #screen-clockin > div > div[style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
   .sidebar{display:none;}
   .mob-bar{display:flex;}
   .app{flex-direction:column;}
@@ -201,6 +204,22 @@ tr:hover td{background:var(--bg2);}
   #clients-list{max-height:300px!important;}
   .card-title{font-size:12.5px;}
   .listing-layout > div:last-child{order:-1;}
+
+/* ── MOBILE: reorder Place Listing screen ── */
+@media(max-width:768px){
+  #screen-orders .listing-layout{
+    display:flex;
+    flex-direction:column;
+  }
+  /* Right column (Listing Summary + My Saved Listings) comes AFTER products */
+  #screen-orders .listing-layout > div:last-child{
+    order:3;
+  }
+  /* Left column (Listing Details + Select Products) comes first */
+  #screen-orders .listing-layout > div:first-child{
+    order:1;
+  }
+}
   .mob-bar{height:50px;}
   .mc::after{display:none;}
   .date-range-strip{gap:6px;}
@@ -433,7 +452,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
       <option value="manager">Manager</option>
       <option value="sales_rep">Sales Representative</option>
     </select>
-    <button class="login-btn" onclick="doLogin()">Sign in to KTLSALES</button>
+    <button class="login-btn" onclick="doLogin()">Sign in</button>
   </div>
 </div>
 
@@ -548,6 +567,97 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
         <div class="card">
           <div class="card-hdr"><span class="card-title">Target Progress</span><button class="btn btn-sm" onclick="goTo('targets')">View all →</button></div>
           <div id="target-progress-list"><div class="empty-state">No targets set yet.</div></div>
+        </div>
+      </div>
+
+      <!-- CLOCK IN / CLOCK OUT -->
+      <!-- CLOCK IN / CLOCK OUT -->
+      <div class="screen" id="screen-clockin">
+        <div style="width:100%;">
+          <div class="metrics-grid" style="margin-bottom:14px;">
+            <div class="mc" style="background:linear-gradient(135deg,#5B8DEF 0%,#4A6FD4 100%);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Current Status</div>
+              <div class="mc-val" id="clock-metric-status" style="color:#fff;font-size:15px;">—</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Today</div>
+            </div>
+            <div class="mc" style="background:linear-gradient(135deg,#4DB896 0%,#2E9E75 100%);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Hours Today</div>
+              <div class="mc-val" id="clock-metric-hours" style="color:#fff;">0h 0m</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Total logged</div>
+            </div>
+            <div class="mc" style="background:linear-gradient(135deg,#F5A623 0%,#E8891A 100%);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Sessions</div>
+              <div class="mc-val" id="clock-metric-sessions" style="color:#fff;">0</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Clock-ins today</div>
+            </div>
+            <div class="mc" style="background:linear-gradient(135deg,#F06B6B 0%,#E04545 100%);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Team Active</div>
+              <div class="mc-val" id="clock-metric-team" style="color:#fff;">—</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Currently in</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr;gap:14px;">
+  <div>
+
+          <!-- Clock display card -->
+          <div class="card" style="text-align:center;padding:28px 20px;margin-bottom:14px;">
+            <div style="font-size:11px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Current Time</div>
+            <div id="clock-display" style="font-size:42px;font-weight:700;letter-spacing:-0.03em;color:var(--royal);font-family:'SF Mono','Courier New',monospace;">00:00:00</div>
+            <div id="clock-date" style="font-size:13px;color:var(--txt3);margin-top:6px;"></div>
+            <div id="clock-status-badge" style="margin-top:14px;"></div>
+          </div>
+
+          <!-- Action card -->
+          <div class="card" style="padding:20px;margin-bottom:14px;">
+            <div class="fg" style="margin-bottom:14px;">
+              <label class="flbl">Notes (optional)</label>
+              <input class="fin" type="text" id="clock-notes" placeholder="e.g. Field visit to Ntinda stores"/>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <button id="btn-clockin" class="btn btn-green" style="justify-content:center;padding:14px;font-size:14px;font-weight:700;border-radius:10px;" onclick="doClock('in')">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" style="margin-right:6px;"><circle cx="8" cy="8" r="7"/><path d="M8 5v3l2 2"/></svg>
+                Clock In
+              </button>
+              <button id="btn-clockout" class="btn btn-danger" style="justify-content:center;padding:14px;font-size:14px;font-weight:700;border-radius:10px;background:#FCEBEB;color:#A32D2D;border-color:#F7C1C1;" onclick="doClock('out')">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" style="margin-right:6px;"><circle cx="8" cy="8" r="7"/><path d="M8 5v6M5 8l3 3 3-3"/></svg>
+                Clock Out
+              </button>
+            </div>
+            <div id="clock-action-msg" style="margin-top:12px;"></div>
+          </div>
+
+          <!-- Today's sessions -->
+          <div class="card" style="padding:0;overflow:hidden;">
+            <div class="card-hdr" style="padding:12px 16px 10px;border-bottom:0.5px solid var(--brd);">
+              <span class="card-title">Today's Sessions</span>
+              <span class="badge bb" id="clock-session-count">0</span>
+            </div>
+            <div id="clock-sessions-list">
+              <div class="empty-state" style="padding:24px;">No clock-ins recorded today.</div>
+            </div>
+            <div id="clock-today-summary" style="padding:10px 16px;background:var(--bg2);border-top:0.5px solid var(--brd);font-size:12px;color:var(--txt2);display:none;">
+              <strong>Total hours today: </strong><span id="clock-total-hours">0h 0m</span>
+            </div>
+          </div>
+
+          <!-- History (admin/manager only) -->
+          <div class="card" id="clock-history-card" style="padding:0;overflow:hidden;margin-top:14px;display:none;">
+            <div class="card-hdr" style="padding:12px 16px 10px;border-bottom:0.5px solid var(--brd);">
+              <span class="card-title">Team Attendance Log</span>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input type="date" id="clock-hist-date" style="padding:5px 9px;border:0.5px solid var(--brd2);border-radius:7px;font-size:12px;font-family:inherit;background:var(--bg);color:var(--txt);" onchange="loadClockHistory()"/>
+                <button class="btn btn-sm btn-gold" onclick="exportClockCSV()">↓ Export</button>
+              </div>
+            </div>
+            <div id="clock-history-list">
+              <div class="empty-state" style="padding:24px;">Select a date to load attendance.</div>
+            </div>
+          </div>
+
+</div><!-- end left col -->
+            <div id="clock-right-col"><!-- right col: team log shown here on desktop -->
+            </div><!-- end right col -->
+          </div><!-- end two-col grid -->
         </div>
       </div>
 
@@ -679,14 +789,14 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                 <div style="font-size:10px;opacity:0.55;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Tier</div>
                 <div style="background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px 14px;text-align:center;">
                   <div style="font-size:18px;font-weight:700;">Standard</div>
-                  <div style="font-size:10px;opacity:0.6;margin-top:2px;">10 pts / item</div>
+                  <div style="font-size:10px;opacity:0.6;margin-top:2px;">1 pts / item</div>
                 </div>
               </div>
             </div>
             <div style="position:relative;z-index:1;margin-top:18px;">
               <div class="progress-label">
-                <span style="font-size:11px;opacity:0.7;">Progress to redemption (500 pts = UGX 50,000)</span>
-                <span style="font-size:11px;font-weight:600;" id="wallet-progress-label">— / 500</span>
+                <span style="font-size:11px;opacity:0.7;">Progress to redemption (50 pts = UGX 50,000)</span>
+                <span style="font-size:11px;font-weight:600;" id="wallet-progress-label">— / 50</span>
               </div>
               <div class="pbar-wallet">
                 <div class="pfill-wallet" id="wallet-progress-fill" style="width:0%;"></div>
@@ -712,20 +822,20 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
               <div class="step"><div class="step-circle sc-done">1</div><div class="step-label">List items for a store</div></div>
               <div class="step"><div class="step-circle sc-done">2</div><div class="step-label">Store purchases the item</div></div>
               <div class="step"><div class="step-circle sc-done">3</div><div class="step-label">Item appears in Listed Items</div></div>
-              <div class="step"><div class="step-circle sc-active">4</div><div class="step-label">Earn 10 pts per item = UGX 1,000</div></div>
-              <div class="step"><div class="step-circle sc-todo">5</div><div class="step-label">Reach 500 pts → redeem UGX 50,000+</div></div>
+              <div class="step"><div class="step-circle sc-active">4</div><div class="step-label">Earn 1 pts per item = UGX 1,000</div></div>
+              <div class="step"><div class="step-circle sc-todo">5</div><div class="step-label">Reach 50 pts → redeem UGX 50,000+</div></div>
             </div>
             <div style="display:flex;gap:10px;margin-top:12px;padding-top:12px;border-top:0.5px solid var(--brd);flex-wrap:wrap;">
               <div style="flex:1;min-width:140px;background:var(--bg2);border-radius:9px;padding:12px;text-align:center;">
-                <div style="font-size:20px;font-weight:700;color:var(--royal);">10 pts</div>
-                <div style="font-size:11px;color:var(--txt3);margin-top:3px;">per confirmed listed item</div>
+              <div style="font-size:20px;font-weight:700;color:var(--royal);">1 pts</div>
+              <div style="font-size:11px;color:var(--txt3);margin-top:3px;">per confirmed listed item = UGX 1,000</div>
               </div>
               <div style="flex:1;min-width:140px;background:var(--bg2);border-radius:9px;padding:12px;text-align:center;">
                 <div style="font-size:20px;font-weight:700;color:#1D9E75;">= UGX 1,000</div>
-                <div style="font-size:11px;color:var(--txt3);margin-top:3px;">per 10 points</div>
+                <div style="font-size:11px;color:var(--txt3);margin-top:3px;">per point</div>
               </div>
               <div style="flex:1;min-width:140px;background:var(--gold-light);border-radius:9px;padding:12px;text-align:center;border:0.5px solid rgba(212,160,23,0.3);">
-                <div style="font-size:20px;font-weight:700;color:var(--gold);">500 pts min</div>
+                <div style="font-size:20px;font-weight:700;color:var(--gold);">50pts min</div>
                 <div style="font-size:11px;color:var(--txt2);margin-top:3px;">to redeem (UGX 50,000)</div>
               </div>
             </div>
@@ -749,11 +859,11 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                 <div style="text-align:center;padding:12px 0 8px;">
                   <div style="width:60px;height:60px;border-radius:50%;background:var(--bg2);border:0.5px solid var(--brd2);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:24px;">🔒</div>
                   <div style="font-size:13px;font-weight:600;margin-bottom:6px;">Not yet eligible</div>
-                  <div style="font-size:12px;color:var(--txt2);line-height:1.6;max-width:220px;margin:0 auto;">You need <strong>50 points</strong> to redeem.</div>
+                  <div style="font-size:12px;color:var(--txt2);line-height:1.6;max-width:220px;margin:0 auto;">You need <strong>50 points (UGX 50,000)</strong> to redeem.</div>
                 </div>
                 <div style="margin:14px 0;background:var(--bg2);border-radius:9px;padding:12px;">
                   <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span style="color:var(--txt2);">Current balance</span><span style="font-weight:600;" id="redeem-current-pts">— pts</span></div>
-                  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span style="color:var(--txt2);">Minimum to redeem</span><span style="font-weight:600;">50pts</span></div>
+                  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span style="color:var(--txt2);">Minimum to redeem</span><span style="font-weight:600;">50 pts</span></div>
                   <div style="display:flex;justify-content:space-between;font-size:12px;padding-top:6px;border-top:0.5px solid var(--brd);"><span style="color:var(--txt2);">Still needed</span><span style="font-weight:700;color:#A32D2D;" id="redeem-still-needed">— pts</span></div>
                 </div>
                 <button class="btn" style="width:100%;justify-content:center;padding:12px 24px;font-size:13px;font-weight:600;border-radius:10px;opacity:0.4;cursor:not-allowed;" disabled id="wallet-payout-btn-locked">Request Payout</button>
@@ -800,7 +910,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
             <div class="mc" style="background:linear-gradient(135deg,#F06B6B,#E04545);border:none;">
               <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Reps Eligible</div>
               <div class="mc-val" id="wadmin-eligible" style="color:#fff;">0</div>
-              <div class="mc-sub" style="color:rgba(255,255,255,0.6);">Have 500+ points</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.6);">Have 50+ points</div>
             </div>
           </div>
 
@@ -1020,7 +1130,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                 <option value="t250">T250 — UBL</option>
                 <option value="slobs">SLOBS — UBL</option>
                 <option value="new_items">NEW ITEMS — UBL</option>
-                <option value="aiwibi_awina">AIWIBI / AIWINA</option>
+                <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
               </select>
               <button class="btn btn-sm btn-royal" onclick="showAddSkuForm()">+ Add SKU</button>
               <button class="btn btn-sm" onclick="showBulkSkuImport()">↑ Bulk Import</button>
@@ -1039,7 +1149,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                   <option value="t250">T250 (UBL)</option>
                   <option value="slobs">SLOBS (UBL)</option>
                   <option value="new_items">NEW ITEMS (UBL)</option>
-                  <option value="aiwibi_awina">AIWIBI / AIWINA</option>
+                  <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
                 </select>
               </div>
               <div class="fg"><label class="flbl">SKU</label><input class="fin" id="add-sku-code" placeholder="e.g. AG0001"/></div>
@@ -1058,7 +1168,7 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
                 <option value="t250">T250 (UBL)</option>
                 <option value="slobs">SLOBS (UBL)</option>
                 <option value="new_items">NEW ITEMS (UBL)</option>
-                <option value="aiwibi_awina">AIWIBI / AIWINA</option>
+                <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
               </select>
               <label class="flbl">Paste SKUs (one per line — optionally: SKU,Item Name)</label>
               <textarea class="fin" id="bulk-sku-text" rows="8" placeholder="AG0001,UBL Detergent 1kg&#10;AG0002,UBL Powder 500g&#10;AG0003" style="resize:vertical;font-family:'SF Mono','Courier New',monospace;font-size:12px;margin-top:4px;"></textarea>
@@ -1197,6 +1307,54 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
   </div>
 </div>
 
+<!-- CLOCK-IN CAMERA MODAL -->
+<div id="clock-camera-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+  <div style="background:#fff;border-radius:18px;width:90%;max-width:420px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+    <div style="background:var(--royal);padding:18px 22px;color:#fff;">
+      <div style="font-size:15px;font-weight:700;" id="cam-modal-title">📸 Clock In — Capture Photo</div>
+      <div style="font-size:11.5px;opacity:0.65;margin-top:3px;">Photo + location required to record attendance</div>
+    </div>
+    <div style="padding:20px 22px;">
+      <!-- Camera view -->
+      <div style="position:relative;border-radius:12px;overflow:hidden;background:#000;margin-bottom:14px;" id="cam-container">
+        <video id="cam-video" autoplay playsinline muted style="width:100%;display:block;border-radius:12px;max-height:280px;object-fit:cover;"></video>
+        <canvas id="cam-canvas" style="display:none;"></canvas>
+        <img id="cam-preview" style="display:none;width:100%;border-radius:12px;max-height:280px;object-fit:cover;" alt="Captured photo"/>
+        <div id="cam-overlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);border-radius:12px;">
+          <div style="text-align:center;color:#fff;">
+            <div style="font-size:28px;margin-bottom:8px;">📷</div>
+            <div style="font-size:12px;">Starting camera...</div>
+          </div>
+        </div>
+      </div>
+      <!-- Location status -->
+      <div id="cam-location-status" style="display:flex;align-items:center;gap:8px;padding:10px 13px;background:var(--bg2);border-radius:9px;border:0.5px solid var(--brd);margin-bottom:14px;font-size:12px;">
+        <span style="font-size:16px;">📍</span>
+        <span id="cam-location-text" style="color:var(--txt2);flex:1;">Detecting your location...</span>
+        <span id="cam-location-badge"></span>
+      </div>
+      <!-- Action buttons -->
+      <div id="cam-action-area">
+        <button id="cam-capture-btn" onclick="captureClockPhoto()" disabled
+          style="width:100%;padding:12px;border-radius:10px;background:var(--royal);color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit;margin-bottom:8px;opacity:0.5;">
+          📸 Capture Photo
+        </button>
+        <button onclick="cancelClockCamera()" style="width:100%;padding:10px;border-radius:9px;background:transparent;border:0.5px solid var(--brd2);cursor:pointer;font-size:13px;color:var(--txt2);font-family:inherit;">
+          Cancel
+        </button>
+      </div>
+      <div id="cam-confirm-area" style="display:none;">
+        <button onclick="confirmClockWithPhoto()" style="width:100%;padding:12px;border-radius:10px;background:#1D9E75;color:#fff;border:none;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit;margin-bottom:8px;">
+          ✅ Confirm & Clock <span id="cam-confirm-type">In</span>
+        </button>
+        <button onclick="retakeClockPhoto()" style="width:100%;padding:10px;border-radius:9px;background:transparent;border:0.5px solid var(--brd2);cursor:pointer;font-size:13px;color:var(--txt2);font-family:inherit;">
+          🔄 Retake Photo
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL  = 'https://bccqhwsbhgssoapiqljy.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjY3Fod3NiaGdzc29hcGlxbGp5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDI0MzczNCwiZXhwIjoyMDg5ODE5NzM0fQ.jQS-HoxiIRhBeahU5FKXPoyys80tOZ-lHudlSXLncbA';
@@ -1219,14 +1377,14 @@ let lastSavedListingClient = '';
 // ─── BRAND / LISTING TABLE CONFIG ─────────────────────────────────────────────
 const BRAND_TABLE_MAP = {
   'UBL':   ['t250', 'slobs', 'new_items'],
-  'AIWIBI': ['aiwibi_awina'],
-  'AIWINA': ['aiwibi_awina'],
+  'AIWIBI': ['aiwibi_aiwina'],
+  'AIWINA': ['aiwibi_aiwina'],
 };
 const TABLE_META = {
   t250:        { label: 'T250',        badgeClass: 'bb'    },
   slobs:       { label: 'SLOBS',       badgeClass: 'ba'    },
   new_items:   { label: 'NEW ITEMS',   badgeClass: 'bg'    },
-  aiwibi_awina: { label: 'AIWIBI/AIWINA', badgeClass: 'bgold' },
+  aiwibi_aiwina: { label: 'AIWIBI/AIWINA', badgeClass: 'bgold' },
 };
 let _skuCache       = {};
 let _clientBrandCache = {};
@@ -1257,6 +1415,7 @@ const canManage  = () => ['admin','manager'].includes(currentUser?.role);
 
 const NAV = [
   {id:'dashboard', label:'Dashboard',         sec:'Main',           icon:'M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z'},
+  {id:'clockin',   label:'Clock-In/Clock-Out', sec:'Main',          icon:'M8 1a7 7 0 100 14A7 7 0 008 1zm0 3v4l3 2'},
   {id:'clients',   label:'Clients',           sec:'Main',           icon:'M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z'},
   {id:'orders',    label:'Place Listing',     sec:'Main',           icon:'M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zm1 3h6M5 7h6M5 10h3'},
   {id:'targets',   label:'Targets',           sec:'Performance',    icon:'M8 1a7 7 0 100 14A7 7 0 008 1zm0 4a3 3 0 100 6 3 3 0 000-6zm0 2a1 1 0 100 2 1 1 0 000-2z'},
@@ -1403,7 +1562,8 @@ if (screen==='admin' && !canManage()) return;
   document.getElementById('page-title').textContent  = titles[screen]||screen;
   document.getElementById('mob-screen').textContent  = shortTitles[screen]||screen;
   buildNav('sidebar-nav'); buildNav('drawer-nav', true);
-  if (screen==='dashboard') loadDashboard();
+if (screen==='dashboard') loadDashboard();
+  else if (screen==='clockin') loadClockScreen();   // ← ADD THIS
   else if (screen==='clients') renderClients();
   else if (screen==='orders') initListingScreen();
   else if (screen==='targets') { loadTargets(); loadTargetDropdowns(); }
@@ -1645,10 +1805,11 @@ async function selectClient(clientId) {
         <button class="btn btn-sm btn-royal" onclick="goToListingForClient('${client.id}')">New Listing</button>
       </div>
 <div class="tabs">
-        <div class="tab active" onclick="swTab(this,'tc-products')">Product History</div>
-        <div class="tab" onclick="swTab(this,'tc-listable');loadListableItems('${client.id}')">Listing Items Pending</div>
-        <div class="tab" onclick="swTab(this,'tc-listings');loadClientListings('${client.id}')">Past Listings</div>
-        <div class="tab" onclick="swTab(this,'tc-listed');loadListedItems('${client.id}')">Listed Items</div>
+        <div class="tab active" onclick="swTab(this,'tc-products')">Purchase History</div>
+        <div class="tab" onclick="swTab(this,'tc-listable');loadListableItems('${client.id}')"> Recommended Listing</div>
+        <div class="tab" onclick="swTab(this,'tc-listings');loadClientListings('${client.id}')">Submitted Listings</div>
+        <div class="tab" onclick="swTab(this,'tc-listed');loadListedItems('${client.id}')">Successful Listing</div>
+        <div class="tab" onclick="swTab(this,'tc-notbought');loadNotBoughtItems('${client.id}')">Not bought (14d)</div>
       </div>
       <div class="tc active" id="tc-products">
         <div class="date-range-strip">
@@ -1679,11 +1840,16 @@ async function selectClient(clientId) {
           <div style="padding:20px;text-align:center;color:var(--txt3);">Click this tab to view past listings...</div>
         </div>
       </div>
-      <div class="tc" id="tc-listed">
-        <div id="client-listed-table">
-          <div style="padding:20px;text-align:center;color:var(--txt3);">Click this tab to view confirmed listed items...</div>
+<div class="tc" id="tc-listed">
+          <div id="client-listed-table">
+            <div style="padding:20px;text-align:center;color:var(--txt3);">Click this tab to view confirmed listed items...</div>
+          </div>
         </div>
-      </div>
+      <div class="tc" id="tc-notbought">
+          <div id="client-notbought-table">
+            <div style="padding:20px;text-align:center;color:var(--txt3);">Click this tab to view items listed but not yet purchased...</div>
+          </div>
+        </div>
     </div>`;
   loadClientSalesHistory(client.id);
 }
@@ -1716,21 +1882,37 @@ async function loadClientSalesHistory(clientId) {
   if (!client) { tableEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3);">Client not found.</div>'; return; }
   const zohoId = client.zoho_customer_id;
   let data, error;
-  if (zohoId) {
-    const r = await sb.from('invoice_line_items')
-      .select('item_id,item_code,item_name,quantity,line_total,unit_price,line_date,invoice_id')
-      .eq('customer_id', zohoId)
-      .gte('line_date', fromVal).lte('line_date', toVal)
-      .order('line_date', {ascending:false});
-    data = r.data; error = r.error;
+if (zohoId) {
+    let allRows = [], from = 0, pageSize = 1000;
+    while (true) {
+      const r = await sb.from('invoice_line_items')
+        .select('item_id,item_code,item_name,quantity,line_total,unit_price,line_date,invoice_id')
+        .eq('customer_id', zohoId)
+        .gte('line_date', fromVal).lte('line_date', toVal)
+        .order('line_date', {ascending:false})
+        .range(from, from + pageSize - 1);
+      if (r.error) { error = r.error; break; }
+      allRows = allRows.concat(r.data || []);
+      if (!r.data || r.data.length < pageSize) break;
+      from += pageSize;
+    }
+    data = allRows;
   }
   if (!zohoId || (!error && (!data || data.length === 0))) {
-    const r = await sb.from('invoice_line_items')
-      .select('item_id,item_code,item_name,quantity,line_total,unit_price,line_date,invoice_id')
-      .ilike('customer_name', client.name)
-      .gte('line_date', fromVal).lte('line_date', toVal)
-      .order('line_date', {ascending:false});
-    data = r.data; error = r.error;
+    let allRows = [], from = 0, pageSize = 1000;
+    while (true) {
+      const r = await sb.from('invoice_line_items')
+        .select('item_id,item_code,item_name,quantity,line_total,unit_price,line_date,invoice_id')
+        .ilike('customer_name', client.name)
+        .gte('line_date', fromVal).lte('line_date', toVal)
+        .order('line_date', {ascending:false})
+        .range(from, from + pageSize - 1);
+      if (r.error) { error = r.error; break; }
+      allRows = allRows.concat(r.data || []);
+      if (!r.data || r.data.length < pageSize) break;
+      from += pageSize;
+    }
+    data = allRows;
   }
   if (error) { tableEl.innerHTML=`<div style="padding:20px;text-align:center;color:#A32D2D;">Error: ${error.message}</div>`; return; }
   const rows = data||[];
@@ -1747,7 +1929,7 @@ async function loadClientSalesHistory(clientId) {
     itemMap[key].invoices.add(r.invoice_id);
     if (r.line_date > itemMap[key].last_order) itemMap[key].last_order = r.line_date;
   });
-  const items = Object.values(itemMap).sort((a,b)=>b.total_amount-a.total_amount);
+  const items = Object.values(itemMap).sort((a,b)=>new Date(b.last_order)-new Date(a.last_order));
   const totalSpend     = items.reduce((s,i)=>s+i.total_amount,0);
   const uniqueInvoices = new Set(rows.map(r=>r.invoice_id)).size;
 tableEl.innerHTML = `
@@ -1904,12 +2086,38 @@ function findProduct(skuRow) {
   }
   if (histError) { tableEl.innerHTML=`<div style="padding:20px;text-align:center;color:#A32D2D;">Error loading history: ${histError.message}</div>`; return; }
 
-  const purchasedCodes   = new Set();
-  const purchasedItemIds = new Set();
-  (histData||[]).forEach(r=>{
-    if (r.item_code) purchasedCodes.add(r.item_code.trim().toLowerCase());
-    if (r.item_id)   purchasedItemIds.add(String(r.item_id).trim());
-    if (r.item_name) purchasedCodes.add(r.item_name.trim().toLowerCase());
+const purchasedCodes   = new Set();
+const purchasedItemIds = new Set();
+// Date-aware maps: key -> array of purchase dates
+const purchasedCodeDates   = {}; // normKey -> [dates]
+const purchasedItemIdDates = {}; // itemId  -> [dates]
+
+(histData||[]).forEach(r=>{
+    const d = r.line_date || '';
+    if (r.item_name) {
+      const k = r.item_name.trim().toLowerCase();
+      purchasedCodes.add(k);
+      if (!purchasedCodeDates[k]) purchasedCodeDates[k] = [];
+      purchasedCodeDates[k].push(d);
+    }
+    if (r.item_code && !/^\d{10,}$/.test(r.item_code.trim())) {
+      const k = r.item_code.trim().toLowerCase();
+      purchasedCodes.add(k);
+      if (!purchasedCodeDates[k]) purchasedCodeDates[k] = [];
+      purchasedCodeDates[k].push(d);
+    }
+    if (r.item_id) {
+      const k = String(r.item_id).trim();
+      purchasedItemIds.add(k);
+      if (!purchasedItemIdDates[k]) purchasedItemIdDates[k] = [];
+      purchasedItemIdDates[k].push(d);
+    }
+    if (r.item_code) {
+      const k = String(r.item_code).trim();
+      purchasedItemIds.add(k);
+      if (!purchasedItemIdDates[k]) purchasedItemIdDates[k] = [];
+      purchasedItemIdDates[k].push(d);
+    }
   });
 
   // Also exclude SKUs already saved in KTLSALES listings for this client
@@ -3693,32 +3901,27 @@ async function loadListedItems(clientId) {
   tableEl.innerHTML = `<div style="padding:24px;text-align:center;color:var(--txt3);">
     <div style="font-size:20px;margin-bottom:8px;">⏳</div>Loading confirmed listed items...</div>`;
 
-  // 1. Get all SKUs the rep ever listed for this client (from submitted/fulfilled past listings)
+  // Step 1: Get all submitted/fulfilled orders for this client
   const { data: pastOrders, error: ordErr } = await sb
     .from('orders')
     .select('id, order_ref, order_date')
     .eq('client_id', String(clientId))
     .in('status', ['submitted', 'fulfilled', 'partial']);
 
-  if (ordErr) {
-    tableEl.innerHTML = `<div style="padding:20px;text-align:center;color:#A32D2D;">Error: ${ordErr.message}</div>`;
-    return;
-  }
-
+  if (ordErr) { tableEl.innerHTML = `<div style="padding:20px;text-align:center;color:#A32D2D;">Error: ${ordErr.message}</div>`; return; }
   if (!pastOrders || pastOrders.length === 0) {
-    tableEl.innerHTML = `
-      <div style="padding:32px 20px;text-align:center;">
-        <div style="font-size:32px;margin-bottom:10px;">📋</div>
-        <div style="font-weight:600;font-size:13px;margin-bottom:5px;">No past listings yet</div>
-        <div style="font-size:12px;color:var(--txt3);line-height:1.6;">
-          Once a sales rep submits a listing for this store, purchased items from that listing will appear here.
-        </div>
-      </div>`;
+    tableEl.innerHTML = `<div style="padding:32px 20px;text-align:center;">
+      <div style="font-size:32px;margin-bottom:10px;">📋</div>
+      <div style="font-weight:600;font-size:13px;margin-bottom:5px;">No past listings yet</div>
+    </div>`;
     return;
   }
 
-  // 2. Get all items from those listings
   const orderIds = pastOrders.map(o => o.id);
+  const orderMap = {};
+  pastOrders.forEach(o => { orderMap[o.id] = { ref: o.order_ref, date: o.order_date }; });
+
+  // Step 2: Get all items from those orders
   const { data: listedItems, error: itemErr } = await sb
     .from('order_items')
     .select('sku, product_name, product_id, unit_price, order_id')
@@ -3732,15 +3935,46 @@ async function loadListedItems(clientId) {
     return;
   }
 
-  // Build a map: sku → listing info (order_ref, order_date)
-  const orderMap = {};
-  pastOrders.forEach(o => { orderMap[o.id] = { ref: o.order_ref, date: o.order_date }; });
+  // Step 3: Build lookup maps for listed items
+  // Key by SKU, by product name, and by product_id
+  const listedBySkuKey = {};
+  const listedByNameKey = {};
+  const listedByProductId = {};
 
-  const listedSkuMap = {}; // sku.toLowerCase() → { product_name, unit_price, order_ref, order_date }
   listedItems.forEach(item => {
-    const key = (item.sku || '').trim().toLowerCase();
-    if (key && !listedSkuMap[key]) {
-      listedSkuMap[key] = {
+    const entry = {
+      sku: item.sku,
+      product_name: item.product_name,
+      unit_price: item.unit_price,
+      order_ref: orderMap[item.order_id]?.ref || '—',
+      order_date: orderMap[item.order_id]?.date || '—',
+    };
+    if (item.sku) listedBySkuKey[normalizeSku(item.sku)] = entry;
+    if (item.product_name) listedByNameKey[normalizeSku(item.product_name)] = entry;
+    if (item.product_id) listedByProductId[String(item.product_id)] = entry;
+  });
+
+  // Step 4: Build product lookup maps
+  const productByZohoId = {};
+  const productBySku = {};
+  const productByName = {};
+  allProducts.forEach(p => {
+    if (p.zoho_item_id) productByZohoId[String(p.zoho_item_id).trim()] = p;
+    if (p.sku) productBySku[normalizeSku(p.sku)] = p;
+    if (p.name) productByName[normalizeSku(p.name)] = p;
+  });
+
+  // Step 5: Build a reverse map — for each listed item, find its zoho_item_id
+  // So we can match invoice rows that only have item_id
+  const listedProductZohoIds = new Set();
+  const listedProductZohoIdToEntry = {};
+  listedItems.forEach(item => {
+    // Find product by SKU
+    const product = item.sku ? productBySku[normalizeSku(item.sku)] : null;
+    if (product && product.zoho_item_id) {
+      const zid = String(product.zoho_item_id).trim();
+      listedProductZohoIds.add(zid);
+      listedProductZohoIdToEntry[zid] = {
         sku: item.sku,
         product_name: item.product_name,
         unit_price: item.unit_price,
@@ -3748,108 +3982,233 @@ async function loadListedItems(clientId) {
         order_date: orderMap[item.order_id]?.date || '—',
       };
     }
-  });
-
-  // 3. Get Zoho purchase history for this client
-  const client = allClients.find(c => c.id === clientId);
-  const zohoId = client?.zoho_customer_id;
-  let histData = [];
-
-  if (zohoId) {
-    const r = await sb.from('invoice_line_items')
-      .select('item_code, item_name, line_date, invoice_id, quantity, unit_price')
-      .eq('customer_id', zohoId);
-    if (!r.error) histData = r.data || [];
-  }
-  if (!zohoId || histData.length === 0) {
-    const r = await sb.from('invoice_line_items')
-      .select('item_code, item_name, line_date, invoice_id, quantity, unit_price')
-      .ilike('customer_name', client?.name || '');
-    if (!r.error) histData = r.data || [];
-  }
-
-  // 4. Cross-reference: which listed SKUs did the store actually purchase?
-  const purchasedSkuMap = {}; // sku.toLowerCase() → { line_date, invoice_id, quantity, unit_price }
-  histData.forEach(row => {
-    const key = (row.item_code || '').trim().toLowerCase();
-    if (key) {
-      // Keep the most recent purchase if multiple
-      if (!purchasedSkuMap[key] || row.line_date > purchasedSkuMap[key].line_date) {
-        purchasedSkuMap[key] = {
-          line_date: row.line_date,
-          invoice_id: row.invoice_id,
-          quantity: row.quantity,
-          purchase_price: row.unit_price,
-          item_name: row.item_name,
+    // Also try by product_id
+    if (item.product_id) {
+      const p2 = allProducts.find(p => p.id === item.product_id);
+      if (p2 && p2.zoho_item_id) {
+        const zid = String(p2.zoho_item_id).trim();
+        listedProductZohoIds.add(zid);
+        listedProductZohoIdToEntry[zid] = {
+          sku: item.sku,
+          product_name: item.product_name,
+          unit_price: item.unit_price,
+          order_ref: orderMap[item.order_id]?.ref || '—',
+          order_date: orderMap[item.order_id]?.date || '—',
         };
       }
     }
   });
 
-  // 5. Filter to only items that appear in BOTH listed AND purchased
-  const confirmedItems = Object.entries(listedSkuMap)
-    .filter(([skuKey]) => !!purchasedSkuMap[skuKey])
-    .map(([skuKey, listingInfo]) => ({
-      ...listingInfo,
-      purchase_date: purchasedSkuMap[skuKey].line_date,
-      invoice_id: purchasedSkuMap[skuKey].invoice_id,
-      purchase_qty: purchasedSkuMap[skuKey].quantity,
-      purchase_price: purchasedSkuMap[skuKey].purchase_price,
-    }))
+  // Step 6: Fetch ALL invoice line items for this client
+  const client = allClients.find(c => String(c.id) === String(clientId));
+  const zohoId = client?.zoho_customer_id;
+  let histData = [];
+
+if (zohoId) {
+    let allRows = [], from = 0, pageSize = 1000;
+    while (true) {
+      const r = await sb.from('invoice_line_items')
+        .select('item_id, item_code, item_name, line_date, invoice_id, quantity, unit_price')
+        .eq('customer_id', zohoId)
+        .order('line_date', { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (r.error) break;
+      allRows = allRows.concat(r.data || []);
+      if (!r.data || r.data.length < pageSize) break;
+      from += pageSize;
+    }
+    histData = allRows;
+  }
+  if (!zohoId || histData.length === 0) {
+    let allRows = [], from = 0, pageSize = 1000;
+    while (true) {
+      const r = await sb.from('invoice_line_items')
+        .select('item_id, item_code, item_name, line_date, invoice_id, quantity, unit_price')
+        .ilike('customer_name', client?.name || '')
+        .order('line_date', { ascending: false })
+        .range(from, from + pageSize - 1);
+      if (r.error) break;
+      allRows = allRows.concat(r.data || []);
+      if (!r.data || r.data.length < pageSize) break;
+      from += pageSize;
+    }
+    histData = allRows;
+  }
+
+  // Step 7: Match each invoice row against listed items using ALL strategies
+  const confirmedMap = {};
+
+  // Helper: does any purchase date for this key fall ON or AFTER the listing date?
+// listingDate = the order_date of the KTLSALES listing (when the rep submitted it)
+// We use the order dates from pastOrders — map order_id -> order_date
+const orderDateMap = {};
+pastOrders.forEach(o => { orderDateMap[o.id] = o.order_date || ''; });
+
+histData.forEach(row => {
+    const invoiceNameKey = normalizeSku(row.item_name || '');
+    const invoiceCodeKey = normalizeSku(row.item_code || '');
+    const itemIdStr      = String(row.item_id   || '').trim();
+    const itemCodeStr    = String(row.item_code || '').trim();
+    const purchaseDate   = row.line_date || '';
+
+    let listingEntry = null;
+    let listingDate  = '';
+
+    // Helper: given a candidate entry, check if the purchase happened after listing
+function qualifies(entry) {
+  if (!entry) return false;
+  // Find the listing date for this item's order
+  const matchedOrder = pastOrders.find(o => o.order_ref === entry.order_ref);
+  const ld = matchedOrder?.order_date || entry.order_date || '';
+  // Purchase MUST be strictly ON or AFTER the listing date
+  // If we don't have a listing date, we cannot confirm — reject it
+  if (!ld) return false;
+  return purchaseDate >= ld;
+}
+
+    // S1: Invoice item_name exactly matches listed product_name
+    if (!listingEntry) { const e = listedByNameKey[invoiceNameKey]; if (qualifies(e)) listingEntry = e; }
+    // S2: Invoice item_name exactly matches listed SKU
+    if (!listingEntry) { const e = listedBySkuKey[invoiceNameKey];  if (qualifies(e)) listingEntry = e; }
+    // S3: Invoice item_code matches listed SKU
+    if (!listingEntry) { const e = listedBySkuKey[invoiceCodeKey];  if (qualifies(e)) listingEntry = e; }
+    // S4: Invoice item_code matches listed product_name
+    if (!listingEntry) { const e = listedByNameKey[invoiceCodeKey]; if (qualifies(e)) listingEntry = e; }
+    // S5: Invoice item_id matches a zoho_item_id of a listed product
+    if (!listingEntry) { const e = listedProductZohoIdToEntry[itemIdStr];  if (qualifies(e)) listingEntry = e; }
+    // S6: Invoice item_code (as zoho ID) matches a zoho_item_id of a listed product
+    if (!listingEntry) { const e = listedProductZohoIdToEntry[itemCodeStr]; if (qualifies(e)) listingEntry = e; }
+
+    // S7: Resolve invoice item_id → product → match listed item
+    if (!listingEntry && itemIdStr) {
+      const product = productByZohoId[itemIdStr];
+      if (product) {
+        const e = listedByProductId[String(product.id)]
+               || listedBySkuKey[normalizeSku(product.sku || '')]
+               || listedByNameKey[normalizeSku(product.name || '')];
+        if (qualifies(e)) listingEntry = e;
+      }
+    }
+    // S8: Resolve invoice item_code → product → match
+    if (!listingEntry && itemCodeStr) {
+      const product = productByZohoId[itemCodeStr];
+      if (product) {
+        const e = listedByProductId[String(product.id)]
+               || listedBySkuKey[normalizeSku(product.sku || '')]
+               || listedByNameKey[normalizeSku(product.name || '')];
+        if (qualifies(e)) listingEntry = e;
+      }
+    }
+    // S9: fuzzy item_name vs listed product_name
+    if (!listingEntry && invoiceNameKey && invoiceNameKey.length > 4) {
+      for (const [key, entry] of Object.entries(listedByNameKey)) {
+        if (key.length > 4 && (invoiceNameKey.includes(key) || key.includes(invoiceNameKey)) && qualifies(entry)) {
+          listingEntry = entry; break;
+        }
+      }
+    }
+    // S10: fuzzy item_name vs listed SKU
+    if (!listingEntry && invoiceNameKey && invoiceNameKey.length > 4) {
+      for (const [key, entry] of Object.entries(listedBySkuKey)) {
+        if (key.length > 4 && (invoiceNameKey.includes(key) || key.includes(invoiceNameKey)) && qualifies(entry)) {
+          listingEntry = entry; break;
+        }
+      }
+    }
+    // S11: match via allProducts as bridge (invoice item_name → product → listed SKU)
+    if (!listingEntry && invoiceNameKey) {
+      const matchedProduct = productByName[invoiceNameKey]
+        || allProducts.find(p => {
+          const pn = normalizeSku(p.name || '');
+          return pn.length > 4 && (invoiceNameKey.includes(pn) || pn.includes(invoiceNameKey));
+        });
+      if (matchedProduct) {
+        const e = listedBySkuKey[normalizeSku(matchedProduct.sku || '')]
+               || listedByProductId[String(matchedProduct.id)]
+               || listedByNameKey[normalizeSku(matchedProduct.name || '')];
+        if (qualifies(e)) listingEntry = e;
+      }
+    }
+    // S12: match via allProducts using invoice item_code as product SKU bridge
+    if (!listingEntry && invoiceCodeKey) {
+      const matchedProduct = productBySku[invoiceCodeKey]
+        || allProducts.find(p => normalizeSku(p.sku || '') === invoiceCodeKey);
+      if (matchedProduct) {
+        const e = listedBySkuKey[normalizeSku(matchedProduct.sku || '')]
+               || listedByProductId[String(matchedProduct.id)]
+               || listedByNameKey[normalizeSku(matchedProduct.name || '')];
+        if (qualifies(e)) listingEntry = e;
+      }
+    }
+
+    if (!listingEntry) return;
+
+    // Deduplicate: keep the most recent qualifying purchase per listed SKU
+    const dedupeKey = normalizeSku(listingEntry.sku || listingEntry.product_name || '');
+    if (!confirmedMap[dedupeKey] || purchaseDate > (confirmedMap[dedupeKey].purchase_date || '')) {
+      confirmedMap[dedupeKey] = {
+        ...listingEntry,
+        purchase_date:  purchaseDate,
+        invoice_id:     row.invoice_id,
+        purchase_qty:   row.quantity,
+        purchase_price: row.unit_price,
+      };
+    }
+  });
+
+  const confirmedItems = Object.values(confirmedMap)
     .sort((a, b) => (b.purchase_date || '').localeCompare(a.purchase_date || ''));
 
+  const totalListed = listedItems.length;
+
   if (confirmedItems.length === 0) {
+    // Show debug info to help diagnose
+    const sampleInvoice = histData.slice(0, 3).map(r => `${r.item_code}|${r.item_name}|${r.item_id}`).join(', ');
+    const sampleListed = listedItems.slice(0, 3).map(r => `${r.sku}|${r.product_name}`).join(', ');
     tableEl.innerHTML = `
       <div style="padding:32px 20px;text-align:center;">
         <div style="font-size:32px;margin-bottom:10px;">⏳</div>
         <div style="font-weight:600;font-size:13px;margin-bottom:5px;">No purchases confirmed yet</div>
-        <div style="font-size:12px;color:var(--txt3);line-height:1.6;max-width:340px;margin:0 auto;">
-          The rep has listed <strong>${Object.keys(listedSkuMap).length} SKU${Object.keys(listedSkuMap).length !== 1 ? 's' : ''}</strong> for this store,
-          but none have been purchased yet according to Zoho invoices.<br><br>
-          Items will appear here automatically after the next Zoho sync once the store makes a purchase.
+        <div style="font-size:12px;color:var(--txt3);line-height:1.6;max-width:380px;margin:0 auto;">
+          ${totalListed} item${totalListed !== 1 ? 's' : ''} listed but none matched in Zoho invoices yet.
         </div>
+        ${histData.length > 0 ? `
+        <details style="margin-top:14px;text-align:left;max-width:500px;margin-left:auto;margin-right:auto;">
+          <summary style="font-size:11px;color:var(--txt3);cursor:pointer;">🔍 Debug info (${histData.length} invoice rows found)</summary>
+          <div style="margin-top:8px;font-size:10.5px;color:var(--txt3);background:var(--bg2);padding:10px;border-radius:8px;font-family:monospace;">
+            <div><strong>Invoice rows sample:</strong> ${sampleInvoice}</div>
+            <div style="margin-top:6px;"><strong>Listed items sample:</strong> ${sampleListed}</div>
+          </div>
+        </details>` : `<div style="font-size:11px;color:var(--txt3);margin-top:8px;">⚠️ No invoice records found for this client in the database. Try syncing invoices from Zoho.</div>`}
       </div>`;
     return;
   }
+
+  const convPct = Math.min(100, Math.round(confirmedItems.length / totalListed * 100));
 
   tableEl.innerHTML = `
     <div style="padding:8px 14px;background:linear-gradient(90deg,rgba(29,158,117,0.08),transparent);border-bottom:0.5px solid var(--brd);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span style="font-size:11.5px;color:var(--txt2);">
         <strong style="color:#1D9E75;font-size:14px;">${confirmedItems.length}</strong>
         item${confirmedItems.length !== 1 ? 's' : ''} confirmed purchased
-        <span style="color:var(--txt3);">out of ${Object.keys(listedSkuMap).length} listed</span>
+        <span style="color:var(--txt3);">out of ${totalListed} listed</span>
       </span>
       <div style="margin-left:auto;">
         <div class="pbar" style="width:120px;margin-top:0;">
-          <div class="pfill" style="width:${Math.round(confirmedItems.length/Object.keys(listedSkuMap).length*100)}%;background:#1D9E75;"></div>
+          <div class="pfill" style="width:${convPct}%;background:#1D9E75;"></div>
         </div>
-        <div style="font-size:10px;color:#1D9E75;text-align:right;margin-top:2px;font-weight:600;">${Math.round(confirmedItems.length/Object.keys(listedSkuMap).length*100)}% conversion</div>
+        <div style="font-size:10px;color:#1D9E75;text-align:right;margin-top:2px;font-weight:600;">${convPct}% conversion</div>
       </div>
     </div>
     <div style="overflow-x:auto;">
     <table>
-      <thead>
-        <tr>
-          <th>SKU</th>
-          <th>Product</th>
-          <th>Listed in</th>
-          <th>Purchased On</th>
-          <th style="text-align:right;">Qty</th>
-          <th style="text-align:right;">Price (UGX)</th>
-        </tr>
-      </thead>
+      <thead><tr><th>SKU</th><th>Product</th><th>Listed in</th><th>Purchased On</th><th style="text-align:right;">Qty</th><th style="text-align:right;">Price (UGX)</th></tr></thead>
       <tbody>
         ${confirmedItems.map(item => `<tr>
           <td class="mono">${item.sku || '—'}</td>
           <td style="font-weight:500;">${(item.product_name || '—').slice(0, 42)}</td>
-          <td>
-            <span class="mono" style="font-size:10.5px;color:var(--royal);">${item.order_ref}</span>
-            <div style="font-size:10px;color:var(--txt3);">${item.order_date}</div>
-          </td>
-          <td>
-            <span class="badge bg" style="font-size:10px;">✓ Purchased</span>
-            <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${item.purchase_date || '—'}</div>
-          </td>
+          <td><span class="mono" style="font-size:10.5px;color:var(--royal);">${item.order_ref}</span><div style="font-size:10px;color:var(--txt3);">${item.order_date}</div></td>
+          <td><span class="badge bg" style="font-size:10px;">✓ Purchased</span><div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${item.purchase_date || '—'}</div></td>
           <td style="text-align:right;font-weight:500;">${item.purchase_qty || '—'}</td>
           <td style="text-align:right;font-weight:500;color:var(--royal);">${Number(item.purchase_price || item.unit_price || 0).toLocaleString()}</td>
         </tr>`).join('')}
@@ -4321,9 +4680,9 @@ async function checkAllSyncResume() {
 // ─── WALLET SCREEN ────────────────────────────────────────────────────────────
 let _walletStep = 1;
 let _walletPoints = 0;
-const WALLET_POINTS_PER_ITEM = 10;
-const WALLET_MIN_REDEEM = 500;
-const WALLET_UGX_PER_POINT = 100; // 10 pts = UGX 1,000 → 1 pt = UGX 100
+const WALLET_POINTS_PER_ITEM = 1;
+const WALLET_MIN_REDEEM = 50;
+const WALLET_UGX_PER_POINT = 1000; // 1 pt = UGX 1,000
 
 function goTo_wallet_hook(screen) {
   if (screen === 'wallet') loadWalletScreen();
@@ -4345,157 +4704,298 @@ async function loadWalletScreen() {
 }
 
 async function loadRepWallet() {
-  // Get all submitted/fulfilled listings by this rep
+  // Get all submitted/fulfilled orders by this rep
   const { data: repOrders } = await sb
     .from('orders')
-    .select('id, item_count, order_date, client_name, created_at, client_id')
+    .select('id, item_count, order_date, client_name, created_at, client_id, order_ref')
     .eq('created_by', currentUser.id)
     .in('status', ['submitted', 'fulfilled', 'partial'])
     .order('created_at', { ascending: false });
 
   const orders = repOrders || [];
-  
-  let totalConfirmedItems = 0;
-  const confirmedByOrder = {};
-  const confirmedStores = new Set();
-  
-  // For each order, check which items appear in "Listed Items" (Zoho purchases)
-  for (const order of orders) {
-    const clientId = order.client_id;
-    if (!clientId) continue;
-    
-    // Get items listed in this order
-    const { data: listedItems } = await sb
-      .from('order_items')
-      .select('sku, product_id, product_name')
-      .eq('order_id', order.id);
-    
-    if (!listedItems || listedItems.length === 0) continue;
-    
-    const listedSkus = new Set(listedItems.map(i => (i.sku || '').trim().toLowerCase()).filter(Boolean));
-    
-    // Get Zoho purchase history for this client (this populates "Listed Items" tab)
-    const client = allClients.find(c => c.id === clientId);
+
+  if (orders.length === 0) {
+    _walletPoints = 0;
+    renderRepWalletUI(0, 0, 0, [], {});
+    return;
+  }
+
+  // Get all order_items for these orders
+  const orderIds = orders.map(o => o.id);
+  const { data: allListedItems } = await sb
+    .from('order_items')
+    .select('order_id, sku, product_id, product_name')
+    .in('order_id', orderIds);
+
+  const itemsByOrder = {};
+  (allListedItems || []).forEach(item => {
+    if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
+    itemsByOrder[item.order_id].push(item);
+  });
+
+  // Build product lookup maps
+  const productBySku    = {};
+  const productByName   = {};
+  const productById     = {};
+  const productByZohoId = {};
+  allProducts.forEach(p => {
+    if (p.sku)          productBySku[normalizeSku(p.sku)]     = p;
+    if (p.name)         productByName[normalizeSku(p.name)]   = p;
+    if (p.id)           productById[String(p.id)]             = p;
+    if (p.zoho_item_id) productByZohoId[String(p.zoho_item_id).trim()] = p;
+  });
+
+  // Get unique clients
+  const uniqueClientIds = [...new Set(orders.map(o => o.client_id).filter(Boolean))];
+
+  // Fetch invoice history per client — EXACT SAME logic as loadListedItems()
+  const purchasedByClient = {};
+  for (const clientId of uniqueClientIds) {
+    const client = allClients.find(c => String(c.id) === String(clientId));
     const zohoId = client?.zoho_customer_id;
     let histData = [];
-    
+
     if (zohoId) {
-      const r = await sb.from('invoice_line_items')
-        .select('item_code').eq('customer_id', zohoId);
-      if (!r.error) histData = r.data || [];
+      let allRows = [], from = 0;
+      while (true) {
+        const r = await sb.from('invoice_line_items')
+          .select('item_code, item_name, item_id, line_date, invoice_id, quantity, unit_price')
+          .eq('customer_id', zohoId)
+          .order('line_date', { ascending: false })
+          .range(from, from + 999);
+        if (r.error || !r.data || r.data.length === 0) break;
+        allRows = allRows.concat(r.data);
+        if (r.data.length < 1000) break;
+        from += 1000;
+      }
+      histData = allRows;
     }
     if (!zohoId || histData.length === 0) {
-      const r = await sb.from('invoice_line_items')
-        .select('item_code').ilike('customer_name', client?.name || '');
-      if (!r.error) histData = r.data || [];
-    }
-    
-    const purchasedCodes = new Set(
-      histData.map(r => (r.item_code || '').trim().toLowerCase()).filter(Boolean)
-    );
-    
-    // Count how many listed SKUs appear in "Listed Items" (Zoho purchases)
-    let confirmedCount = 0;
-    listedSkus.forEach(sku => {
-      if (purchasedCodes.has(sku)) confirmedCount++;
-    });
-    
-    confirmedByOrder[order.id] = confirmedCount;
-    totalConfirmedItems += confirmedCount;
-    
-    if (confirmedCount > 0 && client?.name) {
-      confirmedStores.add(client.name);
-    }
-  }
-  
-  const points = totalConfirmedItems * 10;  // 10 points per confirmed item
-  _walletPoints = points;
-  const ugxValue = points * 100;  // 10 points = UGX 1,000, so 1 point = UGX 100
-  const pct = Math.min(100, Math.round((points / 500) * 100));
-  const needed = Math.max(0, 500 - points);
-  
-  // Unique stores with confirmed purchases
-  const uniqueStores = confirmedStores.size;
-  
-  // Tracking start date (first order with confirmed purchase)
-  let trackingDate = new Date().toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
-  for (const order of orders) {
-    if (confirmedByOrder[order.id] > 0) {
-      trackingDate = new Date(order.created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
-      break;
-    }
-  }
-  
-  // Update hero UI
-  document.getElementById('wallet-hero-pts').textContent = points.toLocaleString();
-  document.getElementById('wallet-hero-ugx').textContent = `= UGX ${ugxValue.toLocaleString()}`;
-  document.getElementById('wallet-tracking-date').textContent = `Tracking from ${trackingDate}`;
-  document.getElementById('wallet-progress-label').textContent = `${points} / 500`;
-  document.getElementById('wallet-progress-fill').style.width = pct + '%';
-  document.getElementById('wallet-progress-sub').textContent = needed > 0
-    ? `${needed} more points needed to redeem (earn 10 points per item when store purchases it)`
-    : 'You are eligible to redeem!';
-  document.getElementById('wallet-stat-items').textContent = totalConfirmedItems;
-  document.getElementById('wallet-stat-stores').textContent = uniqueStores;
-  
-  // Alert text
-  const alertEl = document.getElementById('wallet-alert-not-eligible');
-  const alertText = document.getElementById('wallet-alert-text');
-  if (points >= 500) {
-    alertEl.className = 'alert ag';
-    alertText.innerHTML = `🎉 You have <strong>${points} points (UGX ${ugxValue.toLocaleString()})</strong> from ${totalConfirmedItems} confirmed purchased items — you are eligible to request a payout!`;
-  } else {
-    alertEl.className = 'alert aw';
-    alertText.innerHTML = `📋 You need <strong>50 points (UGX 5,000)</strong> to redeem. You currently have ${points} points from ${totalConfirmedItems} confirmed purchased items — ${needed} more to go!<br><br>✅ Items earn 1 points ONLY when they appear in the <strong>"Listed Items" tab</strong> (store actually purchases them).`;
-  }
-  
-  // Redeem card
-  document.getElementById('redeem-current-pts').textContent = `${points} pts`;
-  document.getElementById('redeem-still-needed').textContent = `${needed} pts`;
-  
-  if (points >= 500) {
-    document.getElementById('wallet-redeem-body').style.display = 'none';
-    document.getElementById('wallet-eligible-body').style.display = 'block';
-    document.getElementById('wallet-eligible-ugx').textContent = `UGX ${ugxValue.toLocaleString()}`;
-    document.getElementById('wallet-eligible-pts').textContent = `${points} points from ${totalConfirmedItems} confirmed purchases`;
-  } else {
-    document.getElementById('wallet-redeem-body').style.display = 'block';
-    document.getElementById('wallet-eligible-body').style.display = 'none';
-  }
-  
-  // Recent earnings - show only orders with confirmed purchases
-  const earnedOrders = orders.filter(o => (confirmedByOrder[o.id] || 0) > 0).slice(0, 5);
-  
-  if (earnedOrders.length === 0) {
-    document.getElementById('wallet-recent-earnings').innerHTML = 
-      '<div class="empty-state">📭 No confirmed purchases yet. Items earn 10 points EACH once they appear in the <strong>"Listed Items" tab</strong> (store purchases them).</div>';
-    document.getElementById('wallet-earnings-badge').textContent = '+0 pts this month';
-  } else {
-    let earningsHtml = '';
-    earnedOrders.forEach(o => {
-      const confirmed = confirmedByOrder[o.id] || 0;
-      const ptsEarned = confirmed * 10;
-      const dateStr = new Date(o.created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
-      earningsHtml += `
-        <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
-          <div class="tl-icon tl-earn">✓</div>
-          <div style="flex:1;">
-            <div style="font-size:12.5px;font-weight:500;">${o.client_name || '—'} — ${confirmed} item${confirmed !== 1 ? 's' : ''} purchased by store</div>
-            <div style="font-size:11px;color:var(--txt3);margin-top:2px;">${dateStr} · Appeared in "Listed Items" tab</div>
-          </div>
-          <div class="tl-amount earn" style="font-size:13px;font-weight:600;">+${ptsEarned} pts</div>
-        </div>`;
-    });
-    document.getElementById('wallet-recent-earnings').innerHTML = earningsHtml;
-    
-    // This month's confirmed points
-    const thisMonth = new Date().toISOString().slice(0, 7);
-    let monthPts = 0;
-    for (const order of orders) {
-      if ((order.created_at || '').startsWith(thisMonth) && (confirmedByOrder[order.id] || 0) > 0) {
-        monthPts += (confirmedByOrder[order.id] || 0) * 10;
+      const clientName = client?.name || '';
+      if (clientName) {
+        let allRows = [], from = 0;
+        while (true) {
+          const r = await sb.from('invoice_line_items')
+            .select('item_code, item_name, item_id, line_date, invoice_id, quantity, unit_price')
+            .ilike('customer_name', clientName)
+            .order('line_date', { ascending: false })
+            .range(from, from + 999);
+          if (r.error || !r.data || r.data.length === 0) break;
+          allRows = allRows.concat(r.data);
+          if (r.data.length < 1000) break;
+          from += 1000;
+        }
+        histData = allRows;
       }
     }
+    purchasedByClient[String(clientId)] = histData;
+  }
+
+  // Count confirmed items per order using IDENTICAL logic to loadListedItems()
+  const confirmedByOrder = {};
+  const confirmedStores  = new Set();
+  let totalConfirmedItems = 0;
+
+  for (const order of orders) {
+    const clientId    = String(order.client_id || '');
+    const orderDate   = order.order_date || '';
+    if (!clientId) { confirmedByOrder[order.id] = 0; continue; }
+
+    const listedItems = itemsByOrder[order.id] || [];
+    if (listedItems.length === 0) { confirmedByOrder[order.id] = 0; continue; }
+
+    const histData = purchasedByClient[clientId] || [];
+    if (histData.length === 0) { confirmedByOrder[order.id] = 0; continue; }
+
+    // Build lookup maps for this client's invoice history
+    const listedBySkuKey      = {};
+    const listedByNameKey     = {};
+    const listedByProductId   = {};
+    const listedProductZohoIdToEntry = {};
+
+    listedItems.forEach(item => {
+      const entry = { sku: item.sku, product_name: item.product_name, order_date: orderDate };
+      if (item.sku)        listedBySkuKey[normalizeSku(item.sku)]              = entry;
+      if (item.product_name) listedByNameKey[normalizeSku(item.product_name)] = entry;
+      if (item.product_id) listedByProductId[String(item.product_id)]         = entry;
+      // Map zoho_item_id for this product
+      const product = item.product_id ? productById[String(item.product_id)]
+                    : productBySku[normalizeSku(item.sku || '')]
+                    || productByName[normalizeSku(item.product_name || '')];
+      if (product?.zoho_item_id) {
+        listedProductZohoIdToEntry[String(product.zoho_item_id).trim()] = entry;
+      }
+    });
+
+    // Match invoice rows against listed items — MUST be purchased ON or AFTER listing date
+    const confirmedMap = {};
+
+    function qualifies(entry, purchaseDate) {
+      if (!entry) return false;
+      const ld = entry.order_date || '';
+      if (!ld) return false;
+      return purchaseDate >= ld;
+    }
+
+    for (const row of histData) {
+      const invoiceNameKey = normalizeSku(row.item_name || '');
+      const invoiceCodeKey = normalizeSku(row.item_code || '');
+      const itemIdStr      = String(row.item_id   || '').trim();
+      const itemCodeStr    = String(row.item_code || '').trim();
+      const purchaseDate   = row.line_date || '';
+
+      let listingEntry = null;
+
+      // All 12 strategies — same as loadListedItems()
+      if (!listingEntry) { const e = listedByNameKey[invoiceNameKey]; if (qualifies(e, purchaseDate)) listingEntry = e; }
+      if (!listingEntry) { const e = listedBySkuKey[invoiceNameKey];  if (qualifies(e, purchaseDate)) listingEntry = e; }
+      if (!listingEntry) { const e = listedBySkuKey[invoiceCodeKey];  if (qualifies(e, purchaseDate)) listingEntry = e; }
+      if (!listingEntry) { const e = listedByNameKey[invoiceCodeKey]; if (qualifies(e, purchaseDate)) listingEntry = e; }
+      if (!listingEntry) { const e = listedProductZohoIdToEntry[itemIdStr];  if (qualifies(e, purchaseDate)) listingEntry = e; }
+      if (!listingEntry) { const e = listedProductZohoIdToEntry[itemCodeStr]; if (qualifies(e, purchaseDate)) listingEntry = e; }
+
+      if (!listingEntry && itemIdStr) {
+        const product = productByZohoId[itemIdStr];
+        if (product) {
+          const e = listedByProductId[String(product.id)]
+                 || listedBySkuKey[normalizeSku(product.sku || '')]
+                 || listedByNameKey[normalizeSku(product.name || '')];
+          if (qualifies(e, purchaseDate)) listingEntry = e;
+        }
+      }
+      if (!listingEntry && itemCodeStr) {
+        const product = productByZohoId[itemCodeStr];
+        if (product) {
+          const e = listedByProductId[String(product.id)]
+                 || listedBySkuKey[normalizeSku(product.sku || '')]
+                 || listedByNameKey[normalizeSku(product.name || '')];
+          if (qualifies(e, purchaseDate)) listingEntry = e;
+        }
+      }
+      if (!listingEntry && invoiceNameKey && invoiceNameKey.length > 4) {
+        for (const [key, entry] of Object.entries(listedByNameKey)) {
+          if (key.length > 4 && (invoiceNameKey.includes(key) || key.includes(invoiceNameKey)) && qualifies(entry, purchaseDate)) {
+            listingEntry = entry; break;
+          }
+        }
+      }
+      if (!listingEntry && invoiceNameKey && invoiceNameKey.length > 4) {
+        for (const [key, entry] of Object.entries(listedBySkuKey)) {
+          if (key.length > 4 && (invoiceNameKey.includes(key) || key.includes(invoiceNameKey)) && qualifies(entry, purchaseDate)) {
+            listingEntry = entry; break;
+          }
+        }
+      }
+      if (!listingEntry && invoiceNameKey) {
+        const matchedProduct = productByName[invoiceNameKey]
+          || allProducts.find(p => {
+            const pn = normalizeSku(p.name || '');
+            return pn.length > 4 && (invoiceNameKey.includes(pn) || pn.includes(invoiceNameKey));
+          });
+        if (matchedProduct) {
+          const e = listedBySkuKey[normalizeSku(matchedProduct.sku || '')]
+                 || listedByProductId[String(matchedProduct.id)]
+                 || listedByNameKey[normalizeSku(matchedProduct.name || '')];
+          if (qualifies(e, purchaseDate)) listingEntry = e;
+        }
+      }
+      if (!listingEntry && invoiceCodeKey) {
+        const matchedProduct = productBySku[invoiceCodeKey];
+        if (matchedProduct) {
+          const e = listedBySkuKey[normalizeSku(matchedProduct.sku || '')]
+                 || listedByProductId[String(matchedProduct.id)]
+                 || listedByNameKey[normalizeSku(matchedProduct.name || '')];
+          if (qualifies(e, purchaseDate)) listingEntry = e;
+        }
+      }
+
+      if (!listingEntry) continue;
+
+      // Deduplicate: one confirmed entry per listed SKU
+      const dedupeKey = normalizeSku(listingEntry.sku || listingEntry.product_name || '');
+      if (!confirmedMap[dedupeKey] || purchaseDate > (confirmedMap[dedupeKey].purchase_date || '')) {
+        confirmedMap[dedupeKey] = { ...listingEntry, purchase_date: purchaseDate };
+      }
+    }
+
+    const confirmedCount = Object.keys(confirmedMap).length;
+    confirmedByOrder[order.id] = confirmedCount;
+    totalConfirmedItems += confirmedCount;
+    if (confirmedCount > 0 && order.client_name) confirmedStores.add(order.client_name);
+  }
+
+  _walletPoints = totalConfirmedItems;
+  renderRepWalletUI(totalConfirmedItems, confirmedStores.size, orders.length, orders, confirmedByOrder);
+}
+
+function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, orders, confirmedByOrder) {
+  const points  = totalConfirmedItems;
+  const ugxValue = points * 1000;
+  const pct     = Math.min(100, Math.round((points / 50) * 100));
+  const needed  = Math.max(0, 50 - points);
+
+  // Hero
+  document.getElementById('wallet-hero-pts').textContent = points.toLocaleString();
+  document.getElementById('wallet-hero-ugx').textContent = `= UGX ${ugxValue.toLocaleString()}`;
+  document.getElementById('wallet-tracking-date').textContent =
+    `Updated ${new Date().toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+  document.getElementById('wallet-progress-label').textContent = `${points} / 50`;
+  document.getElementById('wallet-progress-fill').style.width = pct + '%';
+  document.getElementById('wallet-progress-sub').textContent = needed > 0
+    ? `${needed} more confirmed purchases needed to redeem`
+    : '🎉 You are eligible to redeem!';
+  document.getElementById('wallet-stat-items').textContent   = totalConfirmedItems;
+  document.getElementById('wallet-stat-stores').textContent  = uniqueStores;
+
+  // Alert
+  const alertEl   = document.getElementById('wallet-alert-not-eligible');
+  const alertText = document.getElementById('wallet-alert-text');
+  if (points >= 50) {
+    alertEl.className = 'alert ag';
+    alertText.innerHTML = `🎉 You have <strong>${points} points (UGX ${ugxValue.toLocaleString()})</strong> from ${totalConfirmedItems} confirmed purchases — you are eligible to request a payout!`;
+  } else {
+    alertEl.className = 'alert aw';
+    alertText.innerHTML = `You have <strong>${points} points</strong> from ${totalConfirmedItems} confirmed purchased items. Need ${needed} more to reach 50 pts (UGX 50,000).<br><br>✅ Points are earned when a listed item appears in <strong>"Successful Listing"</strong> tab — meaning the store actually bought it.`;
+  }
+
+  // Redeem card
+  document.getElementById('redeem-current-pts').textContent  = `${points} pts`;
+  document.getElementById('redeem-still-needed').textContent = `${needed} pts`;
+  if (points >= 50) {
+    document.getElementById('wallet-redeem-body').style.display  = 'none';
+    document.getElementById('wallet-eligible-body').style.display = 'block';
+    document.getElementById('wallet-eligible-ugx').textContent   = `UGX ${ugxValue.toLocaleString()}`;
+    document.getElementById('wallet-eligible-pts').textContent   = `${points} points from ${totalConfirmedItems} confirmed purchases`;
+  } else {
+    document.getElementById('wallet-redeem-body').style.display  = 'block';
+    document.getElementById('wallet-eligible-body').style.display = 'none';
+  }
+
+  // Recent earnings
+  const earned = orders.filter(o => (confirmedByOrder[o.id] || 0) > 0).slice(0, 8);
+  if (earned.length === 0) {
+    document.getElementById('wallet-recent-earnings').innerHTML =
+      '<div class="empty-state">No confirmed purchases yet. Points are earned once the store purchases your listed items.</div>';
+    document.getElementById('wallet-earnings-badge').textContent = '+0 pts this month';
+  } else {
+    document.getElementById('wallet-recent-earnings').innerHTML = earned.map(o => {
+      const count   = confirmedByOrder[o.id] || 0;
+      const pts     = count * 1;
+      const dateStr = new Date(o.created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
+      return `<div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
+        <div class="tl-icon tl-earn" style="font-size:13px;">✓</div>
+        <div style="flex:1;">
+          <div style="font-size:12.5px;font-weight:500;">${o.client_name || '—'} — ${count} item${count !== 1 ? 's' : ''} confirmed purchased</div>
+          <div style="font-size:11px;color:var(--txt3);margin-top:2px;">${dateStr} · Ref: ${o.order_ref || '—'}</div>
+        </div>
+        <div class="tl-amount earn" style="font-size:13px;font-weight:600;color:#1D9E75;">+${pts} pts</div>
+      </div>`;
+    }).join('');
+
+    const thisMonth = new Date().toISOString().slice(0, 7);
+    const monthPts  = orders
+      .filter(o => (o.created_at || '').startsWith(thisMonth) && (confirmedByOrder[o.id] || 0) > 0)
+      .reduce((s, o) => s + (confirmedByOrder[o.id] || 0), 0);
     document.getElementById('wallet-earnings-badge').textContent = `+${monthPts} pts this month`;
   }
 }
@@ -4503,135 +5003,229 @@ async function loadRepWallet() {
 async function loadWalletEarningsAll() {
   const { data: allOrders } = await sb
     .from('orders')
-    .select('id, item_count, order_date, client_name, created_at')
+    .select('id, item_count, order_date, client_name, created_at, order_ref')
     .eq('created_by', currentUser.id)
     .in('status', ['submitted', 'fulfilled', 'partial'])
     .order('created_at', { ascending: false });
 
   const orders = allOrders || [];
   if (orders.length === 0) {
-    document.getElementById('wallet-recent-earnings').innerHTML = '<div class="empty-state">No confirmed listings yet.</div>';
+    document.getElementById('wallet-recent-earnings').innerHTML = 
+      '<div class="empty-state">No confirmed listings yet.</div>';
     return;
   }
-  let html = '';
-orders.forEach(o => {
-    if (o.created_by && repStats[o.created_by]) {
-      const items = Number(o.item_count || 0);
-      repStats[o.created_by].items += items;
-      repStats[o.created_by].points += items * WALLET_POINTS_PER_ITEM;
-      repStats[o.created_by].ugx += items * WALLET_POINTS_PER_ITEM * WALLET_UGX_PER_POINT;
-      if (o.client_name) repStats[o.created_by].stores.add(o.client_name);
-    }
-  });
-  document.getElementById('wallet-recent-earnings').innerHTML = html;
+
+  document.getElementById('wallet-recent-earnings').innerHTML = orders.map(o => {
+    const count  = Number(o.item_count || 0);
+    const dateStr = new Date(o.created_at).toLocaleDateString('en-UG', 
+      { day:'2-digit', month:'short', year:'numeric' });
+    return `<div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
+      <div class="tl-icon tl-earn" style="font-size:13px;">✓</div>
+      <div style="flex:1;">
+        <div style="font-size:12.5px;font-weight:500;">${o.client_name || '—'} — ${count} item${count !== 1 ? 's' : ''} listed</div>
+        <div style="font-size:11px;color:var(--txt3);margin-top:2px;">${dateStr} · Ref: ${o.order_ref || '—'}</div>
+      </div>
+      <div class="tl-amount earn" style="font-size:13px;font-weight:600;color:#1D9E75;">+${count} pts</div>
+    </div>`;
+  }).join('');
 }
 
 async function loadAdminWallet() {
   const { data: allUsers } = await sb.from('users').select('id,full_name,email,role').order('full_name');
   const reps = (allUsers || []).filter(u => u.role === 'sales_rep' && u.is_active !== false);
 
-  // Get ALL orders by ALL reps
+  const repStats = {};
+  reps.forEach(u => {
+    repStats[u.id] = { name: u.full_name, items: 0, points: 0, ugx: 0, redeemed: 0, stores: new Set() };
+  });
+
+  // ── Step 1: Get all submitted/fulfilled orders ──
   const { data: allOrders } = await sb
     .from('orders')
-    .select('id, item_count, created_by, client_name, client_id, created_at, order_date')
+    .select('id, created_by, client_id, client_name, order_date, order_ref')
     .in('status', ['submitted', 'fulfilled', 'partial']);
 
   const orders = allOrders || [];
-  
-  // Initialize rep stats
-  const repStats = {};
-  reps.forEach(u => {
-    repStats[u.id] = { 
-      name: u.full_name, 
-      items: 0, 
-      points: 0, 
-      ugx: 0, 
-      redeemed: 0, 
-      stores: new Set()
+  if (orders.length === 0) { _renderAdminWalletUI(repStats, Object.entries(repStats)); return; }
+
+  // ── Step 2: Get ALL order_items in one bulk query ──
+  const allOrderIds = orders.map(o => o.id);
+  const { data: allOrderItems } = await sb
+    .from('order_items')
+    .select('order_id, sku, product_id, product_name')
+    .in('order_id', allOrderIds);
+
+  const itemsByOrder = {};
+  (allOrderItems || []).forEach(item => {
+    if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
+    itemsByOrder[item.order_id].push(item);
+  });
+
+  // Build order lookup: order_id -> { repId, clientId, orderDate, clientName }
+  const orderMeta = {};
+  orders.forEach(o => {
+    orderMeta[o.id] = {
+      repId: o.created_by,
+      clientId: String(o.client_id || ''),
+      orderDate: o.order_date || '',
+      clientName: o.client_name || ''
     };
   });
-  
-  // Group orders by rep
-  const ordersByRep = {};
-  orders.forEach(o => {
-    if (o.created_by) {
-      if (!ordersByRep[o.created_by]) ordersByRep[o.created_by] = [];
-      ordersByRep[o.created_by].push(o);
+
+  // ── Step 3: Get unique zoho customer IDs for all clients in orders ──
+  const uniqueClientIds = [...new Set(orders.map(o => o.client_id).filter(Boolean).map(String))];
+  const zohoIdToClientId = {};
+  const zohoIds = [];
+
+  uniqueClientIds.forEach(clientId => {
+    const client = allClients.find(c => String(c.id) === clientId);
+    if (client?.zoho_customer_id) {
+      const zid = String(client.zoho_customer_id);
+      zohoIdToClientId[zid] = clientId;
+      zohoIds.push(zid);
     }
   });
-  
-  // For each rep, calculate ONLY items that appear in "Listed Items" (Zoho purchases)
-  for (const [repId, repOrders] of Object.entries(ordersByRep)) {
-    if (!repStats[repId]) continue;
-    
-    let totalConfirmedItems = 0;
-    
-    for (const order of repOrders) {
-      const clientId = order.client_id;
-      if (!clientId) continue;
-      
-      // Get items listed in this order
-      const { data: listedItems } = await sb
-        .from('order_items')
-        .select('sku, product_id')
-        .eq('order_id', order.id);
-      
-      if (!listedItems || listedItems.length === 0) continue;
-      
-      const listedSkus = new Set(listedItems.map(i => (i.sku || '').trim().toLowerCase()).filter(Boolean));
-      
-      // Get Zoho purchase history for this client (this populates "Listed Items" tab)
-      const client = allClients.find(c => c.id === clientId);
-      const zohoId = client?.zoho_customer_id;
-      let histData = [];
-      
-      if (zohoId) {
-        const r = await sb.from('invoice_line_items')
-          .select('item_code').eq('customer_id', zohoId);
-        if (!r.error) histData = r.data || [];
+
+  // ── Step 4: ONE bulk fetch of all invoice line items for all relevant clients ──
+  let allInvoiceRows = [];
+  if (zohoIds.length > 0) {
+    let from = 0;
+    while (true) {
+      const r = await sb.from('invoice_line_items')
+        .select('customer_id, item_code, item_name, item_id, line_date')
+        .in('customer_id', zohoIds)
+        .range(from, from + 999);
+      if (r.error || !r.data || r.data.length === 0) break;
+      allInvoiceRows = allInvoiceRows.concat(r.data);
+      if (r.data.length < 1000) break;
+      from += 1000;
+    }
+  }
+
+  // ── Step 5: Group invoice rows by clientId ──
+  // For each client: build sets of (normSku, normName, itemId) with their purchase dates
+  const invoiceByClient = {};
+  allInvoiceRows.forEach(row => {
+    const cid = zohoIdToClientId[String(row.customer_id)];
+    if (!cid) return;
+    if (!invoiceByClient[cid]) invoiceByClient[cid] = [];
+    invoiceByClient[cid].push({
+      nameKey: normalizeSku(row.item_name || ''),
+      codeKey: normalizeSku(row.item_code || ''),
+      itemId:  String(row.item_id || '').trim(),
+      itemCode: String(row.item_code || '').trim(),
+      date:    row.line_date || ''
+    });
+  });
+
+  // ── Step 6: Product lookup maps ──
+  const productBySku  = {};
+  const productByName = {};
+  const productById   = {};
+  const productByZohoId = {};
+  allProducts.forEach(p => {
+    if (p.sku)          productBySku[normalizeSku(p.sku)]   = p;
+    if (p.name)         productByName[normalizeSku(p.name)] = p;
+    if (p.id)           productById[String(p.id)]           = p;
+    if (p.zoho_item_id) productByZohoId[String(p.zoho_item_id).trim()] = p;
+  });
+
+  // ── Step 7: For each order, count how many listed items were actually purchased ──
+  for (const order of orders) {
+    const { repId, clientId, orderDate, clientName } = orderMeta[order.id];
+    if (!repId || !repStats[repId] || !clientId || !orderDate) continue;
+
+    const listedItems = itemsByOrder[order.id] || [];
+    if (listedItems.length === 0) continue;
+
+    const invoiceRows = invoiceByClient[clientId] || [];
+    if (invoiceRows.length === 0) continue;
+
+    // Build lookup sets for this order's listed items
+    const listedSkus   = new Set();
+    const listedNames  = new Set();
+    const listedProdIds = new Set();
+    const listedZohoIds = new Set();
+
+    listedItems.forEach(item => {
+      if (item.sku)        listedSkus.add(normalizeSku(item.sku));
+      if (item.product_name) listedNames.add(normalizeSku(item.product_name));
+      if (item.product_id) {
+        listedProdIds.add(String(item.product_id));
+        const p = productById[String(item.product_id)];
+        if (p?.zoho_item_id) listedZohoIds.add(String(p.zoho_item_id).trim());
+        if (p?.sku) listedSkus.add(normalizeSku(p.sku));
+        if (p?.name) listedNames.add(normalizeSku(p.name));
       }
-      if (!zohoId || histData.length === 0) {
-        const r = await sb.from('invoice_line_items')
-          .select('item_code').ilike('customer_name', client?.name || '');
-        if (!r.error) histData = r.data || [];
+    });
+
+    // Count unique confirmed purchases (one point per unique listed SKU purchased)
+    const confirmedSkus = new Set();
+
+    for (const row of invoiceRows) {
+      // Must be purchased ON or AFTER listing date
+      if (row.date < orderDate) continue;
+
+      let matchedSku = null;
+
+      // S1: invoice item_name matches a listed SKU or product name
+      if (!matchedSku && listedSkus.has(row.nameKey))  matchedSku = row.nameKey;
+      if (!matchedSku && listedNames.has(row.nameKey)) matchedSku = 'name:' + row.nameKey;
+      // S2: invoice item_code matches a listed SKU or product name
+      if (!matchedSku && listedSkus.has(row.codeKey))  matchedSku = row.codeKey;
+      if (!matchedSku && listedNames.has(row.codeKey)) matchedSku = 'name:' + row.codeKey;
+      // S3: invoice item_id matches a zoho_item_id of a listed product
+      if (!matchedSku && row.itemId && listedZohoIds.has(row.itemId)) matchedSku = 'zid:' + row.itemId;
+      // S4: resolve invoice item_id to a product, check if that product was listed
+      if (!matchedSku && row.itemId) {
+        const p = productByZohoId[row.itemId];
+        if (p) {
+          const sk = normalizeSku(p.sku || '');
+          const nk = normalizeSku(p.name || '');
+          if (listedSkus.has(sk))  matchedSku = sk;
+          if (!matchedSku && listedNames.has(nk)) matchedSku = 'name:' + nk;
+        }
       }
-      
-      const purchasedCodes = new Set(
-        histData.map(r => (r.item_code || '').trim().toLowerCase()).filter(Boolean)
-      );
-      
-      // Count how many listed SKUs appear in "Listed Items" (Zoho purchases)
-      let confirmedCount = 0;
-      listedSkus.forEach(sku => {
-        if (purchasedCodes.has(sku)) confirmedCount++;
-      });
-      
-      totalConfirmedItems += confirmedCount;
-      if (confirmedCount > 0 && client?.name) {
-        repStats[repId].stores.add(client.name);
+      // S5: resolve invoice item_code as zoho id
+      if (!matchedSku && row.itemCode) {
+        const p = productByZohoId[row.itemCode];
+        if (p) {
+          const sk = normalizeSku(p.sku || '');
+          const nk = normalizeSku(p.name || '');
+          if (listedSkus.has(sk))  matchedSku = sk;
+          if (!matchedSku && listedNames.has(nk)) matchedSku = 'name:' + nk;
+        }
+      }
+
+      if (matchedSku && !confirmedSkus.has(matchedSku)) {
+        confirmedSkus.add(matchedSku);
       }
     }
-    
-    // Calculate points based on items that appear in "Listed Items" tab only
-    repStats[repId].items = totalConfirmedItems;
-    repStats[repId].points = totalConfirmedItems * 10;  // 10 points per confirmed item
-    repStats[repId].ugx = repStats[repId].points * 100; // 100 UGX per point = 1,000 UGX per item
+
+    const confirmed = confirmedSkus.size;
+    if (confirmed > 0) {
+      repStats[repId].items  += confirmed;
+      repStats[repId].points += confirmed;
+      repStats[repId].ugx    += confirmed * 1000;
+      repStats[repId].stores.add(clientName);
+    }
   }
-  
-  // Sort by points descending
+
   const repList = Object.entries(repStats).sort((a, b) => b[1].points - a[1].points);
-  const totalPoints = repList.reduce((s, [, r]) => s + r.points, 0);
-  const eligibleCount = repList.filter(([, r]) => r.points >= 500).length;
+  _renderAdminWalletUI(repStats, repList);
+}
+
+function _renderAdminWalletUI(repStats, repList) {
+  const totalPoints   = repList.reduce((s, [, r]) => s + r.points, 0);
+  const eligibleCount = repList.filter(([, r]) => r.points >= 50).length;
   const totalRedeemed = repList.reduce((s, [, r]) => s + (r.redeemed || 0), 0);
-  
-  // Update metrics cards
-  document.getElementById('wadmin-total-pts').textContent = totalPoints.toLocaleString();
+
+  document.getElementById('wadmin-total-pts').textContent     = totalPoints.toLocaleString();
   document.getElementById('wadmin-total-redeemed').textContent = `UGX ${totalRedeemed.toLocaleString()}`;
-  document.getElementById('wadmin-eligible').textContent = eligibleCount;
+  document.getElementById('wadmin-eligible').textContent      = eligibleCount;
   document.getElementById('wadmin-leaderboard-month').textContent =
     new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-  
-  // Leaderboard
+
   const avColors = [
     {bg:'var(--royal-light)',txt:'var(--royal)'},
     {bg:'#EAF3DE',txt:'#3B6D11'},
@@ -4641,108 +5235,97 @@ async function loadAdminWallet() {
   ];
   const medals = ['🥇','🥈','🥉'];
   const maxPts = repList[0]?.[1]?.points || 1;
-  
-  if (repList.length === 0) {
-    document.getElementById('wadmin-leaderboard-list').innerHTML = '<div class="empty-state">No reps found.</div>';
-  } else {
-    document.getElementById('wadmin-leaderboard-list').innerHTML = repList.slice(0, 8).map(([repId, s], i) => {
-      const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-      const barPct = maxPts > 0 ? Math.round((s.points / maxPts) * 100) : 0;
-      const ci = i % 5;
-      const eligible = s.points >= 500;
-      return `<div class="earner-row">
-        <div class="earner-rank">${medals[i] || i + 1}</div>
-        <div class="earner-av" style="background:${avColors[ci].bg};color:${avColors[ci].txt};">${initials}</div>
-        <div class="earner-info">
-          <div class="earner-name">${s.name}</div>
-          <div class="earner-pts">${s.points} pts · ${s.items} item${s.items !== 1 ? 's' : ''} confirmed in "Listed Items"</div>
-        </div>
-        <div class="earner-bar-wrap">
-          <div class="earner-bar">
-            <div class="earner-bar-fill" style="width:${barPct}%;background:${eligible ? '#1D9E75' : 'var(--royal)'};"></div>
+
+  // Leaderboard
+  document.getElementById('wadmin-leaderboard-list').innerHTML = repList.length === 0
+    ? '<div class="empty-state">No reps found.</div>'
+    : repList.slice(0, 8).map(([repId, s], i) => {
+        const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        const barPct   = maxPts > 0 ? Math.round((s.points / maxPts) * 100) : 0;
+        const ci       = i % 5;
+        const eligible = s.points >= 50;
+        return `<div class="earner-row">
+          <div class="earner-rank">${medals[i] || i + 1}</div>
+          <div class="earner-av" style="background:${avColors[ci].bg};color:${avColors[ci].txt};">${initials}</div>
+          <div class="earner-info">
+            <div class="earner-name">${s.name}</div>
+            <div class="earner-pts">${s.points} pts · ${s.items} item${s.items !== 1 ? 's' : ''} confirmed</div>
           </div>
-        </div>
-        <div class="earner-ugx" style="color:${eligible ? '#1D9E75' : 'var(--royal)'};">UGX ${s.ugx.toLocaleString()}</div>
-      </div>`;
-    }).join('');
-  }
-  
-  // Desktop table
-  const tbody = document.getElementById('wadmin-reps-tbody');
-  const cardsEl = document.getElementById('wadmin-reps-cards');
-  
-  if (repList.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;">No sales reps found.</td></tr>';
-    cardsEl.innerHTML = '<div class="empty-state">No sales reps found.</div>';
-  } else {
-    tbody.innerHTML = repList.map(([repId, s]) => {
-      const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-      const isEligible = s.points >= 500;
-      const shortfall = 500 - s.points;
-      const balance = s.ugx;
-      return `<tr>
-        <td><div style="display:flex;align-items:center;gap:8px;">
-          <div style="width:28px;height:28px;border-radius:50%;background:var(--royal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">${initials}</div>
-          ${s.name}
-        </div></td>
-        <td>${s.items}</td>
-        <td style="font-weight:600;color:var(--royal);">${s.points}</td>
-        <td>UGX ${s.ugx.toLocaleString()}</td>
-        <td>UGX ${(s.redeemed || 0).toLocaleString()}</td>
-        <td style="font-weight:600;">UGX ${balance.toLocaleString()}</td>
-        <td>${isEligible
-          ? '<span class="badge bg">Eligible ✓</span>'
-          : `<span class="badge br">${shortfall} pts short</span>`}
-        </td>
-        <td><button class="btn btn-sm ${isEligible ? 'btn-green' : ''}"
-          ${isEligible
-            ? `onclick="adminApproveWalletPayout('${repId}','${s.name.replace(/'/g,"\\'")}',${s.ugx},${s.points})"`
-            : 'style="opacity:0.4;" disabled'}>
-          Pay out
-        </button></td>
-      </tr>`;
-    }).join('');
-    
-    // Mobile cards
-    cardsEl.innerHTML = repList.map(([repId, s], i) => {
-      const initials = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-      const isEligible = s.points >= 500;
-      const shortfall = 500 - s.points;
-      const pct = Math.min(100, Math.round((s.points / 500) * 100));
-      const ci = i % 5;
-      return `
-        <div style="padding:14px 0;border-bottom:0.5px solid var(--brd);">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-            <div style="width:42px;height:42px;border-radius:50%;background:${avColors[ci].bg};color:${avColors[ci].txt};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">${initials}</div>
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div>
-              <div style="font-size:10.5px;color:var(--txt3);margin-top:1px;">${s.items} item${s.items!==1?'s':''} confirmed in "Listed Items"</div>
-            </div>
-            <div style="text-align:right;flex-shrink:0;">
-              <div style="font-size:17px;font-weight:700;color:${isEligible?'#1D9E75':'var(--royal)'};">${s.points}<span style="font-size:11px;font-weight:500;"> pts</span></div>
-              <div style="font-size:10px;color:var(--txt3);">UGX ${s.ugx.toLocaleString()}</div>
-            </div>
-          </div>
-          <div style="margin-bottom:10px;">
-            <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--txt3);margin-bottom:4px;">
-              <span>Progress to 500 pts</span>
-              <span style="font-weight:600;color:${isEligible?'#1D9E75':'var(--royal)'};">${pct}%</span>
-            </div>
-            <div style="height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;">
-              <div style="height:100%;width:${pct}%;border-radius:3px;background:${isEligible?'#1D9E75':'var(--royal)'};transition:width 0.4s;"></div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-            ${isEligible
-              ? `<span class="badge bg" style="font-size:11px;">✓ Eligible for payout</span>
-                 <button class="btn btn-sm btn-green" onclick="adminApproveWalletPayout('${repId}','${s.name.replace(/'/g,"\\'")}',${s.ugx},${s.points})" style="white-space:nowrap;padding:6px 14px;">Pay out →</button>`
-              : `<span class="badge br" style="font-size:11px;">Needs ${shortfall} more pts</span>
-                 <button class="btn btn-sm" style="opacity:0.4;cursor:not-allowed;white-space:nowrap;" disabled>Pay out</button>`
-            }
-          </div>
+          <div class="earner-bar-wrap"><div class="earner-bar">
+            <div class="earner-bar-fill" style="width:${barPct}%;background:${eligible?'#1D9E75':'var(--royal)'};"></div>
+          </div></div>
+          <div class="earner-ugx" style="color:${eligible?'#1D9E75':'var(--royal)'};">UGX ${s.ugx.toLocaleString()}</div>
         </div>`;
-    }).join('');
+      }).join('');
+
+  // Desktop table
+  const tbody   = document.getElementById('wadmin-reps-tbody');
+  const cardsEl = document.getElementById('wadmin-reps-cards');
+
+  if (repList.length === 0) {
+    tbody.innerHTML   = '<tr><td colspan="8" style="text-align:center;padding:20px;">No sales reps found.</td></tr>';
+    cardsEl.innerHTML = '<div class="empty-state">No sales reps found.</div>';
+    return;
   }
+
+  tbody.innerHTML = repList.map(([repId, s]) => {
+    const initials  = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const isEligible = s.points >= 50;
+    const shortfall  = Math.max(0, 50 - s.points);
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--royal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;">${initials}</div>
+        ${s.name}
+      </div></td>
+      <td>${s.items}</td>
+      <td style="font-weight:600;color:var(--royal);">${s.points}</td>
+      <td>UGX ${s.ugx.toLocaleString()}</td>
+      <td>UGX ${(s.redeemed || 0).toLocaleString()}</td>
+      <td style="font-weight:600;">UGX ${s.ugx.toLocaleString()}</td>
+      <td>${isEligible ? '<span class="badge bg">Eligible ✓</span>' : `<span class="badge br">${shortfall} pts short</span>`}</td>
+      <td><button class="btn btn-sm ${isEligible ? 'btn-green' : ''}"
+        ${isEligible
+          ? `onclick="adminApproveWalletPayout('${repId}','${s.name.replace(/'/g,"\\'")}',${s.ugx},${s.points})"`
+          : 'style="opacity:0.4;" disabled'}>Pay out</button></td>
+    </tr>`;
+  }).join('');
+
+  cardsEl.innerHTML = repList.map(([repId, s], i) => {
+    const initials   = (s.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const isEligible = s.points >= 50;
+    const shortfall  = Math.max(0, 50 - s.points);
+    const pct        = Math.min(100, Math.round((s.points / 50) * 100));
+    const ci         = i % 5;
+    return `<div style="padding:14px 0;border-bottom:0.5px solid var(--brd);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="width:42px;height:42px;border-radius:50%;background:${avColors[ci].bg};color:${avColors[ci].txt};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;">${initials}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.name}</div>
+          <div style="font-size:10.5px;color:var(--txt3);margin-top:1px;">${s.items} confirmed purchase${s.items!==1?'s':''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:17px;font-weight:700;color:${isEligible?'#1D9E75':'var(--royal)'};">${s.points}<span style="font-size:11px;font-weight:500;"> pts</span></div>
+          <div style="font-size:10px;color:var(--txt3);">UGX ${s.ugx.toLocaleString()}</div>
+        </div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--txt3);margin-bottom:4px;">
+          <span>Progress to 50 pts</span>
+          <span style="font-weight:600;color:${isEligible?'#1D9E75':'var(--royal)'};">${pct}%</span>
+        </div>
+        <div style="height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;border-radius:3px;background:${isEligible?'#1D9E75':'var(--royal)'};transition:width 0.4s;"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        ${isEligible
+          ? `<span class="badge bg" style="font-size:11px;">✓ Eligible for payout</span>
+             <button class="btn btn-sm btn-green" onclick="adminApproveWalletPayout('${repId}','${s.name.replace(/'/g,"\\'")}',${s.ugx},${s.points})" style="white-space:nowrap;padding:6px 14px;">Pay out →</button>`
+          : `<span class="badge br" style="font-size:11px;">Needs ${shortfall} more pts</span>
+             <button class="btn btn-sm" style="opacity:0.4;cursor:not-allowed;white-space:nowrap;" disabled>Pay out</button>`}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function exportWalletCSV() {
@@ -4838,6 +5421,450 @@ function walletModalNext() {
     s3.querySelector('div').style.cssText = 'width:28px;height:28px;border-radius:50%;background:#1D9E75;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin:0 auto 5px;';
     _walletStep = 3;
   }
+}
+
+// ─── CLOCK IN / CLOCK OUT ─────────────────────────────────────────────────────
+let _clockInterval = null;
+
+function startClockDisplay() {
+  if (_clockInterval) clearInterval(_clockInterval);
+  function tick() {
+    const now = new Date();
+    const hh  = String(now.getHours()).padStart(2,'0');
+    const mm  = String(now.getMinutes()).padStart(2,'0');
+    const ss  = String(now.getSeconds()).padStart(2,'0');
+    const el  = document.getElementById('clock-display');
+    if (el) el.textContent = `${hh}:${mm}:${ss}`;
+    const dateEl = document.getElementById('clock-date');
+    if (dateEl) dateEl.textContent = now.toLocaleDateString('en-UG',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  }
+  tick();
+  _clockInterval = setInterval(tick, 1000);
+}
+
+async function loadClockScreen() {
+  startClockDisplay();
+  const today = new Date().toISOString().split('T')[0];
+  await refreshClockStatus();
+  await loadTodaySessions();
+
+  // Show history card for admin/manager
+  const histCard = document.getElementById('clock-history-card');
+  if (histCard) {
+    if (canManage()) {
+      histCard.style.display = 'block';
+      const dateEl = document.getElementById('clock-hist-date');
+      if (dateEl) { dateEl.value = today; loadClockHistory(); }
+    } else {
+      histCard.style.display = 'none';
+    }
+  }
+}
+
+async function refreshClockStatus() {
+  const today  = new Date().toISOString().split('T')[0];
+  const { data } = await sb.from('clock_records')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .eq('date', today)
+    .order('clock_in', { ascending: false })
+    .limit(1);
+
+  const last    = data && data[0];
+  const badgeEl = document.getElementById('clock-status-badge');
+  const inBtn   = document.getElementById('btn-clockin');
+  const outBtn  = document.getElementById('btn-clockout');
+
+  const isClockedIn = last && !last.clock_out;
+
+  if (badgeEl) {
+    badgeEl.innerHTML = isClockedIn
+      ? `<span class="badge bg" style="font-size:12px;padding:4px 14px;">● Clocked In since ${fmtTime(last.clock_in)}</span>`
+      : `<span class="badge br" style="font-size:12px;padding:4px 14px;">● Clocked Out</span>`;
+  }
+  if (inBtn)  inBtn.style.opacity  = isClockedIn ? '0.4' : '1';
+  if (inBtn)  inBtn.disabled       = isClockedIn;
+  if (outBtn) outBtn.style.opacity = isClockedIn ? '1' : '0.4';
+  if (outBtn) outBtn.disabled      = !isClockedIn;
+}
+
+async function doClock(type, photoB64, latitude, longitude, address) {
+  // If called without photo (direct call), launch camera modal instead
+  if (photoB64 === undefined) {
+    await doClock_withCamera(type);
+    return;
+  }
+
+  const notes  = document.getElementById('clock-notes')?.value?.trim() || '';
+  const now    = new Date();
+  const today  = now.toISOString().split('T')[0];
+  const nowISO = now.toISOString();
+  const msgEl  = document.getElementById('clock-action-msg');
+
+  if (type === 'in') {
+    const { data: existing } = await sb.from('clock_records')
+      .select('id').eq('user_id', currentUser.id).eq('date', today).is('clock_out', null).limit(1);
+    if (existing && existing.length > 0) {
+      if (msgEl) msgEl.innerHTML = `<div class="alert aw">You are already clocked in.</div>`;
+      return;
+    }
+    const { error } = await sb.from('clock_records').insert({
+      user_id:        currentUser.id,
+      user_name:      currentUser.full_name,
+      date:           today,
+      clock_in:       nowISO,
+      notes:          notes || null,
+      photo_in:       photoB64 || null,
+      latitude_in:    latitude  || null,
+      longitude_in:   longitude || null,
+      address_in:     address   || null,
+    });
+    if (error) { if (msgEl) msgEl.innerHTML = `<div class="alert ad">Error: ${error.message}</div>`; return; }
+    if (msgEl) msgEl.innerHTML = `<div class="alert ag">✅ Clocked in at <strong>${fmtTime(nowISO)}</strong>${address ? `<br>📍 ${address}` : ''}.</div>`;
+
+  } else {
+    const { data: open } = await sb.from('clock_records')
+      .select('*').eq('user_id', currentUser.id).eq('date', today).is('clock_out', null).limit(1);
+    if (!open || open.length === 0) {
+      if (msgEl) msgEl.innerHTML = `<div class="alert aw">No active clock-in found. Please clock in first.</div>`;
+      return;
+    }
+    const session  = open[0];
+    const duration = Math.round((now - new Date(session.clock_in)) / 60000);
+    const { error } = await sb.from('clock_records').update({
+      clock_out:        nowISO,
+      duration_minutes: duration,
+      notes:            notes || session.notes || null,
+      photo_out:        photoB64 || null,
+      latitude_out:     latitude  || null,
+      longitude_out:    longitude || null,
+      address_out:      address   || null,
+    }).eq('id', session.id);
+    if (error) { if (msgEl) msgEl.innerHTML = `<div class="alert ad">Error: ${error.message}</div>`; return; }
+    if (msgEl) msgEl.innerHTML = `<div class="alert ag">✅ Clocked out at <strong>${fmtTime(nowISO)}</strong>. Session: <strong>${fmtDuration(duration)}</strong>${address ? `<br>📍 ${address}` : ''}.</div>`;
+  }
+
+  document.getElementById('clock-notes').value = '';
+  await refreshClockStatus();
+  await loadTodaySessions();
+}
+
+async function loadTodaySessions() {
+  const today  = new Date().toISOString().split('T')[0];
+  const { data } = await sb.from('clock_records')
+    .select('*').eq('user_id', currentUser.id).eq('date', today)
+    .order('clock_in', { ascending: true });
+
+  const sessions = data || [];
+  const listEl   = document.getElementById('clock-sessions-list');
+  const countEl  = document.getElementById('clock-session-count');
+  const summaryEl = document.getElementById('clock-today-summary');
+  const totalEl  = document.getElementById('clock-total-hours');
+
+  if (countEl) countEl.textContent = sessions.length;
+
+  if (sessions.length === 0) {
+    if (listEl) listEl.innerHTML = '<div class="empty-state" style="padding:24px;">No clock-ins recorded today.</div>';
+    if (summaryEl) summaryEl.style.display = 'none';
+    return;
+  }
+
+  let totalMins = 0;
+  if (listEl) listEl.innerHTML = sessions.map((s, i) => {
+    const dur  = s.duration_minutes || (s.clock_out ? Math.round((new Date(s.clock_out) - new Date(s.clock_in)) / 60000) : null);
+    if (dur) totalMins += dur;
+    const open = !s.clock_out;
+    return `<div style="padding:12px 16px;border-bottom:0.5px solid var(--brd);${open?'background:rgba(29,158,117,0.04);':''}">
+      <div style="display:flex;align-items:flex-start;gap:12px;">
+        <div style="width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;background:${open?'#1D9E75':'var(--txt3)'};"></div>
+        <div style="flex:1;">
+          <div style="font-size:12.5px;font-weight:500;">Session ${i+1} ${open?'<span class="badge bg" style="font-size:9.5px;margin-left:4px;">Active</span>':''}</div>
+          <div style="font-size:11.5px;color:var(--txt2);margin-top:3px;">
+            In: <strong>${fmtTime(s.clock_in)}</strong>
+            ${s.clock_out ? `&nbsp;·&nbsp; Out: <strong>${fmtTime(s.clock_out)}</strong>` : '&nbsp;·&nbsp; <em style="color:var(--txt3);">Still active</em>'}
+            ${dur ? `&nbsp;·&nbsp; <span style="color:var(--royal);font-weight:600;">${fmtDuration(dur)}</span>` : ''}
+          </div>
+          ${s.address_in ? `<div style="font-size:10.5px;color:var(--txt3);margin-top:3px;">📍 In: ${s.address_in}</div>` : ''}
+          ${s.address_out ? `<div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">📍 Out: ${s.address_out}</div>` : ''}
+          ${s.notes ? `<div style="font-size:11px;color:var(--txt3);margin-top:3px;">📝 ${s.notes}</div>` : ''}
+        </div>
+        ${s.photo_in ? `<img src="${s.photo_in}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;border:0.5px solid var(--brd);flex-shrink:0;" title="Clock-in photo"/>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  if (summaryEl) summaryEl.style.display = 'block';
+  if (totalEl)   totalEl.textContent = fmtDuration(totalMins);
+
+// Update metric cards
+  const metricStatus = document.getElementById('clock-metric-status');
+  const metricHours  = document.getElementById('clock-metric-hours');
+  const metricSess   = document.getElementById('clock-metric-sessions');
+  if (metricStatus) {
+    const hasActive = sessions.some(s => !s.clock_out);
+    metricStatus.textContent = hasActive ? '🟢 Clocked In' : sessions.length > 0 ? '🔴 Clocked Out' : '—';
+  }
+  if (metricHours)  metricHours.textContent  = fmtDuration(totalMins);
+  if (metricSess)   metricSess.textContent   = sessions.length;
+  // Team active count
+  const metricTeam = document.getElementById('clock-metric-team');
+  if (metricTeam && canManage()) {
+    const today2 = new Date().toISOString().split('T')[0];
+    sb.from('clock_records').select('user_id').eq('date', today2).is('clock_out', null)
+      .then(({data}) => { if(metricTeam) metricTeam.textContent = (data||[]).length; });
+  } else if (metricTeam) {
+    metricTeam.textContent = '—';
+  }
+
+}
+
+async function loadClockHistory() {
+  if (!canManage()) return;
+  const dateVal = document.getElementById('clock-hist-date')?.value;
+  if (!dateVal) return;
+  const listEl = document.getElementById('clock-history-list');
+  if (listEl) listEl.innerHTML = '<div class="empty-state" style="padding:20px;">Loading...</div>';
+
+  const { data, error } = await sb.from('clock_records')
+    .select('*').eq('date', dateVal)
+    .order('clock_in', { ascending: true });
+
+  if (error) { if(listEl) listEl.innerHTML=`<div class="empty-state" style="color:#A32D2D;">Error: ${error.message}</div>`; return; }
+  const records = data || [];
+
+  if (records.length === 0) {
+    if (listEl) listEl.innerHTML = '<div class="empty-state" style="padding:24px;">No attendance records for this date.</div>';
+    return;
+  }
+
+  const byUser = {};
+  records.forEach(r => {
+    const k = r.user_name || r.user_id;
+    if (!byUser[k]) byUser[k] = [];
+    byUser[k].push(r);
+  });
+
+  if (listEl) listEl.innerHTML = Object.entries(byUser).map(([name, sessions]) => {
+    const totalMins = sessions.reduce((s, r) => {
+      const dur = r.duration_minutes || (r.clock_out ? Math.round((new Date(r.clock_out)-new Date(r.clock_in))/60000) : 0);
+      return s + dur;
+    }, 0);
+    const initials = (name||'U').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+    return `<div style="padding:14px 16px;border-bottom:0.5px solid var(--brd);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="width:34px;height:34px;border-radius:50%;background:var(--royal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">${initials}</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;">${name}</div>
+          <div style="font-size:10.5px;color:var(--txt3);">${sessions.length} session${sessions.length!==1?'s':''} · Total: <strong style="color:var(--royal);">${fmtDuration(totalMins)}</strong></div>
+        </div>
+      </div>
+      ${sessions.map(s => {
+        const dur = s.duration_minutes || (s.clock_out ? Math.round((new Date(s.clock_out)-new Date(s.clock_in))/60000) : null);
+        return `<div style="padding:10px 12px;margin-bottom:8px;background:var(--bg2);border-radius:9px;border:0.5px solid var(--brd);">
+          <div style="display:flex;align-items:flex-start;gap:10px;">
+            <!-- Clock In photo -->
+            ${s.photo_in ? `<img src="${s.photo_in}" style="width:52px;height:52px;border-radius:8px;object-fit:cover;border:0.5px solid var(--brd2);flex-shrink:0;" title="Clock-in photo"/>` :
+              `<div style="width:52px;height:52px;border-radius:8px;background:var(--bg3);border:0.5px dashed var(--brd2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📷</div>`}
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:12px;font-weight:600;margin-bottom:4px;">
+                🟢 In: <strong>${fmtTime(s.clock_in)}</strong>
+                ${s.clock_out ? `&nbsp;&nbsp;🔴 Out: <strong>${fmtTime(s.clock_out)}</strong>` : '<span style="color:#1D9E75;font-style:italic;font-size:11px;"> (Still active)</span>'}
+                ${dur ? `&nbsp;&nbsp;<span style="color:var(--royal);font-weight:600;font-size:11.5px;">${fmtDuration(dur)}</span>` : ''}
+              </div>
+              ${s.address_in ? `<div style="font-size:11px;color:var(--txt2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📍 Clock-in: <span style="color:var(--royal);">${s.address_in}</span></div>` : ''}
+              ${s.address_out ? `<div style="font-size:11px;color:var(--txt2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📍 Clock-out: <span style="color:#854F0B;">${s.address_out}</span></div>` : ''}
+              ${s.notes ? `<div style="font-size:11px;color:var(--txt3);margin-top:3px;">📝 ${s.notes}</div>` : ''}
+            </div>
+            <!-- Clock Out photo -->
+            ${s.photo_out ? `<img src="${s.photo_out}" style="width:52px;height:52px;border-radius:8px;object-fit:cover;border:0.5px solid var(--brd2);flex-shrink:0;" title="Clock-out photo"/>` :
+              s.clock_out ? `<div style="width:52px;height:52px;border-radius:8px;background:var(--bg3);border:0.5px dashed var(--brd2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📷</div>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+async function exportClockCSV() {
+  if (!canManage()) return;
+  const dateVal = document.getElementById('clock-hist-date')?.value || new Date().toISOString().split('T')[0];
+  const { data } = await sb.from('clock_records').select('*').eq('date', dateVal).order('clock_in', { ascending: true });
+  const rows = [['Name','Date','Clock In','Clock Out','Duration (mins)','Notes']];
+  (data||[]).forEach(r => {
+    const dur = r.duration_minutes || (r.clock_out ? Math.round((new Date(r.clock_out)-new Date(r.clock_in))/60000) : '');
+    rows.push([r.user_name||'',r.date,fmtTime(r.clock_in),r.clock_out?fmtTime(r.clock_out):'',dur,r.notes||'']);
+  });
+  const csv  = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], { type:'text/csv;charset=utf-8;' });
+  const a    = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `KTL_Attendance_${dateVal}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function fmtTime(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+function fmtDuration(mins) {
+  if (!mins && mins !== 0) return '—';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+// ─── CLOCK CAMERA + GEOLOCATION ───────────────────────────────────────────────
+let _clockStream     = null;
+let _clockPhotoB64   = null;
+let _clockLatitude   = null;
+let _clockLongitude  = null;
+let _clockAddress    = '';
+let _clockPendingType = null; // 'in' or 'out'
+
+async function doClock_withCamera(type) {
+  _clockPendingType = type;
+  _clockPhotoB64    = null;
+  _clockLatitude    = null;
+  _clockLongitude   = null;
+  _clockAddress     = '';
+
+  const modal = document.getElementById('clock-camera-modal');
+  modal.style.display = 'flex';
+  document.getElementById('cam-modal-title').textContent =
+    type === 'in' ? '📸 Clock In — Capture Photo' : '📸 Clock Out — Capture Photo';
+  document.getElementById('cam-confirm-type').textContent = type === 'in' ? 'In' : 'Out';
+  document.getElementById('cam-preview').style.display  = 'none';
+  document.getElementById('cam-video').style.display    = 'block';
+  document.getElementById('cam-action-area').style.display  = 'block';
+  document.getElementById('cam-confirm-area').style.display = 'none';
+
+  // Start camera
+  try {
+    _clockStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      audio: false
+    });
+    const video = document.getElementById('cam-video');
+    video.srcObject = _clockStream;
+    video.onloadedmetadata = () => {
+      document.getElementById('cam-overlay').style.display = 'none';
+      document.getElementById('cam-capture-btn').disabled = false;
+      document.getElementById('cam-capture-btn').style.opacity = '1';
+    };
+  } catch (err) {
+    document.getElementById('cam-overlay').innerHTML =
+      `<div style="text-align:center;color:#fff;padding:20px;">
+        <div style="font-size:28px;margin-bottom:8px;">⚠️</div>
+        <div style="font-size:12px;line-height:1.6;">Camera access denied.<br>Please allow camera access and retry.</div>
+        <button onclick="cancelClockCamera()" style="margin-top:12px;padding:7px 18px;border-radius:8px;background:rgba(255,255,255,0.2);color:#fff;border:0.5px solid rgba(255,255,255,0.4);cursor:pointer;font-size:12px;">Close</button>
+      </div>`;
+  }
+
+  // Start geolocation in parallel
+  getClockLocation();
+}
+
+async function getClockLocation() {
+  const locText  = document.getElementById('cam-location-text');
+  const locBadge = document.getElementById('cam-location-badge');
+  locText.textContent = 'Detecting your location...';
+  locBadge.innerHTML  = '<span style="font-size:11px;color:var(--txt3);">⏳</span>';
+
+  if (!navigator.geolocation) {
+    locText.textContent = 'Geolocation not supported on this device.';
+    locBadge.innerHTML  = '<span class="badge br" style="font-size:10px;">No GPS</span>';
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      _clockLatitude  = pos.coords.latitude;
+      _clockLongitude = pos.coords.longitude;
+
+      locBadge.innerHTML = '<span class="badge bg" style="font-size:10px;">✓ Located</span>';
+      locText.textContent = `${_clockLatitude.toFixed(5)}, ${_clockLongitude.toFixed(5)} — Fetching address...`;
+
+      // Reverse geocode using OpenStreetMap Nominatim (free, no API key)
+      try {
+        const res  = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${_clockLatitude}&lon=${_clockLongitude}&format=json`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        const data = await res.json();
+        if (data && data.display_name) {
+          // Shorten: show neighbourhood + city
+          const addr = data.address || {};
+          const parts = [
+            addr.road || addr.pedestrian || addr.suburb,
+            addr.neighbourhood || addr.village || addr.town || addr.city_district,
+            addr.city || addr.county || addr.state
+          ].filter(Boolean);
+          _clockAddress = parts.join(', ') || data.display_name.split(',').slice(0,3).join(',');
+          locText.textContent = _clockAddress;
+        } else {
+          _clockAddress = `${_clockLatitude.toFixed(5)}, ${_clockLongitude.toFixed(5)}`;
+          locText.textContent = _clockAddress;
+        }
+      } catch (e) {
+        _clockAddress = `${_clockLatitude.toFixed(5)}, ${_clockLongitude.toFixed(5)}`;
+        locText.textContent = _clockAddress;
+      }
+    },
+    (err) => {
+      locText.textContent = 'Could not detect location. Proceeding without GPS.';
+      locBadge.innerHTML  = '<span class="badge ba" style="font-size:10px;">No GPS</span>';
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+  );
+}
+
+function captureClockPhoto() {
+  const video  = document.getElementById('cam-video');
+  const canvas = document.getElementById('cam-canvas');
+  const preview = document.getElementById('cam-preview');
+
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  // Mirror horizontally (selfie-style)
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  ctx.setTransform(1,0,0,1,0,0);
+
+  _clockPhotoB64 = canvas.toDataURL('image/jpeg', 0.7);
+
+  // Show preview
+  preview.src = _clockPhotoB64;
+  preview.style.display = 'block';
+  video.style.display   = 'none';
+
+  document.getElementById('cam-action-area').style.display  = 'none';
+  document.getElementById('cam-confirm-area').style.display = 'block';
+}
+
+function retakeClockPhoto() {
+  _clockPhotoB64 = null;
+  document.getElementById('cam-preview').style.display = 'none';
+  document.getElementById('cam-video').style.display   = 'block';
+  document.getElementById('cam-action-area').style.display  = 'block';
+  document.getElementById('cam-confirm-area').style.display = 'none';
+}
+
+async function confirmClockWithPhoto() {
+  // Stop camera stream
+  if (_clockStream) { _clockStream.getTracks().forEach(t => t.stop()); _clockStream = null; }
+  document.getElementById('clock-camera-modal').style.display = 'none';
+
+  // Now perform the actual clock-in/out logic
+  await doClock(_clockPendingType, _clockPhotoB64, _clockLatitude, _clockLongitude, _clockAddress);
+}
+
+function cancelClockCamera() {
+  if (_clockStream) { _clockStream.getTracks().forEach(t => t.stop()); _clockStream = null; }
+  document.getElementById('clock-camera-modal').style.display = 'none';
 }
 
 document.getElementById('wallet-redeem-modal').addEventListener('click', function(e) {
