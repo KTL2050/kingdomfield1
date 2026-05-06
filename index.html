@@ -1040,6 +1040,11 @@ body.manager-view .card:has(.card-title:contains("Role Permissions")) {
               </select>
               <button class="btn btn-sm btn-royal" onclick="showAddSkuForm()">+ Add SKU</button>
               <button class="btn btn-sm" onclick="showBulkSkuImport()">↑ Bulk Import</button>
+            <input type="text" id="sku-list-search" placeholder="Search SKU or name..." 
+              style="padding:6px 11px;border:0.5px solid var(--brd2);border-radius:8px;font-size:12px;font-family:inherit;outline:none;min-width:180px;"
+              oninput="filterSkuListView()" 
+              onfocus="this.style.borderColor='var(--royal)'" 
+              onblur="this.style.borderColor='var(--brd2)'"/>
             </div>
           </div>
           <div id="sku-list-view"><div class="empty-state">Select a listing table above to view its SKUs.</div></div>
@@ -3091,15 +3096,28 @@ async function loadSkuListView() {
   const tableName = document.getElementById('sku-list-view-type')?.value; if(!tableName) return;
   invalidateSkuCache(tableName);
   const el = document.getElementById('sku-list-view'); el.innerHTML = '<div class="empty-state">Loading...</div>';
+  const searchEl = document.getElementById('sku-list-search');
+  if (searchEl) searchEl.value = '';
   const { data, error } = await sb.from(tableName).select('*').order('sku');
   if (error) { el.innerHTML=`<div class="empty-state" style="color:#A32D2D;">Error: ${error.message}</div>`; return; }
   const rows = data||[];
   if (rows.length===0) { el.innerHTML=`<div class="empty-state">No SKUs in <strong>${TABLE_META[tableName]?.label||tableName}</strong> yet.</div>`; return; }
   el.innerHTML = `
-    <div style="overflow-x:auto;margin-top:8px;">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 0 8px;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--txt2);cursor:pointer;">
+        <input type="checkbox" id="sku-select-all" onchange="toggleAllSkus(this)"
+          style="width:15px;height:15px;accent-color:var(--royal);cursor:pointer;"/>
+        Select all
+      </label>
+      <button id="sku-delete-selected-btn" class="btn btn-sm btn-danger" onclick="deleteSelectedSkus('${tableName}')"
+        style="display:none;">🗑 Remove Selected (<span id="sku-selected-count">0</span>)</button>
+      <span id="sku-none-selected-hint" style="font-size:11px;color:var(--txt3);">Select SKUs to bulk remove</span>
+    </div>
+    <div style="overflow-x:auto;margin-top:4px;">
       <table>
         <thead>
           <tr>
+            <th style="width:32px;"></th>
             <th>SKU</th>
             <th>Item Name</th>
             <th>Added</th>
@@ -3109,6 +3127,11 @@ async function loadSkuListView() {
         <tbody>
           ${rows.map(r=>`
             <tr id="sku-row-${r.id}">
+              <td>
+                <input type="checkbox" class="sku-row-cb" data-id="${r.id}" data-sku="${r.sku}"
+                  onchange="updateSkuSelection()"
+                  style="width:15px;height:15px;accent-color:var(--royal);cursor:pointer;"/>
+              </td>
               <td class="mono">${r.sku}</td>
               <td>
                 <div id="sku-name-display-${r.id}" style="display:flex;align-items:center;gap:6px;">
@@ -3134,7 +3157,65 @@ async function loadSkuListView() {
         </tbody>
       </table>
     </div>
-    <div style="font-size:11px;color:var(--txt3);margin-top:8px;">${rows.length} SKUs in this list</div>`;
+    <div style="font-size:11px;color:var(--txt3);margin-top:8px;" id="sku-list-count">${rows.length} SKUs in this list</div>`;
+}
+
+function filterSkuListView() {
+  const q = (document.getElementById('sku-list-search')?.value || '').toLowerCase().trim();
+  const allRows = document.querySelectorAll('#sku-list-view tbody tr[id^="sku-row-"]');
+  let visible = 0;
+  allRows.forEach(tr => {
+    const skuCell  = tr.querySelector('td:nth-child(2)')?.textContent?.toLowerCase() || '';
+    const nameCell = tr.querySelector('td:nth-child(3)')?.textContent?.toLowerCase() || '';
+    const match = !q || skuCell.includes(q) || nameCell.includes(q);
+    tr.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  const countEl = document.getElementById('sku-list-count');
+  if (countEl) countEl.textContent = q 
+    ? `${visible} of ${allRows.length} SKUs match "${q}"` 
+    : `${allRows.length} SKUs in this list`;
+}
+
+function toggleAllSkus(masterCb) {
+  document.querySelectorAll('.sku-row-cb').forEach(cb => { cb.checked = masterCb.checked; });
+  updateSkuSelection();
+}
+
+function updateSkuSelection() {
+  const checked = document.querySelectorAll('.sku-row-cb:checked');
+  const total   = document.querySelectorAll('.sku-row-cb');
+  const deleteBtn  = document.getElementById('sku-delete-selected-btn');
+  const hintEl     = document.getElementById('sku-none-selected-hint');
+  const countEl    = document.getElementById('sku-selected-count');
+  const masterCb   = document.getElementById('sku-select-all');
+  if (countEl)  countEl.textContent = checked.length;
+  if (deleteBtn) deleteBtn.style.display = checked.length > 0 ? '' : 'none';
+  if (hintEl)    hintEl.style.display    = checked.length > 0 ? 'none' : '';
+  if (masterCb) {
+    masterCb.indeterminate = checked.length > 0 && checked.length < total.length;
+    masterCb.checked       = checked.length > 0 && checked.length === total.length;
+  }
+}
+
+async function deleteSelectedSkus(tableName) {
+  const checked = [...document.querySelectorAll('.sku-row-cb:checked')];
+  if (checked.length === 0) return;
+  const skuNames = checked.map(cb => cb.dataset.sku).join(', ');
+  showConfirmDialog({
+    icon: '🗑️',
+    title: `Remove ${checked.length} SKU${checked.length > 1 ? 's' : ''}?`,
+    message: `This will permanently remove <strong>${checked.length} SKU${checked.length > 1 ? 's' : ''}</strong> from the ${TABLE_META[tableName]?.label || tableName} list:<br><br><span style="font-family:monospace;font-size:11px;color:var(--txt2);">${skuNames.slice(0, 200)}${skuNames.length > 200 ? '…' : ''}</span>`,
+    confirmLabel: `Remove ${checked.length} SKU${checked.length > 1 ? 's' : ''}`,
+    confirmStyle: 'background:#A32D2D;color:#fff;border:none;',
+    onConfirm: async () => {
+      const ids = checked.map(cb => cb.dataset.id);
+      const { error } = await sb.from(tableName).delete().in('id', ids);
+      if (error) { alert('Error: ' + error.message); return; }
+      invalidateSkuCache(tableName);
+      await loadSkuListView();
+    }
+  });
 }
 
 function startEditSkuName(id, currentName) {
