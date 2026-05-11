@@ -1500,7 +1500,7 @@ async function loadDashboard() {
   const mcSub = document.getElementById('m-clients-sub');
   if (mcSub) mcSub.textContent = isSalesRep() ? 'Assigned to you' : 'From Zoho';
   document.getElementById('m-skus').textContent = allProducts.filter(p=>p.status==='active').length.toLocaleString();
-  const alertCount = allProducts.filter(p=>p.available_stock===0||(p.available_stock>0&&p.available_stock<10)).length;
+  const alertCount = allProducts.filter(p=>p.stock_on_hand<=0||(p.stock_on_hand>0&&p.stock_on_hand<50)).length;
   document.getElementById('m-alerts').textContent = alertCount;
 
   // ── Listings Today (count of order_items rows for orders created today by this rep) ──
@@ -1540,7 +1540,7 @@ async function loadDashboard() {
 
   // ── Stock Alerts ──
   const outOfStock  = allProducts.filter(p=>p.stock_on_hand<=0&&p.status==='active').slice(0,5);
-  const lowStock    = allProducts.filter(p=>p.stock_on_hand>0&&p.stock_on_hand<10&&p.status==='active').slice(0,5);
+  const lowStock    = allProducts.filter(p=>p.stock_on_hand>0&&p.stock_on_hand<50&&p.status==='active').slice(0,5);
   document.getElementById('alerts-badge').textContent = alertCount+' issues';
   if (outOfStock.length===0&&lowStock.length===0) {
     document.getElementById('stock-alerts-list').innerHTML='<div class="empty-state" style="color:#3B6D11;">✓ All products in stock</div>';
