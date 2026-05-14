@@ -1228,6 +1228,13 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 function normalizeSku(s) {
   return (s || '').replace(/[\u00A0\u200B\u200C\u200D\uFEFF\r\n\t]/g, '').trim().toLowerCase();
 }
+
+// ─── GRACE PERIOD: May 6–14 2026 (app downtime) ───────────────────────────────
+const GRACE_START = '2026-05-06';
+const GRACE_END   = '2026-05-14';
+function isGraceListing(listingDate)  { return listingDate  >= GRACE_START && listingDate  <= GRACE_END; }
+function isGracePurchase(purchaseDate){ return purchaseDate >= GRACE_START && purchaseDate <= GRACE_END; }
+function graceQualifies(listingDate, purchaseDate){ return isGraceListing(listingDate) && isGracePurchase(purchaseDate); }
 let currentUser = null, currentScreen = 'dashboard';
 let allClients = [], allProducts = [], orderItems = {};
 let selectedClientId = null, currentDetailClientId = null;
@@ -3994,12 +4001,10 @@ histData.forEach(row => {
     // Helper: given a candidate entry, check if the purchase happened after listing
 function qualifies(entry) {
   if (!entry) return false;
-  // Find the listing date for this item's order
   const matchedOrder = pastOrders.find(o => o.order_ref === entry.order_ref);
   const ld = matchedOrder?.order_date || entry.order_date || '';
-  // Purchase MUST be strictly ON or AFTER the listing date
-  // If we don't have a listing date, we cannot confirm — reject it
   if (!ld) return false;
+  if (graceQualifies(ld, purchaseDate)) return true;
   return purchaseDate >= ld;
 }
 
@@ -4768,11 +4773,12 @@ async function loadRepWallet() {
     const confirmedMap = {};
 
     function qualifies(entry, purchaseDate) {
-      if (!entry) return false;
-      const ld = entry.order_date || '';
-      if (!ld) return false;
-      return purchaseDate >= ld;
-    }
+  if (!entry) return false;
+  const ld = entry.order_date || '';
+  if (!ld) return false;
+  if (graceQualifies(ld, purchaseDate)) return true;
+  return purchaseDate >= ld;
+}
 
     for (const row of histData) {
       const invoiceNameKey = normalizeSku(row.item_name || '');
@@ -5101,7 +5107,9 @@ async function loadAdminWallet() {
 
     for (const row of invoiceRows) {
       // Must be purchased ON or AFTER listing date
-      if (row.date < orderDate) continue;
+    // Exception: grace period — both listing AND purchase fall in May 6–14 2026 downtime
+    const duringGrace = graceQualifies(orderDate, row.date);
+    if (!duringGrace && row.date < orderDate) continue;
 
       let matchedSku = null;
 
