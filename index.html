@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -2755,10 +2755,29 @@ allProducts.forEach(p => {
 function findProduct(skuRow) {
   const skuKey  = normalizeSku(skuRow.sku);
   const nameKey = normalizeSku(skuRow.item_name || '');
-  return productBySku[skuKey]
-      || productByName[skuKey]
-      || (nameKey ? productBySku[nameKey] || productByName[nameKey] : null)
-      || null;
+  
+  // Exact SKU match
+  if (productBySku[skuKey]) return productBySku[skuKey];
+  // SKU treated as name
+  if (productByName[skuKey]) return productByName[skuKey];
+  // item_name as SKU
+  if (nameKey && productBySku[nameKey]) return productBySku[nameKey];
+  // item_name as name
+  if (nameKey && productByName[nameKey]) return productByName[nameKey];
+  
+  // Partial SKU match — listing table SKU is prefix of Zoho SKU or vice versa
+  if (skuKey.length >= 4) {
+    for (const [key, prod] of Object.entries(productBySku)) {
+      if (key.startsWith(skuKey) || skuKey.startsWith(key)) return prod;
+    }
+  }
+  // Partial name match
+  if (nameKey.length > 6) {
+    for (const [key, prod] of Object.entries(productByName)) {
+      if (key.includes(nameKey) || nameKey.includes(key)) return prod;
+    }
+  }
+  return null;
 }
 
   const clientObj = allClients.find(c=>c.id===id);
@@ -3057,25 +3076,43 @@ async function loadClientProducts(preselectedProductId=null){
     console.warn('Could not load past listing items:', e.message);
   }
 
-
-  // 4. Build enriched list — only in-catalogue + never-purchased
+// 4. Build enriched list — ALL SKUs from listing tables, never-purchased
   const enriched = uniqueSkuRows
     .map(skuRow=>{
-      const product = allProducts.find(p => normalizeSku(p.sku) === normalizeSku(skuRow.sku));
-      const codeBought = purchasedCodes.has(skuRow.sku.trim().toLowerCase());
+      const skuKey  = normalizeSku(skuRow.sku);
+const nameKey = normalizeSku(skuRow.item_name || '');
+let product = allProducts.find(p => normalizeSku(p.sku) === skuKey)
+  || allProducts.find(p => normalizeSku(p.name) === skuKey)
+  || (nameKey ? allProducts.find(p => normalizeSku(p.sku) === nameKey) : null)
+  || (nameKey ? allProducts.find(p => normalizeSku(p.name) === nameKey) : null);
+
+if (!product && skuKey.length >= 3) {
+  product = allProducts.find(p => {
+    const ps = normalizeSku(p.sku || '');
+    return ps && (ps.startsWith(skuKey) || skuKey.startsWith(ps));
+  });
+}
+if (!product && nameKey.length > 4) {
+  product = allProducts.find(p => {
+    const pn = normalizeSku(p.name || '');
+    return pn && (pn.includes(nameKey) || nameKey.includes(pn));
+  });
+}
+      const codeBought = purchasedCodes.has(skuRow.sku.trim().toLowerCase())
+                      || purchasedCodes.has((skuRow.item_name||'').trim().toLowerCase());
       const idBought   = product && purchasedItemIds.has(String(product.id).trim());
       return{
         sku:             skuRow.sku,
-        item_name:       skuRow.item_name || product?.name || '—',
+        item_name:       skuRow.item_name || product?.name || skuRow.sku,
         _table:          skuRow._table,
         product_id:      product?.id   ?? null,
-        available_stock: product?.stock_on_hand ?? product?.available_stock ?? 0,
+        available_stock: product?.stock_on_hand ?? product?.available_stock ?? null,
         rate:            product?.rate  ?? 0,
         in_catalogue:    !!product,
         already_bought:  codeBought || idBought,
       };
     })
-    .filter(e=>!e.already_bought);
+    .filter(e=>!e.already_bought); // Show ALL, including not-in-catalogue
 
   _listingScreenItems = enriched;
 
@@ -3130,15 +3167,20 @@ function renderListingScreenTable(items, preselectedProductId=null, brandBadges=
     </td></tr>`;
   }
 
-  tbody.innerHTML = bannerHtml + items.slice(0,200).filter(e => !orderItems[e.product_id]).map(e=>{
-    const stock    = e.available_stock ?? 0;
-    const isChecked= !!orderItems[e.product_id];
-    const disabled = stock<=0 ? 'disabled' : '';
-    const stockBadge = stock<=0
-      ? '<span class="badge br"><span class="stock-dot si-out"></span>No stock</span>'
-      : stock<10
-        ? `<span class="badge ba"><span class="stock-dot si-low"></span>Low (${stock})</span>`
-        : `<span class="badge bg"><span class="stock-dot si-in"></span>In stock</span>`;
+tbody.innerHTML = bannerHtml + items.slice(0,200).filter(e => !orderItems[e.product_id||'sku_'+e.sku]).map(e=>{
+    const stock       = e.available_stock ?? 0;
+    const stockUnknown = e.available_stock === null;
+    const isChecked   = !!orderItems[e.product_id||'sku_'+e.sku];
+    const disabled    = (!stockUnknown && stock<=0 && e.in_catalogue) ? 'disabled' : '';
+    const stockBadge  = !e.in_catalogue
+      ? '<span class="badge ba" style="font-size:9px;">⚠ Not in Zoho</span>'
+      : stockUnknown
+        ? '<span class="badge ba">Unknown</span>'
+        : stock<=0
+          ? '<span class="badge br"><span class="stock-dot si-out"></span>No stock</span>'
+          : stock<10
+            ? `<span class="badge ba"><span class="stock-dot si-low"></span>Low (${stock})</span>`
+            : `<span class="badge bg"><span class="stock-dot si-in"></span>In stock</span>`;
 
     return `<tr class="${isChecked?'listing-row-new':''}">
       <td class="mono">${e.sku}</td>
@@ -3149,7 +3191,7 @@ function renderListingScreenTable(items, preselectedProductId=null, brandBadges=
       <td>${stockBadge}</td>
       <td><input type="checkbox" ${disabled} ${isChecked?'checked':''}
         style="width:17px;height:17px;cursor:pointer;accent-color:var(--royal);"
-        onchange="toggleListingItem('${e.product_id}','${(e.item_name||'').replace(/'/g,"\\'")}',${e.rate},${stock},this.checked)"/></td>
+        onchange="toggleListingItem('${e.product_id||'sku_'+e.sku}','${(e.item_name||'').replace(/'/g,"\\'")}',${e.rate},${stock},this.checked)"/></td>
     </tr>`;
   }).join('');
 
