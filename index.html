@@ -5867,12 +5867,27 @@ async function loadRepWallet() {
     if (confirmedCount > 0 && order.client_name) confirmedStores.add(order.client_name);
   }
 
-  _walletPoints = totalConfirmedItems;
-  renderRepWalletUI(totalConfirmedItems, confirmedStores.size, orders.length, orders, confirmedByOrder);
+_walletPoints = totalConfirmedItems;
+
+  // Load pending/approved payout requests to deduct from display balance
+  let redeemedSoFar = 0;
+  try {
+    const { data: prData } = await sb
+      .from('payout_requests')
+      .select('points_used')
+      .eq('rep_id', currentUser.id)
+      .in('status', ['approved', 'paid', 'pending']);
+    redeemedSoFar = (prData || []).reduce((s, r) => s + Number(r.points_used || 0), 0);
+  } catch(e) { console.warn('Could not load redeemed points:', e.message); }
+
+  _walletRedeemedPoints = redeemedSoFar;
+  const effectivePoints = Math.max(0, totalConfirmedItems - redeemedSoFar);
+
+  renderRepWalletUI(effectivePoints, confirmedStores.size, orders.length, orders, confirmedByOrder);
 }
 
 function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, orders, confirmedByOrder) {
-  const points  = totalConfirmedItems;
+  const points  = totalConfirmedItems; // already has redemptions deducted when called from loadRepWallet
   const ugxValue = points * 1000;
   const pct     = Math.min(100, Math.round((points / 50) * 100));
   const needed  = Math.max(0, 50 - points);
@@ -5887,7 +5902,11 @@ function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, order
   document.getElementById('wallet-progress-sub').textContent = needed > 0
     ? `${needed} more confirmed purchases needed to redeem`
     : '🎉 You are eligible to redeem!';
-  document.getElementById('wallet-stat-items').textContent   = totalConfirmedItems;
+  document.getElementById('wallet-stat-items').textContent   = _walletPoints; // show gross confirmed items
+  document.getElementById('wallet-stat-redemptions').textContent = _walletRedeemedPoints > 0 ? '1+' : '0';
+  document.getElementById('wallet-stat-redeemed').textContent = _walletRedeemedPoints > 0 
+    ? `UGX ${(_walletRedeemedPoints * 1000).toLocaleString()}` 
+    : 'UGX 0';
   document.getElementById('wallet-stat-stores').textContent  = uniqueStores;
 
   // Alert
