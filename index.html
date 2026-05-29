@@ -5862,15 +5862,17 @@ async function loadRepWallet() {
 
 _walletPoints = totalConfirmedItems;
 
-  // Load pending/approved payout requests to deduct from display balance
+  // Load ALL paid/approved/pending payout requests to deduct from balance
   let redeemedSoFar = 0;
   try {
     const { data: prData } = await sb
       .from('payout_requests')
-      .select('points_used')
-      .eq('rep_id', currentUser.id)
-      .in('status', ['approved', 'paid', 'pending']);
-    redeemedSoFar = (prData || []).reduce((s, r) => s + Number(r.points_used || 0), 0);
+      .select('points_used, status')
+      .eq('rep_id', currentUser.id);
+    // Deduct everything except rejected requests
+    redeemedSoFar = (prData || [])
+      .filter(r => r.status !== 'rejected')
+      .reduce((s, r) => s + Number(r.points_used || 0), 0);
   } catch(e) { console.warn('Could not load redeemed points:', e.message); }
 
   _walletRedeemedPoints = redeemedSoFar;
@@ -5895,11 +5897,13 @@ function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, order
   document.getElementById('wallet-progress-sub').textContent = needed > 0
     ? `${needed} more confirmed purchases needed to redeem`
     : '🎉 You are eligible to redeem!';
-  document.getElementById('wallet-stat-items').textContent   = _walletPoints; // show gross confirmed items
   document.getElementById('wallet-stat-redemptions').textContent = _walletRedeemedPoints > 0 ? '1+' : '0';
-  document.getElementById('wallet-stat-redeemed').textContent = _walletRedeemedPoints > 0 
-    ? `UGX ${(_walletRedeemedPoints * 1000).toLocaleString()}` 
+  document.getElementById('wallet-stat-redeemed').textContent = _walletRedeemedPoints > 0
+    ? `UGX ${(_walletRedeemedPoints * 1000).toLocaleString()}`
     : 'UGX 0';
+  // Update redeem card to show correct deducted balance
+  document.getElementById('redeem-current-pts').textContent  = `${totalConfirmedItems - _walletRedeemedPoints} pts`;
+  document.getElementById('redeem-still-needed').textContent = `${Math.max(0, 50 - (totalConfirmedItems - _walletRedeemedPoints))} pts`;
   document.getElementById('wallet-stat-stores').textContent  = uniqueStores;
 
   // Alert
@@ -6203,10 +6207,23 @@ async function loadAdminWallet() {
       }
     }
 
-    repStats[rep.id].items  = totalConfirmedForRep;
-    repStats[rep.id].points = totalConfirmedForRep;
-    repStats[rep.id].ugx    = totalConfirmedForRep * 1000;
-    repStats[rep.id].stores = confirmedStores;
+    // Load redeemed points for this rep from payout_requests
+    let repRedeemedPts = 0;
+    try {
+      const { data: prData } = await sb
+        .from('payout_requests')
+        .select('points_used, status')
+        .eq('rep_id', rep.id);
+      repRedeemedPts = (prData || [])
+        .filter(r => r.status !== 'rejected')
+        .reduce((s, r) => s + Number(r.points_used || 0), 0);
+    } catch(e) {}
+
+    repStats[rep.id].items    = totalConfirmedForRep;
+    repStats[rep.id].points   = Math.max(0, totalConfirmedForRep - repRedeemedPts);
+    repStats[rep.id].ugx      = Math.max(0, totalConfirmedForRep - repRedeemedPts) * 1000;
+    repStats[rep.id].redeemed = repRedeemedPts * 1000;
+    repStats[rep.id].stores   = confirmedStores;
   }
 
   const repList = Object.entries(repStats).sort((a, b) => b[1].points - a[1].points);
