@@ -5578,25 +5578,501 @@ async function _loadAdminPayoutRequests() {
     </div>`;
   };
 
-  requestsEl.innerHTML = requests.map(r => renderRow(r)).join('');
+  requestsEl.innerHTML = requests.map(r => _buildPayoutRequestRow(r)).join('');
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// KTL WALLET — PAYMENT RECEIPT & INVOICE SYSTEM
+// Drop this entire block into your HTML, replacing the existing
+// approvePayoutRequest() function and adding the new helpers.
+// ═══════════════════════════════════════════════════════════════════
+
+// ─── 1. REPLACE approvePayoutRequest() ────────────────────────────
 async function approvePayoutRequest(requestId, repName, ugxAmount, ptsUsed) {
   showConfirmDialog({
     icon: '💰', title: 'Approve & Pay',
-    message: `Approve payout of <strong>UGX ${Number(ugxAmount).toLocaleString()}</strong> (${ptsUsed} pts) for <strong>${repName}</strong>?<br><br>Please complete the mobile money transfer manually after confirming.`,
-    confirmLabel: 'Approve & Mark Paid',
+    message: `Approve payout of <strong>UGX ${Number(ugxAmount).toLocaleString()}</strong> (${ptsUsed} pts) for <strong>${repName}</strong>?<br><br>Please complete the mobile money transfer <strong>before</strong> confirming.`,
+    confirmLabel: 'Approve & Generate Receipt',
     confirmStyle: 'background:#1D9E75;color:#fff;border:none;',
     onConfirm: async () => {
+      // Load full request details first
+      let request = null;
+      try {
+        const { data } = await sb
+          .from('payout_requests')
+          .select('*')
+          .eq('id', requestId)
+          .single();
+        request = data;
+      } catch(e) {}
+
+      // Mark as paid
       const { error } = await sb.from('payout_requests')
-        .update({ status: 'paid', approved_by: currentUser?.id, approved_at: new Date().toISOString() })
+        .update({
+          status:      'paid',
+          approved_by: currentUser?.id,
+          approved_at: new Date().toISOString(),
+        })
         .eq('id', requestId);
+
       if (error) { alert('Error: ' + error.message); return; }
-      alert(`✅ Marked as paid for ${repName}. Please complete the mobile money transfer to their number.`);
+
+      // Build receipt data
+      const receiptData = {
+        receipt_no:    generateReceiptNumber(),
+        request_id:    requestId,
+        rep_name:      repName,
+        mobile_number: request?.mobile_number || '—',
+        points_used:   ptsUsed,
+        amount_ugx:    ugxAmount,
+        balance_after: request?.balance_after ?? 0,
+        requested_at:  request?.requested_at || new Date().toISOString(),
+        approved_at:   new Date().toISOString(),
+        approved_by:   currentUser?.full_name || 'Admin',
+        approved_by_role: currentUser?.role?.replace('_',' ') || 'Admin',
+      };
+
       await loadAdminWallet();
+      openPaymentReceiptModal(receiptData);
     }
   });
 }
+
+// ─── 2. RECEIPT NUMBER GENERATOR ──────────────────────────────────
+function generateReceiptNumber() {
+  const now   = new Date();
+  const year  = now.getFullYear().toString().slice(-2);
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const rand  = Math.floor(1000 + Math.random() * 9000);
+  return `KTL-W${year}${month}-${rand}`;
+}
+
+// ─── 3. VIEW RECEIPT BUTTON (add to paid rows in _loadAdminPayoutRequests) ────
+// Replace the renderRow() function inside _loadAdminPayoutRequests with this:
+function _buildPayoutRequestRow(r) {
+  const date     = r.requested_at
+    ? new Date(r.requested_at).toLocaleDateString('en-UG', { day:'2-digit', month:'short', year:'numeric' })
+    : '—';
+  const isPending = r.status === 'pending';
+  const isPaid    = r.status === 'paid' || r.status === 'approved';
+  const initials  = (r.rep_name || 'R').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+
+  const statusBadge = {
+    pending:  '<span class="badge ba">Pending</span>',
+    approved: '<span class="badge bg">Approved</span>',
+    paid:     '<span class="badge bg">Paid ✓</span>',
+    rejected: '<span class="badge br">Rejected</span>',
+  };
+
+  return `<div style="padding:12px 14px;border-bottom:0.5px solid var(--brd);display:flex;align-items:flex-start;gap:12px;">
+    <div style="width:36px;height:36px;border-radius:50%;background:var(--royal-light);color:var(--royal);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">${initials}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-size:13px;font-weight:600;">${r.rep_name || '—'}</span>
+        ${statusBadge[r.status] || ''}
+      </div>
+      <div style="font-size:11.5px;color:var(--txt2);margin-top:3px;">
+        <strong style="color:#1D9E75;">UGX ${Number(r.amount_ugx || 0).toLocaleString()}</strong>
+        &nbsp;·&nbsp; ${r.points_used || 0} pts redeemed
+        ${r.balance_after != null ? `&nbsp;·&nbsp; <span style="color:var(--royal);">${r.balance_after} pts remaining</span>` : ''}
+      </div>
+      <div style="font-size:11px;color:var(--txt3);margin-top:2px;">
+        📞 ${r.mobile_number || '—'} &nbsp;·&nbsp; ${date}
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
+      ${isPending ? `
+        <button class="btn btn-sm btn-green" style="font-size:11px;padding:4px 10px;white-space:nowrap;"
+          onclick="approvePayoutRequest('${r.id}','${(r.rep_name||'').replace(/'/g,"\\'")}',${r.amount_ugx||0},${r.points_used||0})">
+          ✓ Approve &amp; Pay
+        </button>
+        <button class="btn btn-sm btn-danger" style="font-size:11px;padding:4px 10px;white-space:nowrap;"
+          onclick="rejectPayoutRequest('${r.id}')">
+          ✕ Reject
+        </button>
+      ` : isPaid ? `
+        <button class="btn btn-sm" style="font-size:11px;padding:4px 10px;white-space:nowrap;border-color:var(--royal);color:var(--royal);"
+          onclick="viewPayoutReceipt('${r.id}')">
+          🧾 Receipt
+        </button>
+      ` : `<div style="font-size:10.5px;color:var(--txt3);">${r.status}</div>`}
+    </div>
+  </div>`;
+}
+
+// ─── 4. VIEW EXISTING RECEIPT ──────────────────────────────────────
+async function viewPayoutReceipt(requestId) {
+  let r = null;
+  try {
+    const { data } = await sb.from('payout_requests').select('*').eq('id', requestId).single();
+    r = data;
+  } catch(e) {}
+  if (!r) { alert('Could not load receipt data.'); return; }
+
+  const approvedByName = r.approved_by ? (_repNameCache[r.approved_by] || r.approved_by) : 'Admin';
+
+  openPaymentReceiptModal({
+    receipt_no:       r.receipt_no || generateReceiptNumber(),
+    request_id:       requestId,
+    rep_name:         r.rep_name,
+    mobile_number:    r.mobile_number || '—',
+    points_used:      r.points_used,
+    amount_ugx:       r.amount_ugx,
+    balance_after:    r.balance_after ?? 0,
+    requested_at:     r.requested_at || r.created_at,
+    approved_at:      r.approved_at || r.updated_at,
+    approved_by:      approvedByName,
+    approved_by_role: 'Admin / Manager',
+  });
+}
+
+// ─── 5. MAIN RECEIPT MODAL ────────────────────────────────────────
+function openPaymentReceiptModal(data) {
+  const existing = document.getElementById('ktl-receipt-modal');
+  if (existing) existing.remove();
+
+  const requestedDate = data.requested_at
+    ? new Date(data.requested_at).toLocaleDateString('en-UG', { day:'2-digit', month:'long', year:'numeric' })
+    : '—';
+  const approvedDate = data.approved_at
+    ? new Date(data.approved_at).toLocaleDateString('en-UG', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })
+    : '—';
+  const ugxFormatted = `UGX ${Number(data.amount_ugx).toLocaleString()}`;
+  const initials = (data.rep_name || 'R').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'ktl-receipt-modal';
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(10,20,50,0.75);
+    display:flex;align-items:center;justify-content:center;
+    z-index:99999;backdrop-filter:blur(6px);padding:16px;
+  `;
+
+  overlay.innerHTML = `
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;600&display=swap');
+
+      #ktl-receipt-wrap {
+        background:#fff;
+        border-radius:20px;
+        width:100%;
+        max-width:520px;
+        max-height:92vh;
+        overflow-y:auto;
+        box-shadow:0 32px 80px rgba(10,20,50,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+        font-family:'DM Sans', sans-serif;
+      }
+
+      /* ── Top action bar (non-printable) ── */
+      #ktl-receipt-actions {
+        display:flex;align-items:center;justify-content:space-between;
+        padding:14px 20px;background:#f8f9fb;
+        border-radius:20px 20px 0 0;border-bottom:1px solid #e8eaf0;
+      }
+      #ktl-receipt-actions .ra-title {font-size:13px;font-weight:600;color:#1a3a6b;}
+      #ktl-receipt-actions .ra-btns {display:flex;gap:8px;}
+      .ra-btn {
+        display:inline-flex;align-items:center;gap:6px;
+        padding:8px 14px;border-radius:9px;font-size:12.5px;
+        font-weight:600;cursor:pointer;border:none;font-family:inherit;
+        transition:all 0.15s;
+      }
+      .ra-btn-print  {background:#1a3a6b;color:#fff;}
+      .ra-btn-print:hover {background:#0f2550;}
+      .ra-btn-close  {background:#fff;color:#6b6b67;border:1px solid #dde1ea;}
+      .ra-btn-close:hover {background:#f0f2f7;}
+
+      /* ── Receipt document ── */
+      #ktl-receipt-doc {
+        padding:36px 40px 44px;
+      }
+
+      /* Header strip */
+      .rec-header {
+        display:flex;justify-content:space-between;align-items:flex-start;
+        margin-bottom:28px;padding-bottom:20px;
+        border-bottom:2px solid #f0f2f7;
+      }
+      .rec-brand-mark {
+        width:44px;height:44px;border-radius:11px;background:#1a3a6b;
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:0 4px 14px rgba(26,58,107,0.3);
+      }
+      .rec-brand-mark span {color:#fff;font-size:12px;font-weight:700;letter-spacing:0.05em;}
+      .rec-brand-info {margin-top:5px;}
+      .rec-brand-name {font-family:'DM Serif Display',serif;font-size:17px;color:#1a3a6b;line-height:1.1;}
+      .rec-brand-sub  {font-size:10px;color:#9b9b96;letter-spacing:0.1em;text-transform:uppercase;margin-top:1px;}
+
+      .rec-doc-meta {text-align:right;}
+      .rec-doc-type {
+        font-family:'DM Serif Display',serif;font-style:italic;
+        font-size:22px;color:#1a3a6b;margin-bottom:4px;
+      }
+      .rec-doc-no {
+        font-family:'IBM Plex Mono',monospace;font-size:11px;
+        color:#b8860b;font-weight:600;letter-spacing:0.08em;
+        background:#fdf3d0;padding:3px 10px;border-radius:20px;
+        display:inline-block;
+      }
+
+      /* Gold divider accent */
+      .rec-accent {
+        height:3px;background:linear-gradient(90deg,#1a3a6b,#2451a0,#b8860b,#d4a017);
+        border-radius:3px;margin-bottom:24px;opacity:0.85;
+      }
+
+      /* Recipient section */
+      .rec-recipient {
+        background:linear-gradient(135deg,#f0f4fc,#e8eef8);
+        border-radius:14px;padding:18px 20px;margin-bottom:22px;
+        border:1px solid #b8c8e8;display:flex;align-items:center;gap:16px;
+      }
+      .rec-rep-av {
+        width:52px;height:52px;border-radius:50%;
+        background:linear-gradient(135deg,#1a3a6b,#2451a0);
+        color:#fff;display:flex;align-items:center;justify-content:center;
+        font-size:17px;font-weight:700;flex-shrink:0;
+        box-shadow:0 3px 12px rgba(26,58,107,0.3);
+      }
+      .rec-rep-name {font-size:16px;font-weight:700;color:#1a1a18;margin-bottom:2px;}
+      .rec-rep-sub  {font-size:11.5px;color:#6b6b67;}
+      .rec-rep-phone {
+        margin-left:auto;text-align:right;
+        font-family:'IBM Plex Mono',monospace;font-size:12px;
+        color:#1a3a6b;font-weight:600;
+      }
+      .rec-rep-phone-lbl {font-size:10px;color:#9b9b96;font-family:'DM Sans',sans-serif;margin-bottom:2px;}
+
+      /* Line items */
+      .rec-items {margin-bottom:20px;}
+      .rec-item-row {
+        display:flex;justify-content:space-between;align-items:center;
+        padding:11px 0;border-bottom:1px dashed #e8eaf0;font-size:12.5px;
+      }
+      .rec-item-row:last-child {border-bottom:none;}
+      .rec-item-label {color:#6b6b67;}
+      .rec-item-value {font-weight:600;color:#1a1a18;font-family:'IBM Plex Mono',monospace;font-size:12px;}
+      .rec-item-value.gold  {color:#b8860b;}
+      .rec-item-value.royal {color:#1a3a6b;}
+      .rec-item-value.green {color:#1D9E75;}
+
+      /* Total box */
+      .rec-total {
+        background:linear-gradient(135deg,#1a3a6b 0%,#2451a0 100%);
+        border-radius:14px;padding:20px 22px;margin-bottom:20px;
+        display:flex;justify-content:space-between;align-items:center;
+        box-shadow:0 6px 24px rgba(26,58,107,0.25);
+      }
+      .rec-total-label {font-size:11px;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;}
+      .rec-total-amount {
+        font-family:'DM Serif Display',serif;font-size:28px;
+        color:#fff;letter-spacing:-0.02em;line-height:1;
+      }
+      .rec-total-right {text-align:right;}
+      .rec-total-pts {font-size:12px;color:rgba(255,255,255,0.65);}
+      .rec-total-pts strong {color:rgba(255,255,255,0.9);}
+      .rec-paid-stamp {
+        background:#25D366;border-radius:8px;padding:6px 14px;
+        font-size:11px;font-weight:700;color:#fff;letter-spacing:0.08em;
+        text-transform:uppercase;margin-top:8px;display:inline-block;
+      }
+
+      /* Approval section */
+      .rec-approval {
+        background:#f8f9fb;border-radius:12px;padding:14px 18px;
+        margin-bottom:20px;border:1px solid #e8eaf0;
+      }
+      .rec-approval-hdr {font-size:10px;font-weight:700;color:#9b9b96;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;}
+      .rec-approval-row {display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;}
+      .rec-approval-lbl {color:#6b6b67;}
+      .rec-approval-val {font-weight:600;color:#1a1a18;}
+      .rec-sig-line {
+        border-top:1.5px solid #1a3a6b;margin-top:8px;padding-top:6px;
+        display:flex;justify-content:space-between;font-size:10px;color:#6b6b67;
+      }
+
+      /* Footer */
+      .rec-footer {
+        text-align:center;padding-top:16px;border-top:1px solid #f0f2f7;
+        font-size:10.5px;color:#9b9b96;line-height:1.7;
+      }
+      .rec-footer strong {color:#1a3a6b;}
+      .rec-watermark {
+        font-family:'DM Serif Display',serif;font-style:italic;
+        font-size:11px;color:#b8c8e8;margin-top:6px;
+        letter-spacing:0.05em;
+      }
+
+      /* ── PRINT STYLES ── */
+      @media print {
+        body * { visibility: hidden !important; }
+        #ktl-receipt-doc, #ktl-receipt-doc * { visibility: visible !important; }
+        #ktl-receipt-modal { display:block !important; padding:0 !important; background:none !important; }
+        #ktl-receipt-wrap  { box-shadow:none !important; max-height:none !important; border-radius:0 !important; }
+        #ktl-receipt-actions { display:none !important; }
+        #ktl-receipt-doc { padding:20px 28px 28px !important; }
+        @page { size:A5 portrait; margin:8mm; }
+        .rec-total { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+        .rec-accent { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+        .rec-brand-mark { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+        .rec-rep-av { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+        .rec-recipient { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      }
+    </style>
+
+    <div id="ktl-receipt-wrap">
+
+      <!-- Action bar (hidden on print) -->
+      <div id="ktl-receipt-actions">
+        <div class="ra-title">🧾 Payment Receipt — ${data.receipt_no}</div>
+        <div class="ra-btns">
+          <button class="ra-btn ra-btn-print" onclick="ktlPrintReceipt()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+              <rect x="6" y="14" width="12" height="8"/>
+            </svg>
+            Print / Save PDF
+          </button>
+          <button class="ra-btn ra-btn-close" onclick="document.getElementById('ktl-receipt-modal').remove()">
+            ✕ Close
+          </button>
+        </div>
+      </div>
+
+      <!-- Receipt Document -->
+      <div id="ktl-receipt-doc">
+
+        <!-- Header -->
+        <div class="rec-header">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="rec-brand-mark"><span>KTL</span></div>
+            <div class="rec-brand-info">
+              <div class="rec-brand-name">Kingdom Trading Ltd</div>
+              <div class="rec-brand-sub">Sales Rewards · Wallet System</div>
+            </div>
+          </div>
+          <div class="rec-doc-meta">
+            <div class="rec-doc-type">Payment Receipt</div>
+            <div class="rec-doc-no">${data.receipt_no}</div>
+          </div>
+        </div>
+
+        <!-- Gold accent bar -->
+        <div class="rec-accent"></div>
+
+        <!-- Recipient -->
+        <div class="rec-recipient">
+          <div class="rec-rep-av">${initials}</div>
+          <div>
+            <div class="rec-rep-name">${data.rep_name}</div>
+            <div class="rec-rep-sub">Sales Representative</div>
+            <div style="margin-top:5px;font-size:10.5px;color:#1a3a6b;font-weight:600;">
+              📞 ${data.mobile_number}
+            </div>
+          </div>
+          <div class="rec-rep-phone">
+            <div class="rec-rep-phone-lbl">Mobile Money</div>
+            ${data.mobile_number}
+          </div>
+        </div>
+
+        <!-- Line items -->
+        <div class="rec-items">
+          <div class="rec-item-row">
+            <span class="rec-item-label">Payment purpose</span>
+            <span class="rec-item-value royal">Sales Reward Redemption</span>
+          </div>
+          <div class="rec-item-row">
+            <span class="rec-item-label">Points redeemed</span>
+            <span class="rec-item-value gold">${Number(data.points_used).toLocaleString()} pts @ UGX 1,000 / pt</span>
+          </div>
+          <div class="rec-item-row">
+            <span class="rec-item-label">Date requested</span>
+            <span class="rec-item-value">${requestedDate}</span>
+          </div>
+          <div class="rec-item-row">
+            <span class="rec-item-label">Date approved &amp; paid</span>
+            <span class="rec-item-value">${approvedDate}</span>
+          </div>
+          <div class="rec-item-row">
+            <span class="rec-item-label">Payment method</span>
+            <span class="rec-item-value">Mobile Money (MTN / Airtel)</span>
+          </div>
+          <div class="rec-item-row">
+            <span class="rec-item-label">Remaining balance after payout</span>
+            <span class="rec-item-value royal">${Number(data.balance_after).toLocaleString()} pts remaining</span>
+          </div>
+        </div>
+
+        <!-- Total -->
+        <div class="rec-total">
+          <div>
+            <div class="rec-total-label">Amount Paid</div>
+            <div class="rec-total-amount">${ugxFormatted}</div>
+          </div>
+          <div class="rec-total-right">
+            <div class="rec-total-pts">
+              <strong>${Number(data.points_used).toLocaleString()} pts</strong> redeemed
+            </div>
+            <div class="rec-paid-stamp">✓ PAID</div>
+          </div>
+        </div>
+
+        <!-- Approval details -->
+        <div class="rec-approval">
+          <div class="rec-approval-hdr">Authorisation &amp; Approval Record</div>
+          <div class="rec-approval-row">
+            <span class="rec-approval-lbl">Approved by</span>
+            <span class="rec-approval-val">${data.approved_by}</span>
+          </div>
+          <div class="rec-approval-row">
+            <span class="rec-approval-lbl">Role</span>
+            <span class="rec-approval-val">${data.approved_by_role}</span>
+          </div>
+          <div class="rec-approval-row">
+            <span class="rec-approval-lbl">Approval timestamp</span>
+            <span class="rec-approval-val" style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${approvedDate}</span>
+          </div>
+          <div class="rec-approval-row">
+            <span class="rec-approval-lbl">Reference no.</span>
+            <span class="rec-approval-val" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#b8860b;">${data.receipt_no}</span>
+          </div>
+          <div class="rec-sig-line">
+            <span>Authorised Signature: ________________________</span>
+            <span>Date: ___________</span>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="rec-footer">
+          <strong>Kingdom Trading Ltd</strong> — Sales Rewards Programme<br>
+          This receipt serves as official proof of payment for the above named individual.<br>
+          For queries contact the KTL Accounts Team: <strong>0763 371 564</strong>
+          <div class="rec-watermark">KingdomField · KTLSALES · ${new Date().getFullYear()}</div>
+        </div>
+
+      </div><!-- end receipt doc -->
+    </div><!-- end receipt wrap -->
+  `;
+
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+
+// ─── 6. PRINT HANDLER ─────────────────────────────────────────────
+function ktlPrintReceipt() {
+  window.print();
+}
+
+// ─── 7. UPDATE _loadAdminPayoutRequests TO USE NEW ROW BUILDER ────
+// Replace the existing renderRow call with _buildPayoutRequestRow
+// In your _loadAdminPayoutRequests function, change:
+//   requestsEl.innerHTML = requests.map(r => renderRow(r)).join('');
+// to:
+//   requestsEl.innerHTML = requests.map(r => _buildPayoutRequestRow(r)).join('');
+
 
 async function rejectPayoutRequest(requestId) {
   showConfirmDialog({
