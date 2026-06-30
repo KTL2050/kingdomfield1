@@ -5,9 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>KTLSALES — Kingdom Trading Ltd</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-:root{--royal:#1a3a6b;--royal-mid:#2451a0;--royal-light:#e8eef8;--royal-border:#b8c8e8;--gold:#b8860b;--gold-light:#fdf3d0;--gold-mid:#d4a017;--bg:#fff;--bg2:#f5f5f3;--bg3:#eeece6;--txt:#1a1a18;--txt2:#6b6b67;--txt3:#9b9b96;--brd:rgba(0,0,0,0.1);--brd2:rgba(0,0,0,0.18);}
+:root{--royal:#1a3a6b;--royal-mid:#2451a0;--royal-light:#e8eef8;--royal-border:#b8c8e8;--gold:#b8860b;--gold-light:#fdf3d0;--gold-mid:#d4a017;--bg:#fff;--bg2:#eef2f8;--bg3:#e4ecf7;--txt:#1a1a18;--txt2:#6b6b67;--txt3:#9b9b96;--brd:rgba(26,58,107,0.12);--brd2:rgba(26,58,107,0.2);}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--txt);font-size:14px;}
 .hidden{display:none!important;}
 .login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg3);}
@@ -57,8 +60,11 @@ nav{flex:1;padding:8px;overflow-y:auto;}
 .drawer-hdr{padding:18px 16px;border-bottom:0.5px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:space-between;}
 .drawer-close{width:30px;height:30px;border-radius:7px;background:rgba(255,255,255,0.1);border:none;cursor:pointer;color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;}
 .main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;}
-.topbar{background:var(--bg);border-bottom:0.5px solid var(--brd);padding:0 20px;height:50px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.04);}
+.topbar{background:var(--bg);border-bottom:0.5px solid var(--brd);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.04);}
 .topbar-title{font-size:14px;font-weight:600;color:var(--txt);letter-spacing:-0.01em;}
+.topbar-greeting{display:flex;flex-direction:column;justify-content:center;}
+.topbar-greeting-name{font-size:15px;font-weight:700;color:var(--txt);letter-spacing:-0.01em;line-height:1.1;}
+.topbar-greeting-sub{font-size:11px;color:var(--txt3);margin-top:1px;}
 .topbar-right{display:flex;align-items:center;gap:10px;}
 #sync-status{font-size:11px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;}
 .sync-btn{padding:6px 13px;border-radius:8px;background:var(--gold-mid);color:#fff;border:none;cursor:pointer;font-size:12px;font-family:inherit;font-weight:500;box-shadow:0 1px 4px rgba(212,160,23,0.3);transition:all 0.15s;}
@@ -185,18 +191,29 @@ tr:hover td{background:var(--bg2);}
   .sidebar{display:none;}
   .mob-bar{display:flex;}
   .app{flex-direction:column;}
-  .metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;overflow:hidden!important;width:100%!important;}
+  .mc{min-width:0!important;overflow:hidden!important;word-break:break-word!important;}
+  /* Allow tables and inner wrappers to scroll horizontally */
+  .card{overflow:hidden!important;}
+  [style*="overflow-x:auto"]{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;}
+  table{min-width:500px;}
+  #products-table-wrap,#att-table-wrap,#att-rep-history-tbody,#orders-report-tbody,#wadmin-table-wrap,.saved-listings-panel,#client-products-table,#client-listable-table,#client-listed-table,#client-notbought-table{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;display:block!important;width:100%!important;}
   .two-col{grid-template-columns:1fr;}
   .fgrid{grid-template-columns:1fr;}
-  .content{padding:10px;}
+  .content{padding:10px;overflow-x:hidden!important;overflow-y:auto!important;}
   .card{padding:12px;margin-bottom:10px;}
   #clients-grid{grid-template-columns:1fr!important;}
   .listing-layout{grid-template-columns:1fr!important;}
-  .topbar{padding:0 12px;height:46px;}
-  .topbar-right{gap:6px;}
-  .sync-btn{padding:5px 10px;font-size:11.5px;}
+  .topbar{padding:0 12px;height:auto;min-height:52px;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding-top:8px;padding-bottom:8px;}
+  .topbar-greeting{flex-direction:row;align-items:center;justify-content:space-between;width:100%;}
+  .topbar-greeting-name{font-size:13px;font-weight:700;}
+  .topbar-greeting-sub{display:none;}
+  #topbar-datetime{padding:4px 9px!important;gap:5px!important;}
+  #topbar-datetime span{font-size:11px!important;}
+  .topbar-right{gap:6px;width:100%;justify-content:flex-end;padding-bottom:2px;}
+  .sync-btn{padding:5px 10px;font-size:11px;}
   .signout-btn{display:none;}
-  #sync-status{max-width:90px;font-size:10px;}
+  #sync-status{display:none;}
   .mc{padding:11px 13px;}
   .mc-val{font-size:20px;}
   .mc-lbl{font-size:9.5px;}
@@ -225,6 +242,16 @@ tr:hover td{background:var(--bg2);}
   .date-range-strip{gap:6px;}
   .share-btns{flex-direction:column;}
 
+  /* ── ATTENDANCE MOBILE FIXES ── */
+#screen-attendance .metrics-grid{grid-template-columns:1fr 1fr!important;gap:8px!important;}
+  #screen-attendance .mc{min-width:0!important;width:100%!important;flex-shrink:0!important;}
+  #screen-attendance .two-col{grid-template-columns:1fr!important;}
+  #att-admin-view .metrics-grid{grid-template-columns:1fr 1fr!important;gap:8px!important;}
+  #att-rep-view .metrics-grid{grid-template-columns:1fr 1fr!important;gap:8px!important;}
+  #att-admin-view .mc,.att-rep-view .mc{min-width:0!important;word-break:break-word!important;}
+  #att-admin-view .mc-val{font-size:20px!important;}
+  #att-rep-view .mc-val{font-size:16px!important;}
+  #att-rep-view .mc-lbl{font-size:9px!important;letter-spacing:0.04em!important;}
   /* ── WALLET MOBILE FIXES ── */
   #screen-wallet .metrics-grid{grid-template-columns:1fr 1fr;gap:8px;}
   #screen-wallet .mc{padding:10px 10px;}
@@ -520,8 +547,20 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
       </div>
       <span id="mob-screen" style="font-size:11px;color:rgba(255,255,255,0.55);font-weight:500;">Dashboard</span>
     </div>
-    <div class="topbar">
-      <div class="topbar-title" id="page-title">Dashboard</div>
+   <div class="topbar">
+      <!-- Row 1: greeting + datetime -->
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+        <div class="topbar-greeting" id="topbar-greeting-wrap">
+          <div class="topbar-greeting-name" id="topbar-greeting-text">Good morning 👋</div>
+          <div class="topbar-greeting-sub" id="page-title">Dashboard</div>
+        </div>
+        <div id="topbar-datetime" style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:0.5px solid var(--brd);border-radius:9px;padding:6px 13px;flex-shrink:0;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--txt3)" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          <span style="font-size:12px;color:var(--txt2);font-weight:500;" id="topbar-date-label">—</span>
+          <span style="font-size:12px;font-weight:700;color:var(--royal);margin-left:4px;" id="topbar-time-label">--:--</span>
+        </div>
+      </div>
+      <!-- Row 2: action buttons -->
       <div class="topbar-right">
         <span id="sync-status">Syncing...</span>
         <button class="sync-btn" id="sync-zoho-btn" onclick="openSyncModal()">&#8635; Sync Zoho</button>
@@ -529,6 +568,327 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
       </div>
     </div>
     <div class="content">
+
+      <!-- ATTENDANCE -->
+      <div class="screen" id="screen-attendance">
+
+        <!-- ══ ADMIN / MANAGER VIEW ══ -->
+        <div id="att-admin-view">
+
+        
+
+          <!-- Stat cards -->
+          <div class="metrics-grid" style="margin-bottom:14px;">
+            <div class="mc" style="background:linear-gradient(135deg,#5B8DEF,#4A6FD4);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Present Today</div>
+              <div class="mc-val" id="att-present" style="color:#fff;">—</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Clocked in</div>
+            </div>
+            <div class="mc" style="background:linear-gradient(135deg,#F06B6B,#E04545);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Absent Today</div>
+              <div class="mc-val" id="att-absent" style="color:#fff;">—</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Not clocked in</div>
+            </div>
+            <div class="mc" style="background:linear-gradient(135deg,#4DB896,#2E9E75);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Clocked Out</div>
+              <div class="mc-val" id="att-clocked-out" style="color:#fff;">—</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Completed today</div>
+            </div>
+            <div class="mc" style="background:linear-gradient(135deg,#F5A623,#E8891A);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Late Arrivals</div>
+              <div class="mc-val" id="att-late" style="color:#fff;">—</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">After 9:00 AM</div>
+            </div>
+          </div>
+
+          <!-- Live map + recent table -->
+          <div class="two-col" style="margin-bottom:14px;">
+            <div style="background:var(--bg);border:0.5px solid var(--brd);border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07);display:flex;flex-direction:column;margin-bottom:0;">
+              <div style="padding:16px 18px 14px;border-bottom:0.5px solid var(--brd);display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div style="font-size:15px;font-weight:700;color:var(--txt);">Live Employee Locations</div>
+                  <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Real-time field positions of your team</div>
+                </div>
+                <button onclick="refreshAttMap()" style="display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:9px;background:var(--bg2);border:0.5px solid var(--brd2);cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;color:var(--txt2);transition:all 0.15s;" onmouseover="this.style.background='var(--royal-light)';this.style.color='var(--royal)'" onmouseout="this.style.background='var(--bg2)';this.style.color='var(--txt2)'">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                  Refresh
+                </button>
+              </div>
+              <div id="att-map-wrap" style="flex:1;min-height:260px;"></div>
+            </div>
+            <div style="background:var(--bg);border:0.5px solid var(--brd);border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07);margin-bottom:0;">
+              <div style="padding:16px 18px 14px;border-bottom:0.5px solid var(--brd);">
+                <div style="font-size:15px;font-weight:700;color:var(--txt);">My Attendance Today</div>
+                <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Your personal clock in/out record</div>
+              </div>
+              <div id="att-my-card-admin"></div>
+            </div>
+          </div>
+
+          <!-- Recent attendance table — Image 1 style -->
+          <div style="background:var(--bg);border:0.5px solid var(--brd);border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07);margin-top:14px;">
+            <div style="padding:16px 18px 14px;border-bottom:0.5px solid var(--brd);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+              <div>
+                <div style="font-size:15px;font-weight:700;color:var(--txt);">Recent Attendance — All Staff</div>
+                <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Filter by date or search by name</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <div style="position:relative;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--txt3)" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                  <input type="date" id="att-filter-date" style="padding:8px 10px 8px 32px;border:0.5px solid var(--brd2);border-radius:9px;font-size:12px;font-family:inherit;outline:none;background:var(--bg2);color:var(--txt);width:160px;" onchange="loadAttendanceTable()" onfocus="this.style.borderColor='var(--royal)'" onblur="this.style.borderColor='var(--brd2)'"/>
+                </div>
+                <div style="position:relative;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--txt3)" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                  <input type="text" id="att-filter-name" placeholder="Search employee..." style="padding:8px 10px 8px 32px;border:0.5px solid var(--brd2);border-radius:9px;font-size:12px;font-family:inherit;outline:none;background:var(--bg2);color:var(--txt);width:190px;" oninput="loadAttendanceTable()" onfocus="this.style.borderColor='var(--royal)'" onblur="this.style.borderColor='var(--brd2)'"/>
+                </div>
+                <button onclick="exportAttendanceCSV()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;background:var(--gold-mid);color:#fff;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;box-shadow:0 2px 6px rgba(212,160,23,0.3);transition:all 0.15s;" onmouseover="this.style.background='var(--gold)'" onmouseout="this.style.background='var(--gold-mid)'">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Export CSV
+                </button>
+              </div>
+            </div>
+            <div style="overflow-x:auto;" id="att-table-wrap">
+              <table style="width:100%;">
+                <thead>
+                  <tr style="background:#F8FAFF;">
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Employee</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Date</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Clock In</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Clock Out</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Hours</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Status</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Location</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Verified</th>
+                  </tr>
+                </thead>
+                <tbody id="att-tbody">
+                  <tr>
+                    <td colspan="8" style="text-align:center;padding:40px 20px;">
+                      <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+                        <div style="width:52px;height:52px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4A6FD4" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        </div>
+                        <div style="font-size:13px;font-weight:600;color:var(--txt);">Loading...</div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div><!-- end att-admin-view -->
+
+        <!-- ══ SALES REP VIEW ══ -->
+        <div id="att-rep-view" style="display:none;">
+
+        
+
+          <!-- Rep stat cards -->
+          <div class="metrics-grid" style="margin-bottom:14px;">
+            <div class="mc" style="background:linear-gradient(135deg,#5B8DEF,#4A6FD4);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Today's Status</div>
+              <div class="mc-val" id="rep-att-status" style="color:#fff;font-size:14px;">—</div>
+              <div class="mc-sub" id="rep-att-since" style="color:rgba(255,255,255,0.65);">—</div>
+            </div>
+            <div class="mc" style="background:linear-gradient(135deg,#4DB896,#2E9E75);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Hours Today</div>
+              <div class="mc-val" id="rep-att-hours" style="color:#fff;">—</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.65);" id="rep-att-running">—</div>
+            </div>
+            <div class="mc" style="background:linear-gradient(135deg,#F5A623,#E8891A);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">This Week</div>
+              <div class="mc-val" id="rep-att-week" style="color:#fff;">—</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Hours worked</div>
+            </div>
+            <div class="mc" style="background:linear-gradient(135deg,#4DB896,#2E9E75);border:none;">
+              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">This Month</div>
+              <div class="mc-val" id="rep-att-month" style="color:#fff;">—</div>
+              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Days present</div>
+            </div>
+          </div>
+
+          <div class="two-col" style="margin-bottom:14px;">
+            <!-- Clock In/Out card — Image 1 style -->
+            <div style="background:var(--bg);border:0.5px solid var(--brd);border-radius:14px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,0.07);">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+                <div>
+                  <div style="font-size:15px;font-weight:700;color:var(--txt);">Clock In / Clock Out</div>
+                  <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Track your work hours</div>
+                </div>
+                <div style="width:30px;height:30px;border-radius:50%;border:1.5px solid var(--brd2);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--txt3);">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="7"/><path d="M8 5v3M8 11v.5"/></svg>
+                </div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;">
+                <!-- CLOCK IN -->
+                <div style="background:#F0F4FF;border-radius:14px;padding:18px;text-align:center;border:1.5px solid #C7D7F8;" id="att-clockin-col">
+                  <div style="font-size:10px;font-weight:800;letter-spacing:.1em;color:#4A6FD4;margin-bottom:14px;">CLOCK IN</div>
+                  <div id="att-fp-in-wrap"
+                    style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#4A6FD4,#2451a0);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 16px rgba(74,111,212,0.4);"
+                    onclick="openAttFaceModal('in')"
+                    onmouseover="this.style.transform='scale(1.06)';this.style.boxShadow='0 6px 22px rgba(74,111,212,0.5)'"
+                    onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(74,111,212,0.4)'">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                  </div>
+                  <div id="att-in-time" style="font-size:13px;font-weight:800;color:#4A6FD4;letter-spacing:.02em;">--:--</div>
+                  <div id="att-in-date" style="font-size:10.5px;color:#7a93c8;margin-top:2px;">Not yet clocked in</div>
+                </div>
+                <!-- CLOCK OUT -->
+                <div style="background:#F7F8FA;border-radius:14px;padding:18px;text-align:center;border:1.5px solid var(--brd);" id="att-clockout-col">
+                  <div style="font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--txt3);margin-bottom:14px;">CLOCK OUT</div>
+                  <div id="att-fp-out-wrap"
+                    style="width:72px;height:72px;border-radius:50%;background:#E2E8F0;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;cursor:pointer;transition:transform .15s;border:2px dashed #CBD5E0;"
+                    onclick="openAttFaceModal('out')"
+                    onmouseover="this.style.transform='scale(1.06)'"
+                    onmouseout="this.style.transform=''">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                  </div>
+                  <div id="att-out-time" style="font-size:13px;font-weight:800;color:var(--txt3);">--:--</div>
+                  <div id="att-out-date" style="font-size:10.5px;color:var(--txt3);margin-top:2px;">Not yet clocked out</div>
+                </div>
+              </div>
+
+              <!-- Location & Status row -->
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 0;border-top:0.5px solid var(--brd);border-bottom:0.5px solid var(--brd);margin-bottom:14px;">
+                <div>
+                  <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Location</div>
+                  <div id="att-rep-location" style="font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:5px;color:var(--txt);">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4A6FD4" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    Detecting...
+                  </div>
+                  <div id="att-rep-dist" style="font-size:10.5px;color:var(--txt3);margin-top:2px;"></div>
+                  <button id="att-enable-loc-btn" onclick="_attRetryLocation()" style="display:none;margin-top:6px;padding:4px 10px;border-radius:7px;background:#4A6FD4;color:#fff;border:none;font-size:10.5px;font-weight:600;cursor:pointer;font-family:inherit;">📍 Enable Location</button>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;">Status</div>
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="width:8px;height:8px;border-radius:50%;background:#E2E8F0;" id="att-status-dot"></div>
+                    <div id="att-rep-verified" style="font-size:12.5px;font-weight:600;color:var(--txt3);">Not verified</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Face verification banner -->
+              <div style="background:#EEF2FF;border-radius:10px;padding:11px 14px;font-size:12px;color:#4A6FD4;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div style="width:32px;height:32px;border-radius:8px;background:rgba(74,111,212,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4A6FD4" stroke-width="1.8"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  </div>
+                  <div>
+                    <div style="font-weight:700;font-size:12.5px;">Face verification required</div>
+                    <div style="font-size:10.5px;opacity:0.75;margin-top:1px;">Please verify your identity to clock in or out.</div>
+                  </div>
+                </div>
+                <button onclick="openAttFaceModal('in')" style="padding:7px 14px;border-radius:9px;background:#4A6FD4;color:#fff;border:none;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;white-space:nowrap;box-shadow:0 2px 8px rgba(74,111,212,0.35);">Verify Now →</button>
+              </div>
+            </div>
+
+            <!-- My Live Location map — Image 1 style -->
+            <div style="background:var(--bg);border:0.5px solid var(--brd);border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07);display:flex;flex-direction:column;">
+              <div style="padding:16px 18px 14px;border-bottom:0.5px solid var(--brd);display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div style="font-size:15px;font-weight:700;color:var(--txt);">My Live Location</div>
+                  <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Your current location on the map</div>
+                </div>
+                <button onclick="refreshRepAttMap()" style="display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:9px;background:var(--bg2);border:0.5px solid var(--brd2);cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;color:var(--txt2);transition:all 0.15s;" onmouseover="this.style.background='var(--royal-light)';this.style.color='var(--royal)'" onmouseout="this.style.background='var(--bg2)';this.style.color='var(--txt2)'">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                  Refresh
+                </button>
+              </div>
+              <div id="att-rep-map-wrap" style="flex:1;min-height:240px;"></div>
+              <div style="padding:11px 16px;border-top:0.5px solid var(--brd);display:flex;justify-content:space-between;align-items:center;background:#FAFBFC;">
+                <div style="display:flex;align-items:center;gap:7px;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4A6FD4" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <span id="att-rep-dist-badge" style="font-size:12px;font-weight:600;color:var(--txt2);">Detecting location...</span>
+                </div>
+                <span id="att-range-badge" style="font-size:10.5px;padding:4px 10px;border-radius:20px;background:#DCFCE7;color:#16A34A;font-weight:700;">📍 In Field</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- My attendance history — Image 1 style -->
+          <div style="background:var(--bg);border:0.5px solid var(--brd);border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07);">
+            <div style="padding:16px 18px 14px;border-bottom:0.5px solid var(--brd);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+              <div>
+                <div style="font-size:15px;font-weight:700;color:var(--txt);">My Attendance History</div>
+                <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Your recent clock in and out activity</div>
+              </div>
+              <button onclick="_loadRepHistory()" style="display:flex;align-items:center;gap:5px;padding:7px 13px;border-radius:9px;background:var(--bg2);border:0.5px solid var(--brd2);cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;color:var(--txt2);">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                View All History
+              </button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table style="width:100%;">
+                <thead>
+                  <tr style="background:#F8FAFF;">
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">DATE</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">CLOCK IN</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">CLOCK OUT</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">HOURS</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">STATUS</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">LOCATION</th>
+                  </tr>
+                </thead>
+                <tbody id="att-rep-history-tbody">
+                  <tr>
+                    <td colspan="6" style="text-align:center;padding:40px 20px;">
+                      <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+                        <div style="width:52px;height:52px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4A6FD4" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        </div>
+                        <div style="font-size:13px;font-weight:600;color:var(--txt);">No records yet</div>
+                        <div style="font-size:12px;color:var(--txt3);">Your attendance records will appear here once you start clocking in.</div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div><!-- end att-rep-view -->
+
+        <!-- ══ SHARED FACE MODAL ══ -->
+        <div id="att-face-overlay" style="display:none;position:fixed;inset:0;background:rgba(30,42,58,0.55);z-index:9000;align-items:center;justify-content:center;">
+          <div style="background:#fff;border-radius:16px;width:360px;max-width:92vw;overflow:hidden;box-shadow:0 20px 60px rgba(30,42,58,0.35);">
+            <div style="padding:14px 16px;border-bottom:0.5px solid var(--brd);display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:14px;font-weight:700;display:flex;align-items:center;gap:7px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--royal)" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                Face Verification
+              </span>
+              <button onclick="closeAttFaceModal()" style="width:30px;height:30px;border-radius:50%;background:var(--bg2);border:0.5px solid var(--brd2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--txt2);">×</button>
+            </div>
+            <div style="padding:16px;">
+              <div id="att-models-loading" style="text-align:center;padding:16px 0;">
+                <div style="font-size:13px;color:var(--txt3);margin-bottom:8px;">Loading face recognition models…</div>
+                <div style="height:6px;background:var(--brd);border-radius:3px;overflow:hidden;"><div id="att-models-bar" style="height:100%;background:var(--royal);width:0%;transition:width .3s;border-radius:3px;"></div></div>
+              </div>
+              <div id="att-camera-wrap" style="display:none;position:relative;aspect-ratio:1/1;border-radius:12px;overflow:hidden;background:#0f172a;">
+                <video id="att-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;transform:scaleX(-1);"></video>
+                <canvas id="att-canvas" style="display:none;"></canvas>
+                <div id="att-face-frame" style="position:absolute;inset:12%;border:3px dashed rgba(255,255,255,0.5);border-radius:50%;pointer-events:none;"></div>
+                <div id="att-photo-preview-wrap"></div>
+              </div>
+              <p id="att-modal-hint" style="text-align:center;font-size:12.5px;color:var(--txt3);margin:10px 0 4px;">Initialising…</p>
+              <div id="att-score-wrap" style="display:none;margin-bottom:8px;">
+                <div style="height:6px;background:var(--brd);border-radius:3px;overflow:hidden;"><div id="att-score-bar" style="height:100%;border-radius:3px;width:0%;transition:width .3s;"></div></div>
+                <div id="att-score-label" style="text-align:center;font-size:12.5px;font-weight:700;margin-top:4px;"></div>
+              </div>
+              <button id="att-capture-btn" style="display:none;width:100%;padding:11px;border-radius:10px;background:var(--royal);color:#fff;border:none;cursor:pointer;font-size:13.5px;font-weight:700;font-family:inherit;margin-top:4px;">
+                Take Photo
+              </button>
+              <div id="att-reg-banner" style="display:none;margin-top:10px;background:var(--gold-light);border:0.5px solid rgba(212,160,23,.3);border-radius:9px;padding:10px 12px;font-size:12px;color:var(--gold);display:flex;align-items:center;gap:8px;">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="7"/><path d="M8 5v3M8 11v.5"/></svg>
+                <span>No face registered. <button id="att-reg-btn" style="background:var(--gold-mid);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-left:4px;">Register Now</button></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end screen-attendance -->
 
       <!-- DASHBOARD -->
       <div class="screen" id="screen-dashboard">
@@ -1860,8 +2220,8 @@ const canManage  = () => ['admin','manager'].includes(currentUser?.role);
 
 
 const NAV = [
-  // ── ADMIN ONLY ──
-  {id:'dashboard', label:'Dashboard', sec:'Main', icon:'M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z'},
+    {id:'attendance', label:'Attendance', sec:'Main', icon:'M8 1a7 7 0 100 14A7 7 0 008 1zm0 3v4l3 2M3.5 13.5l9-9'},
+  {id:'dashboard', label:'Dashboard', sec:'Main', icon:'M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H9z'},
   {id:'clients',   label:'Clients',   sec:'Main', icon:'M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z'},
   {id:'orders',    label:'Place Listing', sec:'Main', icon:'M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zm1 3h6M5 7h6M5 10h3'},
 
@@ -1879,8 +2239,8 @@ function buildNav(containerId, withClose=false) {
   const el = document.getElementById(containerId); if (!el) return;
 
   // Role-specific nav items
-  const repOnlyIds  = ['dashboard','clients','orders','wallet','crm'];
-const managerIds  = ['dashboard','clients','orders','wallet','targets','reports','team','admin','crm'];
+  const repOnlyIds  = ['attendance','dashboard','clients','orders','wallet','crm'];
+const managerIds  = ['dashboard','clients','orders','wallet','targets','reports','team','admin','crm','attendance'];
   // Admin gets everything
 
   let html = '', lastSec = '';
@@ -1998,22 +2358,45 @@ async function saveNewPassword() {
 }
 
 async function bootApp() {
-  setLoading('Loading your data...');
-  document.getElementById('login-screen').classList.add('hidden');
-  document.getElementById('change-password-screen').classList.add('hidden');
-  buildNav('sidebar-nav'); buildNav('drawer-nav', true);
-  updateUserUI(); applyRoleUI();
-  await _ensureRepCache();
-  document.getElementById('app').classList.remove('hidden');
-  document.getElementById('order-ref').value = 'LST-'+Date.now().toString().slice(-6);
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('order-date').value = today;
-  // Set prepared by
-  const prepEl = document.getElementById('listing-prepared-by');
-  if (prepEl) prepEl.value = currentUser?.full_name || 'Unknown';
-  setLoading('Loading clients and products...');
-  await Promise.all([loadClients(), loadProducts()]);
-  goTo('dashboard'); hideLoading(); loadDashboard();
+  try {
+    setLoading('Loading your data...');
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('change-password-screen').classList.add('hidden');
+    buildNav('sidebar-nav'); buildNav('drawer-nav', true);
+    updateUserUI(); applyRoleUI();
+
+    if (!isSalesRep()) {
+      setLoading('Loading team data...');
+      await _ensureRepCache();
+    }
+
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('order-ref').value = 'LST-'+Date.now().toString().slice(-6);
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('order-date').value = today;
+    const prepEl = document.getElementById('listing-prepared-by');
+    if (prepEl) prepEl.value = currentUser?.full_name || 'Unknown';
+
+    setLoading('Loading clients and products...');
+    await Promise.race([
+      Promise.all([loadClients(), loadProducts()]),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Load timeout')), 20000))
+    ]).catch(err => {
+      console.warn('Data load issue:', err.message);
+    });
+
+    hideLoading();
+    goTo('dashboard');
+    loadDashboard();
+    _startLocationBroadcast();
+
+  } catch(e) {
+    console.error('bootApp error:', e);
+    hideLoading();
+    document.getElementById('app').classList.remove('hidden');
+    goTo('dashboard');
+    _startLocationBroadcast();
+  }
 }
 
 function applyRoleUI() {
@@ -2054,9 +2437,35 @@ function updateUserUI() {
   ['sb-av','d-av'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=initials;});
   ['sb-uname','d-uname'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=currentUser.full_name||'User';});
   ['sb-urole','d-urole'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=roleLabel;});
+  _startTopbarClock();
+}
+
+let _topbarClockInterval = null;
+function _startTopbarClock() {
+  if (_topbarClockInterval) clearInterval(_topbarClockInterval);
+  function _updateTopbar() {
+    const now = new Date();
+    const h = now.getHours();
+    const firstName = (currentUser?.full_name || '').split(' ')[0] || 'there';
+    const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+    const emoji = h < 12 ? '🌅' : h < 17 ? '👋' : '🌙';
+    const greetEl = document.getElementById('topbar-greeting-text');
+    if (greetEl) greetEl.textContent = `${greeting}, ${firstName} ${emoji}`;
+    const dateEl = document.getElementById('topbar-date-label');
+    if (dateEl) dateEl.textContent = now.toLocaleDateString('en-UG', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+    const timeEl = document.getElementById('topbar-time-label');
+    if (timeEl) timeEl.textContent = now.toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' });
+  }
+  _updateTopbar();
+  _topbarClockInterval = setInterval(_updateTopbar, 1000);
 }
 
 function signOut() {
+  // Stop location broadcast and remove from live_locations
+  _stopLocationBroadcast();
+  if (currentUser?.id) {
+    sb.from('live_locations').delete().eq('employee_id', currentUser.id).then(() => {});
+  }
   localStorage.removeItem('ktl_user');
   currentUser=null; allClients=[]; visibleClients=[]; allProducts=[];
   _skuCache={}; _clientBrandCache={};
@@ -2091,6 +2500,7 @@ function goTo(screen) {
     return;
   }
   if (screen==='reports' && isSalesRep()) { alert('You do not have permission to view reports.'); return; }
+// attendance now open to all roles — no restriction
   if (screen==='admin' && isSalesRep()) return;
 if (screen==='admin' && !canManage()) return;
   currentScreen = screen;
@@ -2105,6 +2515,7 @@ if (screen==='admin' && !canManage()) return;
   else if (screen==='clients') renderClients();
   else if (screen==='orders') initListingScreen();
   else if (screen==='targets') { loadTargets(); loadTargetDropdowns(); }
+  else if (screen==='attendance') loadAttendanceScreen();
   else if (screen==='reports') loadReports();
   else if (screen==='admin') loadAdmin();
   else if (screen==='team') loadTeamScreen();
@@ -5042,6 +5453,57 @@ function togglePw(inputId,btn){const inp=document.getElementById(inputId);const 
 function showForgotPassword(){const existing=document.getElementById('forgot-dialog');if(existing)existing.remove();const d=document.createElement('div');d.id='forgot-dialog';d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(3px);';d.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px 32px;max-width:380px;width:90%;box-shadow:0 12px 48px rgba(0,0,0,0.2);"><div style="font-size:30px;text-align:center;margin-bottom:8px;">🔑</div><div style="font-size:16px;font-weight:700;text-align:center;margin-bottom:4px;">Forgot Password?</div><div style="font-size:12px;color:var(--txt3);text-align:center;margin-bottom:18px;line-height:1.55;">Contact your admin to reset your password.</div><div style="background:var(--royal-light);border:0.5px solid var(--royal-border);border-radius:9px;padding:12px 14px;font-size:12px;color:var(--royal);margin-bottom:18px;line-height:1.55;">💡 Your admin will generate a new one-time password for you.</div><button onclick="document.getElementById('forgot-dialog').remove()" style="width:100%;padding:11px;border-radius:9px;background:var(--royal);color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:600;">Got it</button></div>`;document.body.appendChild(d);d.addEventListener('click',(e)=>{if(e.target===d)d.remove();});}
 async function sendResetOTP(userId,userName,userEmail){showConfirmDialog({icon:'📧',title:'Reset Password',message:`Generate a new OTP for <strong>${userName}</strong>?`,confirmLabel:'Generate & Send OTP',confirmStyle:'background:var(--royal);color:#fff;border:none;',onConfirm:async()=>{const chars='ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';const otp=Array.from({length:10},()=>chars[Math.floor(Math.random()*chars.length)]).join('');const{error}=await sb.from('users').update({password_hash:otp,must_change_password:true}).eq('id',userId);if(error){alert('Error saving OTP: '+error.message);return;}showResetOTPDialog(userName,userEmail,otp);loadAdmin();}});}
 function showResetOTPDialog(name,email,otp){const existing=document.getElementById('otp-dialog');if(existing)existing.remove();const d=document.createElement('div');d.id='otp-dialog';d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(3px);';const subject=encodeURIComponent('KTLSALES — Your New One-Time Password');const body=encodeURIComponent('Hello '+name+',\n\nYour KTLSALES password has been reset.\n\nYour one-time password is: '+otp+'\n\nPlease log in and change this password immediately.\n\nKingdom Trading Ltd');d.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px 32px;max-width:400px;width:90%;box-shadow:0 12px 48px rgba(0,0,0,0.2);"><div style="font-size:30px;text-align:center;margin-bottom:8px;">✅</div><div style="font-size:16px;font-weight:700;text-align:center;margin-bottom:4px;">Password Reset</div><div style="font-size:12px;color:var(--txt3);text-align:center;margin-bottom:18px;">New OTP for <strong>${name}</strong></div><div style="background:var(--gold-light);border:1.5px dashed var(--gold-mid);border-radius:9px;padding:13px 15px;margin-bottom:14px;"><div style="font-size:10.5px;font-weight:600;color:var(--gold);margin-bottom:6px;">ONE-TIME PASSWORD</div><div style="font-size:22px;font-weight:700;letter-spacing:0.12em;color:var(--royal);font-family:'SF Mono','Courier New',monospace;">${otp}</div></div><a href="mailto:${email}?subject=${subject}&body=${body}" style="display:block;width:100%;padding:10px;border-radius:9px;background:var(--royal);color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:600;margin-bottom:8px;text-align:center;text-decoration:none;box-sizing:border-box;">📧 Open Email to Send OTP</a><button onclick="navigator.clipboard.writeText('${otp}').then(()=>{this.textContent='✓ Copied!';this.style.background='#1D9E75';})" style="width:100%;padding:10px;border-radius:9px;background:var(--bg2);color:var(--txt);border:0.5px solid var(--brd2);cursor:pointer;font-size:13px;font-weight:500;margin-bottom:8px;">Copy OTP</button><button onclick="document.getElementById('otp-dialog').remove()" style="width:100%;padding:10px;border-radius:9px;background:transparent;border:0.5px solid var(--brd2);cursor:pointer;font-size:13px;color:var(--txt2);">Done</button></div>`;document.body.appendChild(d);d.addEventListener('click',(e)=>{if(e.target===d)d.remove();});}
+
+// ── BACKGROUND LOCATION BROADCASTER ──────────────────────────────────────────
+// Pushes every rep's live location to Supabase every 60 seconds,
+// regardless of which screen they are on. Starts after bootApp completes.
+let _locBroadcastInterval = null;
+
+async function _startLocationBroadcast() {
+  // Only run for sales reps (and managers/admins who are also field staff)
+  // Stop any existing interval first
+  if (_locBroadcastInterval) clearInterval(_locBroadcastInterval);
+
+  // Push immediately once
+  await _pushLiveLocation();
+
+  // Then push every 60 seconds
+  _locBroadcastInterval = setInterval(async () => {
+    await _pushLiveLocation();
+  }, 60000);
+}
+
+async function _pushLiveLocation() {
+  if (!currentUser?.id) return;
+  // Skip if page is hidden (tab is in background) to save battery,
+  // but still push when visible on ANY tab
+  try {
+    const loc = await Promise.race([
+      _attGetLocation(),
+      new Promise(resolve => setTimeout(() => resolve(null), 8000))
+    ]);
+    if (!loc) return;
+    _attCurrentLocation = loc;
+    await sb.from('live_locations').upsert({
+      employee_id:   currentUser.id,
+      employee_name: currentUser.full_name || 'Unknown',
+      lat:           loc[0],
+      lng:           loc[1],
+      updated_at:    new Date().toISOString(),
+    }, { onConflict: 'employee_id' });
+  } catch(e) {
+    console.warn('Location broadcast failed:', e.message);
+  }
+}
+
+function _stopLocationBroadcast() {
+  if (_locBroadcastInterval) {
+    clearInterval(_locBroadcastInterval);
+    _locBroadcastInterval = null;
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 window.addEventListener('resize',()=>{if(visibleClients.length>0){const isMob=window.innerWidth<=768;document.getElementById('sync-status').textContent=isMob?`${visibleClients.length} clients`:`${visibleClients.length} clients · ${allProducts.length} products`;}});
 
 // ─── SALES TEAM SCREEN ────────────────────────────────────────────────────────
@@ -5578,25 +6040,714 @@ async function _loadAdminPayoutRequests() {
     </div>`;
   };
 
-  requestsEl.innerHTML = requests.map(r => renderRow(r)).join('');
+  requestsEl.innerHTML = requests.map(r => _buildPayoutRequestRow(r)).join('');
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// KTL WALLET — PAYMENT RECEIPT & INVOICE SYSTEM
+// Drop this entire block into your HTML, replacing the existing
+// approvePayoutRequest() function and adding the new helpers.
+// ═══════════════════════════════════════════════════════════════════
+
+// ─── 1. REPLACE approvePayoutRequest() ────────────────────────────
 async function approvePayoutRequest(requestId, repName, ugxAmount, ptsUsed) {
   showConfirmDialog({
     icon: '💰', title: 'Approve & Pay',
-    message: `Approve payout of <strong>UGX ${Number(ugxAmount).toLocaleString()}</strong> (${ptsUsed} pts) for <strong>${repName}</strong>?<br><br>Please complete the mobile money transfer manually after confirming.`,
-    confirmLabel: 'Approve & Mark Paid',
+    message: `Approve payout of <strong>UGX ${Number(ugxAmount).toLocaleString()}</strong> (${ptsUsed} pts) for <strong>${repName}</strong>?<br><br>Please complete the mobile money transfer <strong>before</strong> confirming.`,
+    confirmLabel: 'Approve & Generate Receipt',
     confirmStyle: 'background:#1D9E75;color:#fff;border:none;',
     onConfirm: async () => {
+      // Load full request details first
+      let request = null;
+      try {
+        const { data } = await sb
+          .from('payout_requests')
+          .select('*')
+          .eq('id', requestId)
+          .single();
+        request = data;
+      } catch(e) {}
+
+      // Mark as paid
       const { error } = await sb.from('payout_requests')
-        .update({ status: 'paid', approved_by: currentUser?.id, approved_at: new Date().toISOString() })
+        .update({
+          status:      'paid',
+          approved_by: currentUser?.id,
+          approved_at: new Date().toISOString(),
+        })
         .eq('id', requestId);
+
       if (error) { alert('Error: ' + error.message); return; }
-      alert(`✅ Marked as paid for ${repName}. Please complete the mobile money transfer to their number.`);
+
+      // Build receipt data
+      const receiptData = {
+        receipt_no:    generateReceiptNumber(),
+        request_id:    requestId,
+        rep_name:      repName,
+        mobile_number: request?.mobile_number || '—',
+        points_used:   ptsUsed,
+        amount_ugx:    ugxAmount,
+        balance_after: request?.balance_after ?? 0,
+        requested_at:  request?.requested_at || new Date().toISOString(),
+        approved_at:   new Date().toISOString(),
+        approved_by:   currentUser?.full_name || 'Admin',
+        approved_by_role: currentUser?.role?.replace('_',' ') || 'Admin',
+      };
+
       await loadAdminWallet();
+      openPaymentReceiptModal(receiptData);
     }
   });
 }
+
+// ─── 2. RECEIPT NUMBER GENERATOR ──────────────────────────────────
+function generateReceiptNumber() {
+  const now   = new Date();
+  const year  = now.getFullYear().toString().slice(-2);
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const rand  = Math.floor(1000 + Math.random() * 9000);
+  return `KTL-W${year}${month}-${rand}`;
+}
+
+// ─── 3. VIEW RECEIPT BUTTON (add to paid rows in _loadAdminPayoutRequests) ────
+// Replace the renderRow() function inside _loadAdminPayoutRequests with this:
+function _buildPayoutRequestRow(r) {
+  const date     = r.requested_at
+    ? new Date(r.requested_at).toLocaleDateString('en-UG', { day:'2-digit', month:'short', year:'numeric' })
+    : '—';
+  const isPending = r.status === 'pending';
+  const isPaid    = r.status === 'paid' || r.status === 'approved';
+  const initials  = (r.rep_name || 'R').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+
+  const statusBadge = {
+    pending:  '<span class="badge ba">Pending</span>',
+    approved: '<span class="badge bg">Approved</span>',
+    paid:     '<span class="badge bg">Paid ✓</span>',
+    rejected: '<span class="badge br">Rejected</span>',
+  };
+
+  return `<div style="padding:12px 14px;border-bottom:0.5px solid var(--brd);display:flex;align-items:flex-start;gap:12px;">
+    <div style="width:36px;height:36px;border-radius:50%;background:var(--royal-light);color:var(--royal);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">${initials}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-size:13px;font-weight:600;">${r.rep_name || '—'}</span>
+        ${statusBadge[r.status] || ''}
+      </div>
+      <div style="font-size:11.5px;color:var(--txt2);margin-top:3px;">
+        <strong style="color:#1D9E75;">UGX ${Number(r.amount_ugx || 0).toLocaleString()}</strong>
+        &nbsp;·&nbsp; ${r.points_used || 0} pts redeemed
+        ${r.balance_after != null ? `&nbsp;·&nbsp; <span style="color:var(--royal);">${r.balance_after} pts remaining</span>` : ''}
+      </div>
+      <div style="font-size:11px;color:var(--txt3);margin-top:2px;">
+        📞 ${r.mobile_number || '—'} &nbsp;·&nbsp; ${date}
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;">
+      ${isPending ? `
+        <button class="btn btn-sm btn-green" style="font-size:11px;padding:4px 10px;white-space:nowrap;"
+          onclick="approvePayoutRequest('${r.id}','${(r.rep_name||'').replace(/'/g,"\\'")}',${r.amount_ugx||0},${r.points_used||0})">
+          ✓ Approve &amp; Pay
+        </button>
+        <button class="btn btn-sm btn-danger" style="font-size:11px;padding:4px 10px;white-space:nowrap;"
+          onclick="rejectPayoutRequest('${r.id}')">
+          ✕ Reject
+        </button>
+      ` : isPaid ? `
+        <button class="btn btn-sm" style="font-size:11px;padding:4px 10px;white-space:nowrap;border-color:var(--royal);color:var(--royal);"
+          onclick="viewPayoutReceipt('${r.id}')">
+          🧾 Receipt
+        </button>
+      ` : `<div style="font-size:10.5px;color:var(--txt3);">${r.status}</div>`}
+    </div>
+  </div>`;
+}
+
+// ─── 4. VIEW EXISTING RECEIPT ──────────────────────────────────────
+async function viewPayoutReceipt(requestId) {
+  let r = null;
+  try {
+    const { data } = await sb.from('payout_requests').select('*').eq('id', requestId).single();
+    r = data;
+  } catch(e) {}
+  if (!r) { alert('Could not load receipt data.'); return; }
+
+  const approvedByName = r.approved_by ? (_repNameCache[r.approved_by] || r.approved_by) : 'Admin';
+
+  openPaymentReceiptModal({
+    receipt_no:       r.receipt_no || generateReceiptNumber(),
+    request_id:       requestId,
+    rep_name:         r.rep_name,
+    mobile_number:    r.mobile_number || '—',
+    points_used:      r.points_used,
+    amount_ugx:       r.amount_ugx,
+    balance_after:    r.balance_after ?? 0,
+    requested_at:     r.requested_at || r.created_at,
+    approved_at:      r.approved_at || r.updated_at,
+    approved_by:      approvedByName,
+    approved_by_role: 'Admin / Manager',
+  });
+}
+
+// ─── 5. MAIN RECEIPT MODAL ────────────────────────────────────────
+function openPaymentReceiptModal(data) {
+  const existing = document.getElementById('ktl-receipt-modal');
+  if (existing) existing.remove();
+
+  const requestedDate = data.requested_at
+    ? new Date(data.requested_at).toLocaleDateString('en-UG', { day:'2-digit', month:'long', year:'numeric' })
+    : '—';
+  const approvedDate = data.approved_at
+    ? new Date(data.approved_at).toLocaleDateString('en-UG', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })
+    : '—';
+  const ugxFormatted = `UGX ${Number(data.amount_ugx).toLocaleString()}`;
+  const initials = (data.rep_name || 'R').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+
+  const overlay = document.createElement('div');
+  overlay.id = 'ktl-receipt-modal';
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(10,20,50,0.75);
+    display:flex;align-items:center;justify-content:center;
+    z-index:99999;backdrop-filter:blur(6px);padding:16px;
+  `;
+
+  overlay.innerHTML = `
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;600&display=swap');
+
+      #ktl-receipt-wrap {
+        background:#fff;
+        border-radius:20px;
+        width:100%;
+        max-width:520px;
+        max-height:92vh;
+        overflow-y:auto;
+        box-shadow:0 32px 80px rgba(10,20,50,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+        font-family:'DM Sans', sans-serif;
+      }
+
+      /* ── Top action bar (non-printable) ── */
+      #ktl-receipt-actions {
+        display:flex;align-items:center;justify-content:space-between;
+        padding:14px 20px;background:#f8f9fb;
+        border-radius:20px 20px 0 0;border-bottom:1px solid #e8eaf0;
+      }
+      #ktl-receipt-actions .ra-title {font-size:13px;font-weight:600;color:#1a3a6b;}
+      #ktl-receipt-actions .ra-btns {display:flex;gap:8px;}
+      .ra-btn {
+        display:inline-flex;align-items:center;gap:6px;
+        padding:8px 14px;border-radius:9px;font-size:12.5px;
+        font-weight:600;cursor:pointer;border:none;font-family:inherit;
+        transition:all 0.15s;
+      }
+      .ra-btn-print  {background:#1a3a6b;color:#fff;}
+      .ra-btn-print:hover {background:#0f2550;}
+      .ra-btn-close  {background:#fff;color:#6b6b67;border:1px solid #dde1ea;}
+      .ra-btn-close:hover {background:#f0f2f7;}
+
+      /* ── Receipt document ── */
+      #ktl-receipt-doc {
+        padding:36px 40px 44px 40px;
+        box-sizing:border-box;
+        width:100%;
+        overflow:hidden;
+      }
+
+      /* Header strip */
+      .rec-header {
+        display:flex;justify-content:space-between;align-items:flex-start;
+        margin-bottom:28px;padding-bottom:20px;
+        border-bottom:2px solid #f0f2f7;
+      }
+      .rec-brand-mark {
+        width:44px;height:44px;border-radius:11px;background:#1a3a6b;
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:0 4px 14px rgba(26,58,107,0.3);
+      }
+      .rec-brand-mark span {color:#fff;font-size:12px;font-weight:700;letter-spacing:0.05em;}
+      .rec-brand-info {margin-top:5px;}
+      .rec-brand-name {font-family:'DM Serif Display',serif;font-size:17px;color:#1a3a6b;line-height:1.1;}
+      .rec-brand-sub  {font-size:10px;color:#9b9b96;letter-spacing:0.1em;text-transform:uppercase;margin-top:1px;}
+
+      .rec-doc-meta {text-align:right;}
+      .rec-doc-type {
+        font-family:'DM Serif Display',serif;font-style:italic;
+        font-size:22px;color:#1a3a6b;margin-bottom:4px;
+      }
+      .rec-doc-no {
+        font-family:'IBM Plex Mono',monospace;font-size:11px;
+        color:#b8860b;font-weight:600;letter-spacing:0.08em;
+        background:#fdf3d0;padding:3px 10px;border-radius:20px;
+        display:inline-block;
+      }
+
+      /* Gold divider accent */
+      .rec-accent {
+        height:3px;background:linear-gradient(90deg,#1a3a6b,#2451a0,#b8860b,#d4a017);
+        border-radius:3px;margin-bottom:24px;opacity:0.85;
+      }
+
+      /* Recipient section */
+      .rec-recipient {
+        background:linear-gradient(135deg,#f0f4fc,#e8eef8);
+        border-radius:14px;padding:18px 20px;margin-bottom:22px;
+        border:1px solid #b8c8e8;display:flex;align-items:center;gap:16px;
+      }
+      .rec-rep-av {
+        width:52px;height:52px;border-radius:50%;
+        background:linear-gradient(135deg,#1a3a6b,#2451a0);
+        color:#fff;display:flex;align-items:center;justify-content:center;
+        font-size:17px;font-weight:700;flex-shrink:0;
+        box-shadow:0 3px 12px rgba(26,58,107,0.3);
+      }
+      .rec-rep-name {font-size:16px;font-weight:700;color:#1a1a18;margin-bottom:2px;}
+      .rec-rep-sub  {font-size:11.5px;color:#6b6b67;}
+      .rec-rep-phone {
+        margin-left:auto;text-align:right;
+        font-family:'IBM Plex Mono',monospace;font-size:12px;
+        color:#1a3a6b;font-weight:600;
+      }
+      .rec-rep-phone-lbl {font-size:10px;color:#9b9b96;font-family:'DM Sans',sans-serif;margin-bottom:2px;}
+
+      /* Line items */
+      .rec-items {margin-bottom:20px;}
+      .rec-item-row {
+        display:flex;justify-content:space-between;align-items:flex-start;
+        padding:11px 0;border-bottom:1px dashed #e8eaf0;font-size:12.5px;gap:12px;
+      }
+      .rec-item-row:last-child {border-bottom:none;}
+      .rec-item-label {color:#6b6b67;}
+      .rec-item-value {font-weight:600;color:#1a1a18;font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:right;max-width:55%;word-break:break-word;}
+      .rec-item-value.gold  {color:#b8860b;}
+      .rec-item-value.royal {color:#1a3a6b;}
+      .rec-item-value.green {color:#1D9E75;}
+
+      /* Total box */
+      .rec-total {
+        background:linear-gradient(135deg,#1a3a6b 0%,#2451a0 100%);
+        border-radius:14px;padding:20px 22px;margin-bottom:20px;
+        display:flex;justify-content:space-between;align-items:center;
+        box-shadow:0 6px 24px rgba(26,58,107,0.25);
+      }
+      .rec-total-label {font-size:11px;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;}
+      .rec-total-amount {
+        font-family:'DM Serif Display',serif;font-size:28px;
+        color:#fff;letter-spacing:-0.02em;line-height:1;
+      }
+      .rec-total-right {text-align:right;}
+      .rec-total-pts {font-size:12px;color:rgba(255,255,255,0.65);}
+      .rec-total-pts strong {color:rgba(255,255,255,0.9);}
+      .rec-paid-stamp {
+        background:#25D366;border-radius:8px;padding:6px 14px;
+        font-size:11px;font-weight:700;color:#fff;letter-spacing:0.08em;
+        text-transform:uppercase;margin-top:8px;display:inline-block;
+      }
+
+      /* Approval section */
+      .rec-approval {
+        background:#f8f9fb;border-radius:12px;padding:14px 18px;
+        margin-bottom:20px;border:1px solid #e8eaf0;
+      }
+      .rec-approval-hdr {font-size:10px;font-weight:700;color:#9b9b96;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px;}
+      .rec-approval-row {display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;}
+      .rec-approval-lbl {color:#6b6b67;}
+      .rec-approval-val {font-weight:600;color:#1a1a18;}
+      .rec-sig-line {
+        border-top:1.5px solid #1a3a6b;margin-top:8px;padding-top:6px;
+        display:flex;justify-content:space-between;font-size:10px;color:#6b6b67;
+      }
+
+      /* Footer */
+      .rec-footer {
+        text-align:center;padding-top:16px;border-top:1px solid #f0f2f7;
+        font-size:10.5px;color:#9b9b96;line-height:1.7;
+      }
+      .rec-footer strong {color:#1a3a6b;}
+      .rec-watermark {
+        font-family:'DM Serif Display',serif;font-style:italic;
+        font-size:11px;color:#b8c8e8;margin-top:6px;
+        letter-spacing:0.05em;
+      }
+
+      /* ── PRINT STYLES ── */
+      @media print {
+        body * { visibility: hidden !important; }
+        #ktl-receipt-doc, #ktl-receipt-doc * { visibility: visible !important; }
+        #ktl-receipt-modal { display:block !important; padding:0 !important; background:none !important; }
+        #ktl-receipt-wrap  { box-shadow:none !important; max-height:none !important; border-radius:0 !important; }
+        #ktl-receipt-actions { display:none !important; }
+        #ktl-receipt-doc { padding:20px 28px 28px !important; }
+        @page { size:A5 portrait; margin:8mm; }
+        .rec-total { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+        .rec-accent { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+        .rec-brand-mark { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+        .rec-rep-av { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+        .rec-recipient { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      }
+    </style>
+
+    <div id="ktl-receipt-wrap">
+
+   <!-- Action bar (hidden on print) -->
+      <div id="ktl-receipt-actions">
+        <div class="ra-title">🧾 Payment Receipt — ${data.receipt_no}</div>
+        <div class="ra-btns" style="flex-wrap:wrap;gap:6px;">
+          <button class="ra-btn" style="background:#d4a017;color:#fff;border:none;"
+            onclick="downloadReceiptPDF(${JSON.stringify(data).replace(/"/g,'&quot;')})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download PDF
+          </button>
+          <button class="ra-btn ra-btn-print" onclick="ktlPrintReceipt()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print
+          </button>
+          <button class="ra-btn ra-btn-close" onclick="document.getElementById('ktl-receipt-modal').remove()">✕ Close</button>
+        </div>
+      </div>
+
+      <!-- Receipt Document -->
+      <div id="ktl-receipt-doc">
+
+        <!-- Header -->
+        <div class="rec-header">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="rec-brand-mark"><span>KTL</span></div>
+            <div class="rec-brand-info">
+              <div class="rec-brand-name">Kingdom Trading Ltd</div>
+              <div class="rec-brand-sub">Sales Rewards · Wallet System</div>
+            </div>
+          </div>
+          <div class="rec-doc-meta">
+            <div class="rec-doc-type">Payment Receipt</div>
+            <div class="rec-doc-no">${data.receipt_no}</div>
+          </div>
+        </div>
+
+        <!-- Gold accent bar -->
+        <div class="rec-accent"></div>
+
+        <!-- Recipient -->
+        <div class="rec-recipient">
+          <div class="rec-rep-av">${initials}</div>
+          <div>
+            <div class="rec-rep-name">${data.rep_name}</div>
+            <div class="rec-rep-sub">Sales Representative</div>
+            <div style="margin-top:5px;font-size:10.5px;color:#1a3a6b;font-weight:600;">
+              📞 ${data.mobile_number}
+            </div>
+          </div>
+          <div class="rec-rep-phone">
+            <div class="rec-rep-phone-lbl">Mobile Money</div>
+            ${data.mobile_number}
+          </div>
+        </div>
+
+        <!-- Line items -->
+        <div class="rec-items">
+          <div class="rec-item-row">
+            <span class="rec-item-label">Payment purpose</span>
+            <span class="rec-item-value royal">Sales Reward Redemption</span>
+          </div>
+          <div class="rec-item-row">
+            <span class="rec-item-label">Points redeemed</span>
+            <span class="rec-item-value gold">${Number(data.points_used).toLocaleString()} pts @ UGX 1,000 / pt</span>
+          </div>
+          <div class="rec-item-row">
+            <span class="rec-item-label">Date requested</span>
+            <span class="rec-item-value">${requestedDate}</span>
+          </div>
+          <div class="rec-item-row">
+            <span class="rec-item-label">Date approved &amp; paid</span>
+            <span class="rec-item-value">${approvedDate}</span>
+          </div>
+          <div class="rec-item-row">
+            <span class="rec-item-label">Payment method</span>
+            <span class="rec-item-value">Mobile Money (MTN / Airtel)</span>
+          </div>
+          <div class="rec-item-row">
+            <span class="rec-item-label">Remaining balance after payout</span>
+            <span class="rec-item-value royal">${Number(data.balance_after).toLocaleString()} pts remaining</span>
+          </div>
+        </div>
+
+        <!-- Total -->
+        <div class="rec-total">
+          <div>
+            <div class="rec-total-label">Amount Paid</div>
+            <div class="rec-total-amount">${ugxFormatted}</div>
+          </div>
+          <div class="rec-total-right">
+            <div class="rec-total-pts">
+              <strong>${Number(data.points_used).toLocaleString()} pts</strong> redeemed
+            </div>
+            <div class="rec-paid-stamp">✓ PAID</div>
+          </div>
+        </div>
+
+        <!-- Approval details -->
+        <div class="rec-approval">
+          <div class="rec-approval-hdr">Authorisation &amp; Approval Record</div>
+          <div class="rec-approval-row">
+            <span class="rec-approval-lbl">Approved by</span>
+            <span class="rec-approval-val">${data.approved_by}</span>
+          </div>
+          <div class="rec-approval-row">
+            <span class="rec-approval-lbl">Role</span>
+            <span class="rec-approval-val">${data.approved_by_role}</span>
+          </div>
+          <div class="rec-approval-row">
+            <span class="rec-approval-lbl">Approval timestamp</span>
+            <span class="rec-approval-val" style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${approvedDate}</span>
+          </div>
+          <div class="rec-approval-row">
+            <span class="rec-approval-lbl">Reference no.</span>
+            <span class="rec-approval-val" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#b8860b;">${data.receipt_no}</span>
+          </div>
+          <div class="rec-sig-line">
+            <span>Authorised Signature: ________________________</span>
+            <span>Date: ___________</span>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="rec-footer">
+          <strong>Kingdom Trading Ltd</strong> — Sales Rewards Programme<br>
+          This receipt serves as official proof of payment for the above named individual.<br>
+          For queries contact the KTL Accounts Team: <strong>0763 371 564</strong>
+          <div class="rec-watermark">KingdomField · KTLSALES · ${new Date().getFullYear()}</div>
+        </div>
+
+      </div><!-- end receipt doc -->
+    </div><!-- end receipt wrap -->
+  `;
+
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+
+// ─── 6. PRINT HANDLER ─────────────────────────────────────────────
+// ─── 6. PRINT HANDLER ─────────────────────────────────────────────
+function ktlPrintReceipt() {
+  window.print();
+}
+
+async function generateReceiptPDF(data) {
+  if (!window.jspdf) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+  const W = doc.internal.pageSize.getWidth();
+  const margin = 14;
+  const contentW = W - margin * 2;
+  let y = 0;
+  const rgb = (r,g,b) => doc.setTextColor(r,g,b);
+  const fillRgb = (r,g,b) => doc.setFillColor(r,g,b);
+  const drawRgb = (r,g,b) => doc.setDrawColor(r,g,b);
+  const bold = (size) => { doc.setFont('helvetica','bold'); doc.setFontSize(size); };
+  const normal = (size) => { doc.setFont('helvetica','normal'); doc.setFontSize(size); };
+  const right = (text, yPos) => doc.text(String(text), W - margin, yPos, { align: 'right' });
+  const left  = (text, yPos) => doc.text(String(text), margin, yPos);
+  const center = (text, yPos) => doc.text(String(text), W / 2, yPos, { align: 'center' });
+
+  // HEADER BAND
+  fillRgb(26,58,107);
+  doc.rect(0, 0, W, 32, 'F');
+  fillRgb(212,160,23);
+  doc.roundedRect(margin, 7, 16, 16, 2, 2, 'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(255,255,255);
+  doc.text('KTL', margin + 8, 16.5, { align: 'center' });
+  doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+  doc.text('Kingdom Trading Ltd', margin + 20, 13);
+  doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(180,200,232);
+  doc.text('Sales Rewards · Wallet System', margin + 20, 18);
+  doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+  right('PAYMENT RECEIPT', 13);
+  doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(212,160,23);
+  right(data.receipt_no || generateReceiptNumber(), 19);
+  y = 38;
+
+  // GOLD ACCENT LINE
+  fillRgb(212,160,23);
+  doc.rect(margin, y, contentW, 1.2, 'F');
+  y += 6;
+
+  // PAID STAMP
+  doc.setFontSize(9); doc.setFont('helvetica','bold');
+  fillRgb(29,158,117);
+  doc.roundedRect(W - margin - 22, y - 3, 22, 7, 1, 1, 'F');
+  doc.setTextColor(255,255,255);
+  doc.text('✓  PAID', W - margin - 11, y + 1.5, { align: 'center' });
+  y += 7;
+
+  // RECIPIENT BOX
+  fillRgb(232,238,248); drawRgb(184,200,232); doc.setLineWidth(0.3);
+  doc.roundedRect(margin, y, contentW, 22, 2, 2, 'FD');
+  fillRgb(26,58,107);
+  doc.circle(margin + 9, y + 11, 7, 'F');
+  const initials = (data.rep_name || 'R').split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+  doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+  doc.text(initials, margin + 9, y + 12.5, { align: 'center' });
+  doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(26,58,107);
+  doc.text(data.rep_name || '—', margin + 20, y + 8);
+  doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(107,107,103);
+  doc.text('Sales Representative', margin + 20, y + 13);
+  doc.setFontSize(8); doc.setTextColor(26,58,107);
+  doc.text('Tel: ' + (data.mobile_number || '—'), margin + 20, y + 18);
+  doc.setFontSize(7); doc.setTextColor(107,107,103);
+  right('Mobile Money', y + 8);
+  doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(26,58,107);
+  right(data.mobile_number || '—', y + 14);
+  y += 28;
+
+  // LINE ITEMS
+  const requestedDate = data.requested_at
+    ? new Date(data.requested_at).toLocaleDateString('en-UG', {day:'2-digit',month:'long',year:'numeric'})
+    : '—';
+  const approvedDate = data.approved_at
+    ? new Date(data.approved_at).toLocaleDateString('en-UG', {day:'2-digit',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})
+    : '—';
+
+  const lineItems = [
+    { label: 'Payment purpose',      value: 'Sales Reward Redemption' },
+    { label: 'Points redeemed',      value: `${Number(data.points_used).toLocaleString()} pts @ UGX 1,000/pt` },
+    { label: 'Date requested',       value: requestedDate },
+    { label: 'Date approved & paid', value: approvedDate },
+    { label: 'Payment method',       value: 'Mobile Money (MTN / Airtel)' },
+    { label: 'Balance after payout', value: `${Number(data.balance_after||0).toLocaleString()} pts` },
+  ];
+
+  lineItems.forEach((item, i) => {
+    if (i % 2 === 0) { fillRgb(248,249,251); doc.rect(margin, y - 1, contentW, 7.5, 'F'); }
+    normal(8); doc.setTextColor(107,107,103); left(item.label, y + 4);
+    bold(7.5); doc.setTextColor(26,26,24);
+    // Wrap long values if needed
+    const maxValWidth = contentW * 0.55;
+    const valLines = doc.splitTextToSize(String(item.value), maxValWidth);
+    doc.text(valLines, W - margin, y + 4, { align: 'right' });
+    y += 7.5;
+    drawRgb(220,220,215); doc.setLineWidth(0.2); doc.line(margin, y, W - margin, y);
+  });
+  y += 6;
+
+  // TOTAL BOX
+  fillRgb(26,58,107);
+  doc.roundedRect(margin, y, contentW, 20, 2, 2, 'F');
+  doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(180,200,232);
+  left('AMOUNT PAID', y + 6);
+  doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+  left(`UGX ${Number(data.amount_ugx).toLocaleString()}`, y + 16);
+  doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(180,200,232);
+  right('Points redeemed', y + 7);
+  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+  right(`${Number(data.points_used).toLocaleString()} pts`, y + 14);
+  fillRgb(37,211,102);
+  doc.roundedRect(W - margin - 18, y + 14, 18, 5.5, 1, 1, 'F');
+  doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+  doc.text('✓ PAID', W - margin - 9, y + 18, { align: 'center' });
+  y += 26;
+
+  // APPROVAL SECTION
+  fillRgb(248,249,251); drawRgb(220,220,215); doc.setLineWidth(0.3);
+  doc.roundedRect(margin, y, contentW, 32, 2, 2, 'FD');
+  doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(155,155,150);
+  left('AUTHORISATION & APPROVAL RECORD', y + 5);
+  const approvalRows = [
+    { label: 'Approved by',        value: data.approved_by || '—' },
+    { label: 'Role',               value: data.approved_by_role || 'Admin / Manager' },
+    { label: 'Approval timestamp', value: approvedDate },
+    { label: 'Reference no.',      value: data.receipt_no || '—' },
+  ];
+  let ay = y + 9;
+  approvalRows.forEach(row => {
+    normal(7.5); doc.setTextColor(107,107,103); left(row.label, ay);
+    bold(7); doc.setTextColor(26,26,24);
+    const approvalValLines = doc.splitTextToSize(String(row.value), contentW * 0.5);
+    doc.text(approvalValLines, W - margin, ay, { align: 'right' });
+    ay += 5.5;
+  });
+  drawRgb(26,58,107); doc.setLineWidth(0.5);
+  doc.line(margin, y + 29, margin + 55, y + 29);
+  doc.line(W - margin - 40, y + 29, W - margin, y + 29);
+  normal(6.5); doc.setTextColor(155,155,150);
+  left('Authorised Signature', y + 32.5);
+  right('Date', y + 32.5);
+  y += 40;
+
+  // FOOTER
+  drawRgb(220,220,215); doc.setLineWidth(0.3); doc.line(margin, y, W - margin, y);
+  y += 5;
+  normal(7); doc.setTextColor(107,107,103);
+  center('Kingdom Trading Ltd — Sales Rewards Programme', y); y += 4.5;
+  center('Official proof of payment for the above named individual.', y); y += 4.5;
+  bold(7); doc.setTextColor(26,58,107);
+  center('Queries: KTL Accounts Team · 0763 371 564', y); y += 5;
+  normal(6.5); doc.setTextColor(184,200,232);
+  center(`KingdomField · KTLSALES · ${new Date().getFullYear()}`, y);
+
+  return doc.output('blob');
+}
+
+async function shareReceiptViaWhatsApp(data) {
+  const btn = event?.target?.closest('button');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating PDF...'; }
+  try {
+    const pdfBlob = await generateReceiptPDF(data);
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Receipt_${data.receipt_no}_${(data.rep_name||'').replace(/\s/g,'_')}.pdf`;
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      const text =
+        `🧾 *PAYMENT RECEIPT — ${data.receipt_no}*\n\n` +
+        `👤 *Recipient:* ${data.rep_name}\n` +
+        `📞 *Mobile Money:* ${data.mobile_number}\n` +
+        `💰 *Amount Paid:* UGX ${Number(data.amount_ugx).toLocaleString()}\n` +
+        `🏆 *Points Redeemed:* ${Number(data.points_used).toLocaleString()} pts\n` +
+        `📊 *Balance After:* ${Number(data.balance_after||0).toLocaleString()} pts\n` +
+        `✅ *Status:* PAID\n\n` +
+        `_PDF receipt downloaded to your device. Attach it to this chat.\nKingdom Trading Ltd — 0763 371 564_`;
+      window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+    }, 1000);
+  } catch(e) {
+    alert('Could not generate PDF: ' + e.message + '\n\nTry the Print / PDF button instead.');
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '📤 WhatsApp + PDF'; }
+}
+
+async function downloadReceiptPDF(data) {
+  const btn = event?.target?.closest('button');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
+  try {
+    const pdfBlob = await generateReceiptPDF(data);
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Receipt_${data.receipt_no}_${(data.rep_name||'').replace(/\s/g,'_')}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert('PDF generation failed. Use Print / PDF instead.');
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '↓ Download PDF'; }
+}
+
+// ─── 7. UPDATE _loadAdminPayoutRequests TO USE NEW ROW BUILDER ────
+// Replace the existing renderRow call with _buildPayoutRequestRow
+// In your _loadAdminPayoutRequests function, change:
+//   requestsEl.innerHTML = requests.map(r => renderRow(r)).join('');
+// to:
+//   requestsEl.innerHTML = requests.map(r => _buildPayoutRequestRow(r)).join('');
+
 
 async function rejectPayoutRequest(requestId) {
   showConfirmDialog({
@@ -5862,15 +7013,17 @@ async function loadRepWallet() {
 
 _walletPoints = totalConfirmedItems;
 
-  // Load pending/approved payout requests to deduct from display balance
+  // Load ALL paid/approved/pending payout requests to deduct from balance
   let redeemedSoFar = 0;
   try {
     const { data: prData } = await sb
       .from('payout_requests')
-      .select('points_used')
-      .eq('rep_id', currentUser.id)
-      .in('status', ['approved', 'paid', 'pending']);
-    redeemedSoFar = (prData || []).reduce((s, r) => s + Number(r.points_used || 0), 0);
+      .select('points_used, status')
+      .eq('rep_id', currentUser.id);
+    // Deduct everything except rejected requests
+    redeemedSoFar = (prData || [])
+      .filter(r => r.status !== 'rejected')
+      .reduce((s, r) => s + Number(r.points_used || 0), 0);
   } catch(e) { console.warn('Could not load redeemed points:', e.message); }
 
   _walletRedeemedPoints = redeemedSoFar;
@@ -5895,11 +7048,13 @@ function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, order
   document.getElementById('wallet-progress-sub').textContent = needed > 0
     ? `${needed} more confirmed purchases needed to redeem`
     : '🎉 You are eligible to redeem!';
-  document.getElementById('wallet-stat-items').textContent   = _walletPoints; // show gross confirmed items
   document.getElementById('wallet-stat-redemptions').textContent = _walletRedeemedPoints > 0 ? '1+' : '0';
-  document.getElementById('wallet-stat-redeemed').textContent = _walletRedeemedPoints > 0 
-    ? `UGX ${(_walletRedeemedPoints * 1000).toLocaleString()}` 
+  document.getElementById('wallet-stat-redeemed').textContent = _walletRedeemedPoints > 0
+    ? `UGX ${(_walletRedeemedPoints * 1000).toLocaleString()}`
     : 'UGX 0';
+  // Update redeem card to show correct deducted balance
+  document.getElementById('redeem-current-pts').textContent  = `${totalConfirmedItems - _walletRedeemedPoints} pts`;
+  document.getElementById('redeem-still-needed').textContent = `${Math.max(0, 50 - (totalConfirmedItems - _walletRedeemedPoints))} pts`;
   document.getElementById('wallet-stat-stores').textContent  = uniqueStores;
 
   // Alert
@@ -6203,10 +7358,23 @@ async function loadAdminWallet() {
       }
     }
 
-    repStats[rep.id].items  = totalConfirmedForRep;
-    repStats[rep.id].points = totalConfirmedForRep;
-    repStats[rep.id].ugx    = totalConfirmedForRep * 1000;
-    repStats[rep.id].stores = confirmedStores;
+    // Load redeemed points for this rep from payout_requests
+    let repRedeemedPts = 0;
+    try {
+      const { data: prData } = await sb
+        .from('payout_requests')
+        .select('points_used, status')
+        .eq('rep_id', rep.id);
+      repRedeemedPts = (prData || [])
+        .filter(r => r.status !== 'rejected')
+        .reduce((s, r) => s + Number(r.points_used || 0), 0);
+    } catch(e) {}
+
+    repStats[rep.id].items    = totalConfirmedForRep;
+    repStats[rep.id].points   = Math.max(0, totalConfirmedForRep - repRedeemedPts);
+    repStats[rep.id].ugx      = Math.max(0, totalConfirmedForRep - repRedeemedPts) * 1000;
+    repStats[rep.id].redeemed = repRedeemedPts * 1000;
+    repStats[rep.id].stores   = confirmedStores;
   }
 
   const repList = Object.entries(repStats).sort((a, b) => b[1].points - a[1].points);
@@ -6560,6 +7728,1238 @@ async function walletModalNext() {
 document.getElementById('wallet-redeem-modal').addEventListener('click', function(e) {
   if (e.target === this) closeWalletRedeemModal();
 });
+
+// ═══════════════════════════════════════════════════════════
+// ATTENDANCE MODULE
+// ═══════════════════════════════════════════════════════════
+
+const ATT_OFFICE = [0.3136, 32.5811]; // adjust to your office GPS
+const ATT_RANGE_KM = 1.0;
+const ATT_MODELS_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+const ATT_MATCH_THRESHOLD = 0.45;
+
+let _attModelsReady = false;
+let _attStream = null;
+let _attMode = 'in'; // 'in' or 'out'
+let _attCapturedPhoto = null;
+let _attCurrentLocation = null;
+let _attLocationIsReal = false;  // true only when a real device GPS reading was obtained
+let _attLocationError  = '';     // human-readable reason if GPS failed
+let _attRefDescriptor = null;
+let _attAdminMap = null;
+let _attRepMap = null;
+let _attOpenRecord = null; // today's open clock-in record
+
+// ── Load face-api models once ──────────────────────────────
+async function _attLoadModels() {
+  if (_attModelsReady) return;
+  const bar = document.getElementById('att-models-bar');
+  const steps = [
+    () => faceapi.nets.tinyFaceDetector.loadFromUri(ATT_MODELS_URL),
+    () => faceapi.nets.faceLandmark68Net.loadFromUri(ATT_MODELS_URL),
+    () => faceapi.nets.faceRecognitionNet.loadFromUri(ATT_MODELS_URL),
+  ];
+  for (let i = 0; i < steps.length; i++) {
+    await steps[i]();
+    if (bar) bar.style.width = ((i + 1) / steps.length * 100) + '%';
+  }
+  _attModelsReady = true;
+}
+_attLoadModels().catch(console.warn);
+
+// ── Load reference face descriptor ────────────────────────
+async function _attLoadRefDescriptor() {
+  if (_attRefDescriptor) return _attRefDescriptor;
+  const empId = currentUser?.id 
+    || JSON.parse(localStorage.getItem('ktl_user') || '{}')?.id;
+  
+  if (!empId) return null;
+  
+  const { data, error } = await sb.from('employee_faces').select('photo_path').eq('employee_id', empId).maybeSingle();
+  if (error || !data) return null;
+  const { data: urlData } = await sb.storage.from('attendance-photos').createSignedUrl(data.photo_path, 60);
+  if (!urlData) return null;
+  const img = await faceapi.fetchImage(urlData.signedUrl);
+  const opts = [
+    new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.2 }),
+    new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.15 }),
+  ];
+  let det = null;
+  for (const o of opts) { det = await faceapi.detectSingleFace(img, o).withFaceLandmarks().withFaceDescriptor(); if (det) break; }
+  if (!det) return null;
+  _attRefDescriptor = det.descriptor;
+  return _attRefDescriptor;
+}
+
+// ── Main screen loader ─────────────────────────────────────
+async function loadAttendanceScreen() {
+  const isRep = isSalesRep();
+  document.getElementById('att-admin-view').style.display = isRep ? 'none' : 'block';
+  document.getElementById('att-rep-view').style.display   = isRep ? 'block' : 'none';
+
+  // Get current location
+  _attCurrentLocation = await _attGetLocation();
+  // Push live location to DB so admin can track
+  if (_attCurrentLocation && currentUser?.id) {
+    sb.from('live_locations').upsert({
+      employee_id:   currentUser.id,
+      employee_name: currentUser.full_name || 'Unknown',
+      lat:           _attCurrentLocation[0],
+      lng:           _attCurrentLocation[1],
+      updated_at:    new Date().toISOString(),
+    }, { onConflict: 'employee_id' }).then(() => {});
+  }
+
+  if (isRep) {
+    _loadRepAttendanceView();
+  } else {
+    _loadAdminAttendanceView();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// ADMIN / MANAGER VIEW
+// ─────────────────────────────────────────────────────────────
+async function _loadAdminAttendanceView() {
+  // Start real-time greeting & clock
+  _startAttAdminClock();
+
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('att-filter-date').value = today;
+
+  // Load all users
+  const { data: allUsers } = await sb.from('users').select('id,full_name,role').order('full_name');
+  const reps = (allUsers || []).filter(u => u.is_active !== false);
+  const totalStaff = reps.length;
+
+  // Load today's attendance
+  const { data: todayRecs } = await sb.from('attendance').select('*').gte('clock_in', today + 'T00:00:00').order('clock_in', { ascending: false });
+  const records = todayRecs || [];
+
+  const presentIds = new Set(records.map(r => r.employee_id));
+  const clockedOut = records.filter(r => r.clock_out);
+  const lateArr    = records.filter(r => {
+    const h = new Date(r.clock_in).getHours();
+    const m = new Date(r.clock_in).getMinutes();
+    return h > 9 || (h === 9 && m > 0);
+  });
+
+  document.getElementById('att-present').textContent     = presentIds.size;
+  document.getElementById('att-absent').textContent      = Math.max(0, totalStaff - presentIds.size);
+  document.getElementById('att-clocked-out').textContent = clockedOut.length;
+  document.getElementById('att-late').textContent        = lateArr.length;
+
+  // My own attendance card (admin clocking in for themselves)
+  _renderAdminMyCard();
+
+  // Map
+  setTimeout(() => { _initAttAdminMap(records); }, 100);
+
+  // Table
+  loadAttendanceTable();
+}
+
+function _renderAdminMyCard() {
+  const el = document.getElementById('att-my-card-admin');
+  el.innerHTML = `
+    <div style="padding:18px;">
+      <!-- Clock In / Out columns -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+        <div style="background:#F0F4FF;border-radius:12px;padding:16px;text-align:center;border:1.5px solid #C7D7F8;">
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.1em;color:#4A6FD4;margin-bottom:12px;">CLOCK IN</div>
+          <div id="att-admin-fp" onclick="openAttFaceModal('in')"
+            style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#4A6FD4,#2451a0);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 16px rgba(74,111,212,0.4);"
+            onmouseover="this.style.transform='scale(1.06)';this.style.boxShadow='0 6px 22px rgba(74,111,212,0.5)'"
+            onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(74,111,212,0.4)'">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          </div>
+          <div style="font-size:13px;font-weight:800;color:#4A6FD4;" id="att-admin-in">--:--</div>
+          <div style="font-size:10px;color:#7a93c8;margin-top:2px;" id="att-admin-status-lbl">Not clocked in</div>
+        </div>
+        <div style="background:#F7F8FA;border-radius:12px;padding:16px;text-align:center;border:1.5px solid var(--brd);">
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.1em;color:var(--txt3);margin-bottom:12px;">CLOCK OUT</div>
+          <div onclick="openAttFaceModal('out')"
+            style="width:64px;height:64px;border-radius:50%;background:#E2E8F0;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;cursor:pointer;transition:transform .15s;border:2px dashed #CBD5E0;"
+            onmouseover="this.style.transform='scale(1.06)'"
+            onmouseout="this.style.transform=''">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          </div>
+          <div style="font-size:13px;font-weight:800;color:var(--txt3);" id="att-admin-out">--:--</div>
+          <div style="font-size:10px;color:var(--txt3);margin-top:2px;" id="att-admin-time-lbl">Not yet</div>
+        </div>
+      </div>
+
+      <!-- Info grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 0;border-top:0.5px solid var(--brd);border-bottom:0.5px solid var(--brd);margin-bottom:14px;">
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Location</div>
+          <div style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;" id="att-admin-loc">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4A6FD4" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Detecting…
+          </div>
+          <button id="att-admin-enable-loc-btn" onclick="_attRetryLocation()" style="display:none;margin-top:5px;padding:3px 9px;border-radius:7px;background:#4A6FD4;color:#fff;border:none;font-size:9.5px;font-weight:600;cursor:pointer;font-family:inherit;">📍 Enable</button>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Total Hours</div>
+          <div style="font-size:15px;font-weight:800;color:#1D9E75;" id="att-admin-hours">--</div>
+        </div>
+      </div>
+
+      <!-- Face verification banner -->
+      <div style="background:#EEF2FF;border-radius:10px;padding:10px 13px;font-size:12px;color:#4A6FD4;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:30px;height:30px;border-radius:8px;background:rgba(74,111,212,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4A6FD4" stroke-width="1.8"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:12px;">Face verification required</div>
+            <div style="font-size:10px;opacity:0.75;margin-top:1px;">Please verify your identity to clock in or out.</div>
+          </div>
+        </div>
+        <button onclick="openAttFaceModal('in')" style="padding:6px 12px;border-radius:9px;background:#4A6FD4;color:#fff;border:none;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;white-space:nowrap;box-shadow:0 2px 8px rgba(74,111,212,0.35);">Verify Now →</button>
+      </div>
+    </div>`;
+
+  // Populate with today's record if any
+  _loadMyTodayRecord('admin');
+ // Update location label
+  if (_attCurrentLocation) {
+    _attReverseGeocode(_attCurrentLocation[0], _attCurrentLocation[1]).then(addr => {
+      const el2 = document.getElementById('att-admin-loc');
+      if (el2) el2.textContent = _attLocationIsReal ? addr : '⚠ Using office default';
+      const btn = document.getElementById('att-admin-enable-loc-btn');
+      if (btn) btn.style.display = _attLocationIsReal ? 'none' : 'inline-block';
+    });
+  }
+}
+
+async function _loadMyTodayRecord(view) {
+  const today = new Date().toISOString().split('T')[0];
+  const { data } = await sb.from('attendance').select('*').eq('employee_id', currentUser.id).gte('clock_in', today + 'T00:00:00').order('clock_in', { ascending: false }).limit(1).maybeSingle();
+  _attOpenRecord = data || null;
+
+  if (view === 'admin') {
+    if (!data) return;
+    const inTime  = new Date(data.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('att-admin-in').textContent          = inTime;
+    document.getElementById('att-admin-status-lbl').textContent  = data.clock_out ? 'Clocked Out' : 'Clocked In ✓';
+    document.getElementById('att-admin-status-lbl').style.color  = data.clock_out ? 'var(--txt2)' : '#1D9E75';
+    document.getElementById('att-admin-time-lbl').textContent    = 'Since ' + inTime;
+    if (data.clock_out) {
+      const outTime = new Date(data.clock_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('att-admin-out').textContent  = outTime;
+      document.getElementById('att-admin-hours').textContent = _attFormatDuration(data.clock_in, data.clock_out);
+    }
+  } else {
+    // Rep view
+    if (!data) {
+      document.getElementById('rep-att-status').textContent = 'Not Clocked In';
+      document.getElementById('rep-att-since').textContent  = '—';
+      document.getElementById('rep-att-hours').textContent  = '--';
+      document.getElementById('rep-att-running').textContent = '';
+      return;
+    }
+    const inTime = new Date(data.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('rep-att-status').textContent   = data.clock_out ? 'Clocked Out' : 'Clocked In';
+    document.getElementById('rep-att-since').textContent    = 'Since ' + inTime;
+    document.getElementById('att-in-time').textContent      = inTime;
+    document.getElementById('att-in-date').textContent      = new Date(data.clock_in).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+    document.getElementById('att-fp-in-wrap').style.background = 'var(--royal-light)';
+    if (data.clock_out) {
+      const outTime = new Date(data.clock_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('att-out-time').textContent   = outTime;
+      document.getElementById('att-out-date').textContent   = new Date(data.clock_out).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+      document.getElementById('rep-att-hours').textContent  = _attFormatDuration(data.clock_in, data.clock_out);
+      document.getElementById('rep-att-running').textContent = 'Completed';
+    } else {
+      document.getElementById('rep-att-hours').textContent   = _attRunningHours(data.clock_in);
+      document.getElementById('rep-att-running').textContent = '● Running';
+      document.getElementById('rep-att-running').style.color = '#1D9E75';
+    }
+    document.getElementById('att-rep-verified').textContent  = '✓ Verified';
+    document.getElementById('att-rep-verified').style.color  = '#1D9E75';
+  }
+}
+
+async function loadAttendanceTable() {
+  const tbody = document.getElementById('att-tbody');
+  const dateVal = document.getElementById('att-filter-date')?.value || new Date().toISOString().split('T')[0];
+  const nameVal = (document.getElementById('att-filter-name')?.value || '').toLowerCase();
+
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:16px;color:var(--txt3);">Loading…</td></tr>';
+
+  const { data: recs, error } = await sb.from('attendance').select('*').gte('clock_in', dateVal + 'T00:00:00').lte('clock_in', dateVal + 'T23:59:59').order('clock_in', { ascending: false });
+
+  if (error) { tbody.innerHTML = `<tr><td colspan="8" style="color:#A32D2D;text-align:center;padding:16px;">Error: ${error.message}</td></tr>`; return; }
+
+  let rows = recs || [];
+  if (nameVal) rows = rows.filter(r => (r.employee_name || '').toLowerCase().includes(nameVal));
+
+  if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--txt3);">No records for this date.</td></tr>'; return; }
+
+  tbody.innerHTML = rows.map(r => {
+    const inTime  = new Date(r.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const outTime = r.clock_out ? new Date(r.clock_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+    const hours   = r.clock_out ? _attFormatDuration(r.clock_in, r.clock_out) : _attRunningHours(r.clock_in) + ' ▶';
+    const initials = (r.employee_name || 'E').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const inH = new Date(r.clock_in).getHours();
+    const isLate = inH >= 9;
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:9px;">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--royal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">${initials}</div>
+        <div><div style="font-weight:500;font-size:12.5px;">${r.employee_name || '—'}</div><div style="font-size:10.5px;color:var(--txt3);">${r.employee_id?.slice(0,8)||'—'}</div></div>
+      </div></td>
+      <td style="font-size:11.5px;">${dateVal}</td>
+      <td><span style="font-weight:700;color:${isLate?'#E8891A':'#1D9E75'};">${inTime}</span>${isLate ? ' <span class="badge ba" style="font-size:9px;">Late</span>' : ''}</td>
+      <td style="font-weight:${r.clock_out?'700':'400'};color:${r.clock_out?'var(--txt)':'var(--txt3)'};">${outTime}</td>
+      <td style="font-size:12px;font-weight:600;color:var(--royal);">${hours}</td>
+      <td><span class="badge ${r.clock_out ? 'bg' : 'bb'}">${r.clock_out ? 'Completed' : 'Clocked In'}</span></td>
+      <td style="font-size:11px;color:var(--txt3);">${r.clock_in_location || (r.clock_in_lat ? r.clock_in_lat.toFixed(3) + ', ' + r.clock_in_lng.toFixed(3) : '—')}</td>
+      <td><span style="width:22px;height:22px;border-radius:50%;background:${r.clock_in_photo_url?'#EAF3DE':'var(--brd)'};color:${r.clock_in_photo_url?'#1D9E75':'var(--txt3)'};display:inline-flex;align-items:center;justify-content:center;font-size:12px;">✓</span></td>
+    </tr>`;
+  }).join('');
+}
+
+async function exportAttendanceCSV() {
+  const dateVal = document.getElementById('att-filter-date')?.value || new Date().toISOString().split('T')[0];
+  const { data: recs } = await sb.from('attendance').select('*').gte('clock_in', dateVal + 'T00:00:00').lte('clock_in', dateVal + 'T23:59:59').order('clock_in', { ascending: false });
+  const rows = [['Employee','Date','Clock In','Clock Out','Hours','Status','Location']];
+  (recs || []).forEach(r => {
+    const inTime  = new Date(r.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const outTime = r.clock_out ? new Date(r.clock_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+    const hours   = r.clock_out ? _attFormatDuration(r.clock_in, r.clock_out) : 'Running';
+    rows.push([r.employee_name || '', dateVal, inTime, outTime, hours, r.clock_out ? 'Completed' : 'In', r.clock_in_location || '']);
+  });
+  const csv = rows.map(r => r.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `Attendance_${dateVal}.csv`; a.click();
+}
+
+
+// ── Real-time greeting & clock for ADMIN attendance header ──
+let _attAdminClockInterval = null;
+function _startAttAdminClock() {
+  if (_attAdminClockInterval) clearInterval(_attAdminClockInterval);
+  function _updateAdminClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+    const emoji = h < 12 ? '🌅' : h < 17 ? '👋' : '🌙';
+    const firstName = (currentUser?.full_name || '').split(' ')[0] || 'there';
+
+    const greetEl = document.getElementById('att-admin-greeting');
+    if (greetEl) greetEl.textContent = `${greeting}, ${firstName} ${emoji}`;
+
+    const dateEl = document.getElementById('att-admin-date-label');
+    if (dateEl) dateEl.textContent = now.toLocaleDateString('en-UG', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+    const timeEl = document.getElementById('att-admin-time-label');
+    if (timeEl) timeEl.textContent = now.toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' });
+
+    const avEl = document.getElementById('att-admin-avatar-initials');
+    if (avEl) avEl.textContent = (currentUser?.full_name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  }
+  _updateAdminClock();
+  _attAdminClockInterval = setInterval(_updateAdminClock, 1000);
+}
+
+// ── Real-time greeting & clock for rep attendance header ──
+let _attClockInterval = null;
+function _startAttRepClock() {
+  if (_attClockInterval) clearInterval(_attClockInterval);
+  function _updateAttClock() {
+    const now = new Date();
+    const h = now.getHours();
+    const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+    const emoji = h < 12 ? '🌅' : h < 17 ? '👋' : '🌙';
+    const firstName = (currentUser?.full_name || '').split(' ')[0] || 'there';
+    const greetEl = document.getElementById('att-rep-greeting');
+    if (greetEl) greetEl.textContent = `${greeting}, ${firstName} ${emoji}`;
+
+    const dateEl = document.getElementById('att-rep-date-label');
+    if (dateEl) dateEl.textContent = now.toLocaleDateString('en-UG', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+    const timeEl = document.getElementById('att-rep-time-label');
+    if (timeEl) timeEl.textContent = now.toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' });
+
+    const avEl = document.getElementById('att-rep-avatar-initials');
+    if (avEl) avEl.textContent = (currentUser?.full_name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  }
+  _updateAttClock();
+  _attClockInterval = setInterval(_updateAttClock, 1000);
+}
+
+// ─────────────────────────────────────────────────────────────
+// SALES REP VIEW
+// ─────────────────────────────────────────────────────────────
+async function _loadRepAttendanceView() {
+  _startAttRepClock();
+  _loadMyTodayRecord('rep');
+
+  // Week hours
+  const weekStart = _attWeekStart();
+  const { data: weekRecs } = await sb.from('attendance').select('clock_in,clock_out').eq('employee_id', currentUser.id).gte('clock_in', weekStart + 'T00:00:00');
+  let weekMins = 0;
+  (weekRecs || []).forEach(r => {
+    if (r.clock_out) weekMins += (new Date(r.clock_out) - new Date(r.clock_in)) / 60000;
+  });
+  document.getElementById('rep-att-week').textContent = Math.floor(weekMins / 60) + 'h ' + (weekMins % 60 | 0) + 'm';
+
+  // Month days present
+  const monthStart = new Date().toISOString().slice(0, 7) + '-01';
+  const { data: monthRecs } = await sb.from('attendance').select('clock_in').eq('employee_id', currentUser.id).gte('clock_in', monthStart + 'T00:00:00');
+  const uniqueDays = new Set((monthRecs || []).map(r => r.clock_in.split('T')[0]));
+  document.getElementById('rep-att-month').textContent = uniqueDays.size + ' days';
+
+// Location
+  if (_attCurrentLocation) {
+    const addr = await _attReverseGeocode(_attCurrentLocation[0], _attCurrentLocation[1]);
+    document.getElementById('att-rep-location').innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--royal)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> ${addr}`;
+    document.getElementById('att-rep-dist').textContent = '';
+    document.getElementById('att-rep-dist-badge').textContent = addr;
+    document.getElementById('att-range-badge').textContent   = '📍 In Field';
+    document.getElementById('att-range-badge').style.cssText = 'font-size:10px;padding:3px 9px;border-radius:20px;background:#EAF3DE;color:#3B6D11;font-weight:700;';
+
+    const enableBtn = document.getElementById('att-enable-loc-btn');
+    if (enableBtn) enableBtn.style.display = _attLocationIsReal ? 'none' : 'inline-block';
+    if (!_attLocationIsReal && _attLocationError) {
+      document.getElementById('att-rep-dist').innerHTML = `<span style="color:#A32D2D;">⚠ ${_attLocationError}</span>`;
+    }
+  }
+
+  // Map
+  setTimeout(() => { _initAttRepMap(); }, 100);
+
+  // History table
+  _loadRepHistory();
+}
+
+async function _loadRepHistory() {
+  const tbody = document.getElementById('att-rep-history-tbody');
+  const { data: recs } = await sb.from('attendance').select('*').eq('employee_id', currentUser.id).order('clock_in', { ascending: false }).limit(20);
+  const rows = recs || [];
+  if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--txt3);">No records yet.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r => {
+    const dateStr = new Date(r.clock_in).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const inTime  = new Date(r.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const outTime = r.clock_out ? new Date(r.clock_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+    const hours   = r.clock_out ? _attFormatDuration(r.clock_in, r.clock_out) : _attRunningHours(r.clock_in) + ' ▶';
+    return `<tr>
+      <td style="font-size:11.5px;">${dateStr}</td>
+      <td style="font-weight:700;color:#1D9E75;">${inTime}</td>
+      <td style="font-weight:${r.clock_out?'700':'400'};color:${r.clock_out?'var(--txt)':'var(--txt3)'};">${outTime}</td>
+      <td style="font-size:12px;font-weight:600;color:var(--royal);">${hours}</td>
+      <td><span class="badge ${r.clock_out?'bg':'bb'}">${r.clock_out?'Completed':'Running'}</span></td>
+      <td style="font-size:11px;color:var(--txt3);">${r.clock_in_location || (r.clock_in_lat ? r.clock_in_lat.toFixed(3) + ', ' + r.clock_in_lng.toFixed(3) : '—')}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// FACE MODAL (shared between admin & rep)
+// ─────────────────────────────────────────────────────────────
+function openAttFaceModal(mode) {
+  _attMode = mode;
+  _attCapturedPhoto = null;
+
+  const overlay   = document.getElementById('att-face-overlay');
+  const loadingEl = document.getElementById('att-models-loading');
+  const cameraEl  = document.getElementById('att-camera-wrap');
+  const hintEl    = document.getElementById('att-modal-hint');
+  const capBtn    = document.getElementById('att-capture-btn');
+  const scoreWrap = document.getElementById('att-score-wrap');
+  const regBanner = document.getElementById('att-reg-banner');
+  const previewWrap = document.getElementById('att-photo-preview-wrap');
+
+  hintEl.textContent = 'Initialising…';
+  hintEl.style.color = 'var(--txt3)';
+  capBtn.style.display = 'none';
+  capBtn.disabled = false;
+  capBtn.textContent = 'Take Photo';
+  scoreWrap.style.display = 'none';
+  regBanner.style.display = 'none';
+  previewWrap.innerHTML = '';
+  document.getElementById('att-video').style.display = 'block';
+  document.getElementById('att-face-frame').style.display = 'block';
+
+  overlay.style.display = 'flex';
+
+  // Get location
+  _attGetLocation().then(loc => { _attCurrentLocation = loc; });
+
+  (async () => {
+    if (!_attModelsReady) {
+      loadingEl.style.display = 'block';
+      cameraEl.style.display  = 'none';
+      await _attLoadModels();
+    }
+    loadingEl.style.display = 'none';
+
+    // Start camera
+    try {
+      _attStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      document.getElementById('att-video').srcObject = _attStream;
+      cameraEl.style.display = 'block';
+    } catch (err) {
+      hintEl.textContent = 'Camera error: ' + (err.message || 'Permission denied');
+      hintEl.style.color = '#A32D2D';
+      return;
+    }
+
+    // Check for reference face
+    // Check if reference exists (don't load descriptor yet — done at verify time)
+    const { data: faceCheck } = await sb
+      .from('employee_faces')
+      .select('photo_path')
+      .eq('employee_id', currentUser?.id)
+      .maybeSingle();
+
+    if (!faceCheck) {
+      hintEl.textContent = 'No face registered. Click Register Now to set up.';
+      regBanner.style.display = 'flex';
+      return;
+    }
+
+    hintEl.textContent = 'Position your face in the circle, then click Take Photo.';
+    capBtn.style.display = 'block';
+  })();
+}
+
+function closeAttFaceModal() {
+  if (_attStream) { _attStream.getTracks().forEach(t => t.stop()); _attStream = null; }
+  document.getElementById('att-face-overlay').style.display = 'none';
+  _attCapturedPhoto = null;
+  const retakeBtn = document.getElementById('att-retake-btn');
+  if (retakeBtn) retakeBtn.remove();
+}
+
+document.getElementById('att-capture-btn').addEventListener('click', async () => {
+  const capBtn    = document.getElementById('att-capture-btn');
+  const hintEl    = document.getElementById('att-modal-hint');
+  const scoreWrap = document.getElementById('att-score-wrap');
+  const video     = document.getElementById('att-video');
+  const canvas    = document.getElementById('att-canvas');
+  const previewWrap = document.getElementById('att-photo-preview-wrap');
+
+  // ── STEP 1: Take Photo ──
+  if (!_attCapturedPhoto) {
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    _attCapturedPhoto = canvas.toDataURL('image/jpeg', 0.9);
+
+    video.style.display = 'none';
+    document.getElementById('att-face-frame').style.display = 'none';
+
+    const img = document.createElement('img');
+    img.src = _attCapturedPhoto;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+    previewWrap.innerHTML = '';
+    previewWrap.appendChild(img);
+
+    capBtn.textContent = 'Verify Identity';
+    hintEl.textContent = 'Photo taken. Click Verify to confirm your identity.';
+    hintEl.style.color = 'var(--txt2)';
+
+    if (!document.getElementById('att-retake-btn')) {
+      const rb = document.createElement('button');
+      rb.id = 'att-retake-btn';
+      rb.style.cssText = 'width:100%;padding:10px;border-radius:9px;background:transparent;border:0.5px solid var(--brd2);cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;margin-top:7px;color:var(--txt2);';
+      rb.textContent = '↺ Retake Photo';
+      rb.addEventListener('click', () => {
+        _attCapturedPhoto = null;
+        previewWrap.innerHTML = '';
+        video.style.display = 'block';
+        document.getElementById('att-face-frame').style.display = 'block';
+        capBtn.textContent = 'Take Photo';
+        capBtn.disabled = false;
+        scoreWrap.style.display = 'none';
+        hintEl.textContent = 'Position your face in the circle, then click Take Photo.';
+        hintEl.style.color = 'var(--txt3)';
+        rb.remove();
+      });
+      capBtn.parentNode.insertBefore(rb, capBtn.nextSibling);
+    }
+    return;
+  }
+
+  // ── STEP 2: Verify by pixel comparison with stored reference ──
+  capBtn.disabled = true;
+  capBtn.textContent = 'Verifying…';
+  hintEl.textContent = 'Loading your registered face…';
+  hintEl.style.color = 'var(--royal)';
+  scoreWrap.style.display = 'none';
+
+  try {
+    // Load reference face from Supabase Storage
+    const empId = currentUser?.id 
+      || JSON.parse(localStorage.getItem('ktl_user') || '{}')?.id;
+
+    if (!empId) {
+      hintEl.textContent = 'Session error. Please sign out and sign back in.';
+      hintEl.style.color = '#A32D2D';
+      capBtn.disabled = false;
+      capBtn.textContent = 'Verify Identity';
+      return;
+    }
+
+    const { data: faceData, error: faceErr } = await sb
+      .from('employee_faces')
+      .select('photo_path')
+      .eq('employee_id', empId)
+      .maybeSingle();
+
+    if (faceErr || !faceData) {
+      hintEl.textContent = 'No registered face found. Register your face first.';
+      hintEl.style.color = '#A32D2D';
+      document.getElementById('att-reg-banner').style.display = 'flex';
+      capBtn.disabled = false;
+      capBtn.textContent = 'Take Photo';
+      _attCapturedPhoto = null;
+      previewWrap.innerHTML = '';
+      video.style.display = 'block';
+      document.getElementById('att-face-frame').style.display = 'block';
+      document.getElementById('att-retake-btn')?.remove();
+      return;
+    }
+
+    hintEl.textContent = 'Comparing with your registered face…';
+
+    const { data: urlData } = await sb.storage
+      .from('attendance-photos')
+      .createSignedUrl(faceData.photo_path, 60);
+
+    if (!urlData) throw new Error('Could not load registered face image.');
+
+    // Load both images into canvases for comparison
+    const loadImg = (src) => new Promise((res, rej) => {
+      const i = new Image(); i.crossOrigin = 'anonymous';
+      i.onload = () => res(i); i.onerror = rej; i.src = src;
+    });
+
+    const [capturedImg, refImg] = await Promise.all([
+      loadImg(_attCapturedPhoto),
+      loadImg(urlData.signedUrl)
+    ]);
+
+    // Use face-api.js to get descriptors — but with relaxed thresholds
+    // so it works even without perfect detection conditions
+    if (!_attModelsReady) {
+      hintEl.textContent = 'Loading face models…';
+      await _attLoadModels();
+    }
+
+    const opts = [
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.1 }),
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.1 }),
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.08 }),
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.05 }),
+    ];
+
+    // Detect in captured photo
+    let capturedDet = null;
+    for (const o of opts) {
+      capturedDet = await faceapi.detectSingleFace(capturedImg, o).withFaceLandmarks().withFaceDescriptor();
+      if (capturedDet) break;
+    }
+    // Fallback: try on canvas directly
+    if (!capturedDet) {
+      for (const o of opts) {
+        capturedDet = await faceapi.detectSingleFace(canvas, o).withFaceLandmarks().withFaceDescriptor();
+        if (capturedDet) break;
+      }
+    }
+
+    // Detect in reference photo
+    let refDet = null;
+    for (const o of opts) {
+      refDet = await faceapi.detectSingleFace(refImg, o).withFaceLandmarks().withFaceDescriptor();
+      if (refDet) break;
+    }
+
+    if (!capturedDet && !refDet) {
+      // Neither detected — fall back to basic pixel similarity
+      hintEl.textContent = 'Using basic image comparison (ensure good lighting)…';
+      const sim = _attPixelSimilarity(capturedImg, refImg);
+      _attShowVerificationResult(sim >= 0.72, Math.round(sim * 100), hintEl, scoreWrap, capBtn);
+      return;
+    }
+
+    if (!capturedDet) {
+      hintEl.textContent = 'Face not detected in your photo. Ensure good lighting and face the camera directly.';
+      hintEl.style.color = '#A32D2D';
+      capBtn.disabled = false;
+      capBtn.textContent = 'Verify Identity';
+      return;
+    }
+
+    if (!refDet) {
+      // Reference face couldn't be detected — use pixel comparison as fallback
+      const sim = _attPixelSimilarity(capturedImg, refImg);
+      _attShowVerificationResult(sim >= 0.72, Math.round(sim * 100), hintEl, scoreWrap, capBtn);
+      return;
+    }
+
+    // Compare descriptors
+    const distance   = faceapi.euclideanDistance(capturedDet.descriptor, refDet.descriptor);
+    const similarity = Math.max(0, Math.min(100, Math.round((1 - distance) * 100)));
+    const verified   = distance <= 0.50; // slightly relaxed threshold
+
+    _attShowVerificationResult(verified, similarity, hintEl, scoreWrap, capBtn);
+
+  } catch (err) {
+    console.error('Verification error:', err);
+    hintEl.textContent = 'Error: ' + err.message;
+    hintEl.style.color = '#A32D2D';
+    capBtn.disabled = false;
+    capBtn.textContent = 'Verify Identity';
+  }
+});
+
+// ── Pixel similarity fallback (used when face-api can't detect) ──
+function _attPixelSimilarity(img1, img2) {
+  const SIZE = 64;
+  const c1 = document.createElement('canvas'); c1.width = SIZE; c1.height = SIZE;
+  const c2 = document.createElement('canvas'); c2.width = SIZE; c2.height = SIZE;
+  c1.getContext('2d').drawImage(img1, 0, 0, SIZE, SIZE);
+  c2.getContext('2d').drawImage(img2, 0, 0, SIZE, SIZE);
+  const d1 = c1.getContext('2d').getImageData(0, 0, SIZE, SIZE).data;
+  const d2 = c2.getContext('2d').getImageData(0, 0, SIZE, SIZE).data;
+  let diff = 0;
+  for (let i = 0; i < d1.length; i += 4) {
+    diff += Math.abs(d1[i] - d2[i]) + Math.abs(d1[i+1] - d2[i+1]) + Math.abs(d1[i+2] - d2[i+2]);
+  }
+  const maxDiff = SIZE * SIZE * 3 * 255;
+  return 1 - (diff / maxDiff);
+}
+
+// ── Show verification result and trigger clock-in/out if verified ──
+function _attShowVerificationResult(verified, similarityPct, hintEl, scoreWrap, capBtn) {
+  scoreWrap.style.display = 'block';
+  document.getElementById('att-score-bar').style.width = similarityPct + '%';
+  document.getElementById('att-score-bar').style.background = verified ? '#1D9E75' : '#A32D2D';
+  document.getElementById('att-score-label').textContent = `Match: ${similarityPct}% — ${verified ? '✓ Verified' : '✗ Not matched'}`;
+  document.getElementById('att-score-label').style.color = verified ? '#1D9E75' : '#A32D2D';
+
+  if (verified) {
+    hintEl.textContent = 'Identity verified! Recording attendance…';
+    hintEl.style.color = '#1D9E75';
+    capBtn.textContent = '✓ Verified';
+    document.getElementById('att-retake-btn')?.remove();
+    setTimeout(async () => {
+      await _attRecordClock(_attMode);
+      closeAttFaceModal();
+    }, 700);
+  } else {
+    hintEl.textContent = `Face did not match (${similarityPct}% similarity). Please retake the photo in better lighting.`;
+    hintEl.style.color = '#A32D2D';
+    capBtn.disabled = false;
+    capBtn.textContent = 'Verify Identity';
+  }
+}
+
+// Register face button
+document.getElementById('att-reg-btn')?.addEventListener('click', async () => {
+  const capBtn  = document.getElementById('att-capture-btn');
+  const hintEl  = document.getElementById('att-modal-hint');
+  const canvas  = document.getElementById('att-canvas');
+  const video   = document.getElementById('att-video');
+  const regBanner = document.getElementById('att-reg-banner');
+
+  regBanner.style.display = 'none';
+  hintEl.textContent = 'Position your face clearly and click Register.';
+  capBtn.textContent  = '📸 Register My Face';
+  capBtn.style.display = 'block';
+  capBtn.disabled = false;
+
+  capBtn.onclick = async () => {
+      capBtn.disabled = true; capBtn.textContent = 'Registering…';
+      
+      // Safe ID - multiple fallbacks
+      const empId = currentUser?.id 
+        || JSON.parse(localStorage.getItem('ktl_user') || '{}')?.id;
+      const empName = currentUser?.full_name 
+        || JSON.parse(localStorage.getItem('ktl_user') || '{}')?.full_name 
+        || 'Unknown';
+
+      if (!empId || empId === '00000000-0000-0000-0000-000000000001') {
+        hintEl.textContent = 'Session error. Please sign out and sign back in.';
+        hintEl.style.color = '#A32D2D';
+        capBtn.disabled = false;
+        capBtn.textContent = '📸 Register My Face';
+        return;
+      }
+
+      canvas.width  = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      const imgData = canvas.toDataURL('image/jpeg', 0.9);
+      const capturedImg = await new Promise((res, rej) => {
+        const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = imgData;
+      });
+
+      // Try face detection
+      const regOpts = [
+        new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 }),
+        new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.15 }),
+        new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.1 }),
+        new faceapi.TinyFaceDetectorOptions({ inputSize: 608, scoreThreshold: 0.1 }),
+      ];
+      let det = null;
+      for (const o of regOpts) {
+        det = await faceapi.detectSingleFace(canvas, o).withFaceLandmarks().withFaceDescriptor();
+        if (det) break;
+        det = await faceapi.detectSingleFace(capturedImg, o).withFaceLandmarks().withFaceDescriptor();
+        if (det) break;
+      }
+      if (!det) {
+        hintEl.textContent = 'No face detected. Move to a brighter spot and try again.';
+        hintEl.style.color = '#A32D2D';
+        capBtn.disabled = false;
+        capBtn.textContent = '📸 Register My Face';
+        return;
+      }
+
+      // Step 1: Upload photo to storage
+      hintEl.textContent = 'Uploading your photo...';
+      const blob = await fetch(imgData).then(r => r.blob());
+      const filePath = `${empId}/reference_face.jpg`;
+      
+      const { error: uploadError } = await sb.storage
+        .from('attendance-photos')
+        .upload(filePath, blob, { contentType: 'image/jpeg', upsert: true });
+
+      if (uploadError) {
+        hintEl.textContent = 'Upload failed: ' + uploadError.message;
+        hintEl.style.color = '#A32D2D';
+        capBtn.disabled = false;
+        capBtn.textContent = '📸 Try Again';
+        return;
+      }
+
+      // Step 2: Save record to database
+      hintEl.textContent = 'Saving your face record...';
+      const { error: dbError } = await sb.from('employee_faces').upsert({
+        employee_id:     empId,
+        photo_path:      filePath,
+        registered_name: empName,
+        registered_at:   new Date().toISOString(),
+      }, { onConflict: 'employee_id' });
+
+      if (dbError) {
+        hintEl.textContent = 'Database save failed: ' + dbError.message;
+        hintEl.style.color = '#A32D2D';
+        capBtn.disabled = false;
+        capBtn.textContent = '📸 Try Again';
+        return;
+      }
+
+      // Step 3: Success
+      _attRefDescriptor = null; // clear cache so it reloads fresh
+      alert(`✅ Face registered successfully for ${empName}! You can now clock in.`);
+      closeAttFaceModal();
+      capBtn.onclick = null;
+    };
+});
+
+// ── Clock In / Out ────────────────────────────────────────────
+async function _attRecordClock(mode) {
+  const now = new Date();
+  const loc  = _attCurrentLocation;
+  const addr = loc ? await _attReverseGeocode(loc[0], loc[1]) : '';
+
+  // Get the user from Supabase directly to ensure the ID matches
+  const storedUser = JSON.parse(localStorage.getItem('ktl_user') || '{}');
+  const empId = currentUser?.id || storedUser?.id;
+  const empName = currentUser?.full_name || storedUser?.full_name || 'Unknown';
+
+  if (!empId) {
+    alert('Session error. Please sign out and sign back in.');
+    return;
+  }
+
+  // VERIFY the employee_id actually exists in the users table
+  const { data: userCheck, error: userCheckErr } = await sb
+    .from('users')
+    .select('id')
+    .eq('id', empId)
+    .maybeSingle();
+
+  if (userCheckErr || !userCheck) {
+    alert(`Clock-in failed: Your user account (ID: ${empId}) was not found in the database. Please sign out and sign back in.`);
+    return;
+  }
+  
+
+  // Upload photo
+  let photoUrl = null;
+  if (_attCapturedPhoto) {
+    const blob = await fetch(_attCapturedPhoto).then(r => r.blob());
+    const fp   = `${empId}/${mode}_${Date.now()}.jpg`;
+    const { data: upData } = await sb.storage.from('attendance-photos').upload(fp, blob, { contentType: 'image/jpeg' });
+    if (upData) photoUrl = fp;
+  }
+
+  if (mode === 'in') {
+    const today = now.toISOString().split('T')[0];
+    const { data: existing } = await sb.from('attendance').select('id').eq('employee_id', empId).gte('clock_in', today + 'T00:00:00').is('clock_out', null).maybeSingle();
+    if (existing) { alert('You are already clocked in today.'); return; }
+
+    const { data, error } = await sb.from('attendance').insert({
+      employee_id:       empId,
+      employee_name:     empName,
+      clock_in:          now.toISOString(),
+      clock_in_lat:      loc ? loc[0] : null,
+      clock_in_lng:      loc ? loc[1] : null,
+      clock_in_location: addr,
+      clock_in_photo_url: photoUrl,
+      status: 'in',
+    }).select().single();
+
+    if (error) {
+      alert('❌ Clock-in failed: ' + error.message + '\n\nCode: ' + error.code);
+      return;
+    }
+    _attOpenRecord = data;
+    alert('✅ Clocked In at ' + now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+    await loadAttendanceScreen();
+  } else {
+    // Clock out
+    if (!_attOpenRecord) {
+      const today = now.toISOString().split('T')[0];
+      const { data: open } = await sb.from('attendance').select('*').eq('employee_id', currentUser.id).gte('clock_in', today + 'T00:00:00').is('clock_out', null).order('clock_in', { ascending: false }).limit(1).maybeSingle();
+      if (!open) { alert('No open clock-in record found for today.'); return; }
+      _attOpenRecord = open;
+    }
+    await sb.from('attendance').update({
+      clock_out:          now.toISOString(),
+      clock_out_lat:      loc ? loc[0] : null,
+      clock_out_lng:      loc ? loc[1] : null,
+      clock_out_location: addr,
+      clock_out_photo_url: photoUrl,
+      status: 'completed',
+    }).eq('id', _attOpenRecord.id);
+    alert('✅ Clocked Out at ' + now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+  await loadAttendanceScreen();
+  }
+
+  // Refresh the screen
+  await loadAttendanceScreen();
+}
+
+// ─────────────────────────────────────────────────────────────
+// MAPS
+// ─────────────────────────────────────────────────────────────
+async function _initAttAdminMap(records) {
+  const wrap = document.getElementById('att-map-wrap'); if (!wrap) return;
+  if (_attAdminMap) { _attAdminMap.remove(); _attAdminMap = null; }
+
+  _attAdminMap = L.map(wrap, { zoomControl: true, scrollWheelZoom: false }).setView(ATT_OFFICE, 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(_attAdminMap);
+
+  // Office marker (green)
+  L.marker(ATT_OFFICE, { icon: _attGreenDot() }).addTo(_attAdminMap)
+    .bindPopup('<strong>🏢 Office</strong><br>Kingdom Trading Ltd');
+
+  const bounds = [ATT_OFFICE];
+
+  // ── LIVE locations from live_locations table ──
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { data: liveData } = await sb.from('live_locations')
+    .select('*')
+    .gte('updated_at', fiveMinutesAgo);
+
+  // ── Group employees by rounded position to detect overlaps ──
+  const positionGroups = {}; // key: "lat,lng" → array of employees
+  (liveData || []).forEach(emp => {
+    if (!emp.lat || !emp.lng) return;
+    // Round to 4 decimal places (~11m precision) to detect near-same positions
+    const key = `${emp.lat.toFixed(4)},${emp.lng.toFixed(4)}`;
+    if (!positionGroups[key]) positionGroups[key] = [];
+    positionGroups[key].push(emp);
+  });
+
+  // ── Spread function: offset overlapping markers in a circle ──
+  function spreadOffset(index, total, baseLat, baseLng) {
+    if (total <= 1) return [baseLat, baseLng];
+    // Spread in a circle — radius grows with count
+    const radius = 0.0006 * Math.ceil(total / 4); // ~60m per 4 people
+    const angle  = (2 * Math.PI * index) / total;
+    return [
+      baseLat + radius * Math.cos(angle),
+      baseLng + radius * Math.sin(angle),
+    ];
+  }
+
+  // ── Dot colors for variety when multiple people are visible ──
+  const dotColors = ['#4B6FED','#E8891A','#9B59B6','#E24B4A','#16A085','#2980B9','#D35400','#8E44AD'];
+
+  // ── Place markers, spreading overlapping ones ──
+  Object.entries(positionGroups).forEach(([key, employees]) => {
+    const [baseLat, baseLng] = key.split(',').map(Number);
+
+    employees.forEach((emp, idx) => {
+      const [lat, lng] = spreadOffset(idx, employees.length, baseLat, baseLng);
+      const pos        = [lat, lng];
+      const label      = emp.employee_name || 'Employee';
+      const firstName  = label.split(' ')[0];
+      const color      = dotColors[idx % dotColors.length];
+      const ago        = Math.round((Date.now() - new Date(emp.updated_at)) / 60000);
+
+      // If multiple at same spot, draw a line from spread dot back to true position
+      if (employees.length > 1) {
+        L.polyline([[baseLat, baseLng], pos], {
+          color, weight: 1.5, opacity: 0.5, dashArray: '4,4',
+        }).addTo(_attAdminMap);
+      }
+
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;">
+          <div style="background:#fff;border:2px solid ${color};border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;color:${color};white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.2);">${firstName}</div>
+          <div style="width:13px;height:13px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 0 0 3px ${color}44;"></div>
+        </div>`,
+        iconSize:   [70, 34],
+        iconAnchor: [35, 34],
+      });
+
+      L.marker(pos, { icon }).addTo(_attAdminMap).bindPopup(
+        `<div style="font-size:12.5px;min-width:160px;">
+          <div style="font-weight:700;margin-bottom:4px;">👤 ${label}</div>
+          <div style="color:#555;font-size:11.5px;">📍 Live location</div>
+          <div style="color:#888;font-size:10.5px;margin-top:3px;">Updated ${ago < 1 ? 'just now' : ago + ' min ago'}</div>
+          ${employees.length > 1 ? `<div style="margin-top:5px;padding:3px 7px;background:#FFF3CD;border-radius:6px;font-size:10px;color:#856404;">📌 ${employees.length} people at this location</div>` : ''}
+        </div>`
+      );
+
+      bounds.push(pos);
+    });
+
+    // If a cluster (2+ people), show a small count badge at the true center
+    if (employees.length > 1) {
+      const clusterIcon = L.divIcon({
+        className: '',
+        html: `<div style="width:22px;height:22px;border-radius:50%;background:#1a3a6b;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(26,58,107,0.4);">${employees.length}</div>`,
+        iconSize:   [22, 22],
+        iconAnchor: [11, 11],
+      });
+      L.marker([baseLat, baseLng], { icon: clusterIcon, zIndexOffset: -100 })
+        .addTo(_attAdminMap)
+        .bindPopup(
+          `<div style="font-size:12px;font-weight:700;margin-bottom:6px;">👥 ${employees.length} employees here</div>` +
+          employees.map(e => `<div style="font-size:11.5px;padding:2px 0;">• ${e.employee_name}</div>`).join('')
+        );
+    }
+  });
+
+  // ── Fallback: clock-in locations for those still in but not in live_locations ──
+  const liveIds = new Set((liveData || []).map(l => l.employee_id));
+  records.filter(r => r.clock_in_lat && !r.clock_out && !liveIds.has(r.employee_id)).forEach(r => {
+    const pos = [r.clock_in_lat, r.clock_in_lng];
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+        <div style="background:#fff;border:2px solid #888;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700;color:#555;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.15);">${(r.employee_name||'?').split(' ')[0]}</div>
+        <div style="width:12px;height:12px;border-radius:50%;background:#aaa;border:2.5px solid #fff;box-shadow:0 0 0 2px #aaa44;"></div>
+      </div>`,
+      iconSize: [70, 32], iconAnchor: [35, 32],
+    });
+    L.marker(pos, { icon }).addTo(_attAdminMap)
+      .bindPopup(`<strong>${r.employee_name || 'Employee'}</strong><br>📍 Clock-in location (not live)`);
+    bounds.push(pos);
+  });
+
+  if (bounds.length > 1) _attAdminMap.fitBounds(L.latLngBounds(bounds), { padding: [50, 50] });
+
+  // Auto-refresh every 30 seconds
+  clearInterval(window._attMapRefreshInterval);
+  window._attMapRefreshInterval = setInterval(() => {
+    if (currentScreen === 'attendance' && !isSalesRep()) _initAttAdminMap([]);
+  }, 30000);
+}
+
+function _initAttRepMap() {
+  const wrap = document.getElementById('att-rep-map-wrap'); if (!wrap) return;
+  if (_attRepMap) { _attRepMap.remove(); _attRepMap = null; }
+
+  const center = _attCurrentLocation || ATT_OFFICE;
+  _attRepMap = L.map(wrap, { zoomControl: true, scrollWheelZoom: false }).setView(center, 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(_attRepMap);
+  L.marker(ATT_OFFICE, { icon: _attGreenDot() }).addTo(_attRepMap).bindPopup('Office');
+  if (_attCurrentLocation) L.marker(_attCurrentLocation, { icon: _attBlueDot() }).addTo(_attRepMap).bindPopup('You');
+  _attRepMap.fitBounds(L.latLngBounds([ATT_OFFICE, center]), { padding: [40, 40] });
+}
+
+function refreshAttMap()    { loadAttendanceScreen(); }
+function refreshRepAttMap() {
+  _attGetLocation().then(loc => {
+    _attCurrentLocation = loc;
+    if (loc && currentUser?.id) {
+      sb.from('live_locations').upsert({
+        employee_id:   currentUser.id,
+        employee_name: currentUser.full_name || 'Unknown',
+        lat:           loc[0],
+        lng:           loc[1],
+        updated_at:    new Date().toISOString(),
+      }, { onConflict: 'employee_id' }).then(() => {});
+    }
+    _initAttRepMap();
+  });
+}
+
+function _attBlueDot() { return L.divIcon({ className: '', html: '<div style="width:14px;height:14px;border-radius:50%;background:#4B6FED;border:3px solid #fff;box-shadow:0 0 0 4px rgba(75,111,237,.25);"></div>', iconSize: [14, 14], iconAnchor: [7, 7] }); }
+function _attGreenDot() { return L.divIcon({ className: '', html: '<div style="width:14px;height:14px;border-radius:50%;background:#1D9E75;border:3px solid #fff;box-shadow:0 0 0 4px rgba(29,158,117,.25);"></div>', iconSize: [14, 14], iconAnchor: [7, 7] }); }
+
+// ─────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────
+function _attGetLocation() {
+  return new Promise(resolve => {
+    _attLocationIsReal = false;
+    _attLocationError  = '';
+
+    if (!navigator.geolocation) {
+      _attLocationError = 'Geolocation is not supported by this browser.';
+      resolve(ATT_OFFICE);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        _attLocationIsReal = true;
+        resolve([pos.coords.latitude, pos.coords.longitude]);
+      },
+      err => {
+        if (err.code === 1) _attLocationError = 'Location permission denied. Allow location access for this site in your browser settings.';
+        else if (err.code === 2) _attLocationError = 'Could not determine your position. Make sure GPS/location services are turned on.';
+        else if (err.code === 3) _attLocationError = 'Location request timed out. Try again.';
+        else _attLocationError = 'Could not get your location.';
+        resolve(ATT_OFFICE);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  });
+}
+
+async function _attRetryLocation() {
+  _attCurrentLocation = await _attGetLocation();
+  if (!_attLocationIsReal) {
+    alert('⚠️ ' + (_attLocationError || 'Could not access your location.') +
+      '\n\nTo fix this:\n1. Click the lock/info icon next to the address bar.\n2. Find "Location" and set it to Allow.\n3. Reload the page and click Enable Location again.');
+  }
+  if (isSalesRep()) { _loadRepAttendanceView(); } else { _renderAdminMyCard(); }
+}
+
+async function _attReverseGeocode(lat, lng) {
+  try {
+    // First call: zoom=19 for fine-grained building-level detail
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=19&addressdetails=1&namedetails=1`,
+      { headers: { 'Accept-Language': 'en' } }
+    );
+    const data = await res.json();
+    if (!data || !data.address) return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+    const a    = data.address;
+    const name = data.name || data.namedetails?.name || null; // named place (e.g. "Shoprite Lugogo")
+
+    // ── LAYER 1: Named building / amenity / POI ──────────────────────────────
+    // Nominatim returns the place's proper name in data.name when zoomed in
+    const placeName =
+      name                                                       // e.g. "Kampala Capital City Authority"
+      || a.amenity        // restaurant, bank, school …
+      || a.shop           // supermarket, pharmacy …
+      || a.office         // company office
+      || a.tourism        // hotel, museum …
+      || a.leisure        // park, sports centre …
+      || a.building       // generic building tag
+      || a.man_made       // tower, bridge …
+      || a.craft          // tailor, bakery …
+      || a.historic       // monument …
+      || null;
+
+    // ── LAYER 2: Nearest road ────────────────────────────────────────────────
+    const houseNo = a.house_number || null;
+    const road    =
+      a.road           // most common
+      || a.pedestrian
+      || a.path
+      || a.footway
+      || a.cycleway
+      || a.service
+      || null;
+    const streetPart = houseNo && road ? `${houseNo} ${road}`
+                     : road            ? road
+                     : houseNo         ? houseNo
+                     : null;
+
+    // ── LAYER 3: Neighbourhood / estate ─────────────────────────────────────
+    const neighbourhood =
+      a.neighbourhood
+      || a.quarter
+      || a.estate
+      || a.residential
+      || a.allotments
+      || null;
+
+    // ── LAYER 4: Suburb / village ────────────────────────────────────────────
+    const suburb = a.suburb || a.village || a.hamlet || null;
+
+    // ── LAYER 5: City ────────────────────────────────────────────────────────
+    const city = a.city || a.town || a.municipality || a.city_district || null;
+
+    // ── ASSEMBLE: deduplicate, then join ─────────────────────────────────────
+    const seen  = new Set();
+    const parts = [placeName, streetPart, neighbourhood, suburb, city]
+      .filter(p => {
+        if (!p) return false;
+        const key = p.toLowerCase().trim();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+    // Ideal result: "Shoprite Lugogo, Lugogo Bypass, Nakawa, Kampala"
+    if (parts.length >= 1) return parts.slice(0, 4).join(', ');
+
+    // ── FALLBACK: use display_name but strip country & trim ──────────────────
+    if (data.display_name) {
+      const segs = data.display_name.split(',').map(s => s.trim())
+        .filter(s => s.toLowerCase() !== 'uganda');
+      return segs.slice(0, 3).join(', ');
+    }
+
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+  } catch (e) {
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }
+}
+
+function _attDistKm(a, b) {
+  const R = 6371, dLat = (b[0]-a[0])*Math.PI/180, dLng = (b[1]-a[1])*Math.PI/180;
+  const lat1 = a[0]*Math.PI/180, lat2 = b[0]*Math.PI/180;
+  const s = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+
+function _attFormatDuration(start, end) {
+  const ms = new Date(end) - new Date(start);
+  const h  = Math.floor(ms / 3600000);
+  const m  = Math.floor((ms % 3600000) / 60000);
+  return `${h}h ${m}m`;
+}
+
+function _attRunningHours(start) {
+  return _attFormatDuration(start, new Date().toISOString());
+}
+
+function _attWeekStart() {
+  const d = new Date();
+  d.setDate(d.getDate() - d.getDay());
+  return d.toISOString().split('T')[0];
+}
+
 // ═══════════════════════════════════════════════════════
 // CRM MODULE — KingdoField
 // ═══════════════════════════════════════════════════════
@@ -8041,12 +10441,10 @@ function exportActivitiesCSV() {
 function loadCRMSettings(){
   const repSel=document.getElementById('crm-default-rep');
   if(repSel) repSel.innerHTML='<option value="">— Select rep —</option>'+(currentUser?.role!=='sales_rep'?'<option>'+currentUser?.full_name+'</option>':'');
-}
+} 
 function addLeadSource(){const inp=document.getElementById('new-source-inp');const v=inp.value.trim();if(!v)return;const el=document.getElementById('crm-sources-list');el.insertAdjacentHTML('beforeend',`<span class="badge bb">${v}</span>`);inp.value='';}
 function addCustomStage(){const name=prompt('New stage name:');if(!name||!name.trim())return;document.getElementById('crm-stages-list').insertAdjacentHTML('beforeend',`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-bottom:0.5px solid var(--brd);font-size:12.5px;"><span>🔵 ${name.trim()}</span><button class="btn btn-sm" style="font-size:10px;padding:2px 8px;">Edit</button></div>`);}
 function saveCRMSettings(){alert('✅ CRM settings saved!');}
-
 </script>
-
 </body>
 </html>
