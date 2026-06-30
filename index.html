@@ -2220,7 +2220,7 @@ const canManage  = () => ['admin','manager'].includes(currentUser?.role);
 
 
 const NAV = [
-  {id:'attendance', label:'Attendance', sec:'Main', icon:'M8 1a7 7 0 100 14A7 7 0 008 1zm0 3v4l3 2M3.5 13.5l9-9', adminOnly:true},
+    {id:'attendance', label:'Attendance', sec:'Main', icon:'M8 1a7 7 0 100 14A7 7 0 008 1zm0 3v4l3 2M3.5 13.5l9-9'},
   {id:'dashboard', label:'Dashboard', sec:'Main', icon:'M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H9z'},
   {id:'clients',   label:'Clients',   sec:'Main', icon:'M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z'},
   {id:'orders',    label:'Place Listing', sec:'Main', icon:'M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zm1 3h6M5 7h6M5 10h3'},
@@ -2240,7 +2240,7 @@ function buildNav(containerId, withClose=false) {
 
   // Role-specific nav items
   const repOnlyIds  = ['attendance','dashboard','clients','orders','wallet','crm'];
-const managerIds  = ['dashboard','clients','orders','wallet','targets','reports','team','admin','crm'];
+const managerIds  = ['dashboard','clients','orders','wallet','targets','reports','team','admin','crm','attendance'];
   // Admin gets everything
 
   let html = '', lastSec = '';
@@ -2500,7 +2500,7 @@ function goTo(screen) {
     return;
   }
   if (screen==='reports' && isSalesRep()) { alert('You do not have permission to view reports.'); return; }
-if (screen==='attendance' && !canAdmin()) { return; }
+// attendance now open to all roles — no restriction
   if (screen==='admin' && isSalesRep()) return;
 if (screen==='admin' && !canManage()) return;
   currentScreen = screen;
