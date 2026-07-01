@@ -200,7 +200,7 @@ tr:hover td{background:var(--bg2);}
   #products-table-wrap,#att-table-wrap,#att-rep-history-tbody,#orders-report-tbody,#wadmin-table-wrap,.saved-listings-panel,#client-products-table,#client-listable-table,#client-listed-table,#client-notbought-table{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;display:block!important;width:100%!important;}
   .two-col{grid-template-columns:1fr;}
   .fgrid{grid-template-columns:1fr;}
-  .content{padding:10px;overflow-x:hidden!important;overflow-y:auto!important;}
+  .content{padding:10px;overflow-x:auto!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;}
   .card{padding:12px;margin-bottom:10px;}
   #clients-grid{grid-template-columns:1fr!important;}
   .listing-layout{grid-template-columns:1fr!important;}
@@ -236,7 +236,7 @@ tr:hover td{background:var(--bg2);}
   #screen-orders .listing-layout > div:first-child{
     order:1;
   }
-}
+}   
   .mob-bar{height:50px;}
   .mc::after{display:none;}
   .date-range-strip{gap:6px;}
@@ -8657,11 +8657,7 @@ async function _initAttAdminMap(records) {
   _attAdminMap = L.map(wrap, { zoomControl: true, scrollWheelZoom: false }).setView(ATT_OFFICE, 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(_attAdminMap);
 
-  // Office marker (green)
-  L.marker(ATT_OFFICE, { icon: _attGreenDot() }).addTo(_attAdminMap)
-    .bindPopup('<strong>🏢 Office</strong><br>Kingdom Trading Ltd');
-
-  const bounds = [ATT_OFFICE];
+  const bounds = [];
 
   // ── LIVE locations from live_locations table ──
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
@@ -8785,9 +8781,7 @@ function _initAttRepMap() {
   const center = _attCurrentLocation || ATT_OFFICE;
   _attRepMap = L.map(wrap, { zoomControl: true, scrollWheelZoom: false }).setView(center, 15);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(_attRepMap);
-  L.marker(ATT_OFFICE, { icon: _attGreenDot() }).addTo(_attRepMap).bindPopup('Office');
   if (_attCurrentLocation) L.marker(_attCurrentLocation, { icon: _attBlueDot() }).addTo(_attRepMap).bindPopup('You');
-  _attRepMap.fitBounds(L.latLngBounds([ATT_OFFICE, center]), { padding: [40, 40] });
 }
 
 function refreshAttMap()    { loadAttendanceScreen(); }
