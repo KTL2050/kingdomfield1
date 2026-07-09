@@ -2318,6 +2318,10 @@ window.onload = async () => {
   else { hideLoading(); showLogin(); }
 };
 
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js').catch(console.warn);
+}
+
 async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pass  = document.getElementById('login-pass').value;
