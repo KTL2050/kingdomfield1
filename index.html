@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>KTLSALES — Kingdom Trading Ltd</title>
 <link rel="manifest" href="/manifest.json"/>
-<meta name="theme-color" content="#1a3a6b"/>
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+<meta name="theme-color" content="#1a3a6b"/>   
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/> 
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="KTLSALES"/>
@@ -174,6 +174,19 @@ tr:hover td{background:var(--bg2);}
 .assign-tag button{background:none;border:none;cursor:pointer;color:var(--royal);font-size:12px;line-height:1;padding:0 0 0 2px;opacity:0.6;}
 .assign-tag button:hover{opacity:1;}
 .rep-scope-banner{display:flex;align-items:center;gap:8px;padding:9px 13px;background:linear-gradient(90deg,var(--royal-light),#f0f4fc);border:0.5px solid var(--royal-border);border-radius:9px;font-size:12px;color:var(--royal);margin-bottom:12px;font-weight:500;}
+  /* ── PWA INSTALL BANNER ── */
+#pwa-install-banner{position:fixed;left:0;right:0;bottom:0;background:#1a1a1a;color:#fff;padding:14px 18px;display:none;align-items:center;justify-content:space-between;gap:14px;z-index:99999;box-shadow:0 -4px 20px rgba(0,0,0,0.25);flex-wrap:wrap;}
+#pwa-install-banner.show{display:flex;}
+#pwa-install-text{flex:1;min-width:200px;}
+#pwa-install-title{font-size:13px;font-weight:700;color:var(--gold-mid);margin-bottom:2px;}
+#pwa-install-sub{font-size:11.5px;color:rgba(255,255,255,0.6);}
+#pwa-install-actions{display:flex;gap:8px;flex-shrink:0;}
+.pwa-btn{padding:8px 16px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;border:none;font-family:inherit;}
+.pwa-btn-install{background:var(--gold-mid);color:#fff;}
+.pwa-btn-install:hover{background:var(--gold);}
+.pwa-btn-dismiss{background:#333;color:#ccc;}
+.pwa-btn-dismiss:hover{background:#444;}
+@media(max-width:480px){#pwa-install-banner{flex-direction:column;align-items:flex-start;}#pwa-install-actions{width:100%;}.pwa-btn{flex:1;text-align:center;}}
 
 /* ── LISTING SUMMARY SHARE PANEL ── */
 .share-panel{background:linear-gradient(135deg,var(--royal) 0%,var(--royal-mid) 100%);border-radius:12px;padding:16px;color:#fff;margin-top:14px;}
@@ -2322,6 +2335,34 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/service-worker.js').catch(console.warn);
 }
 
+  let _deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  const dismissedAt = localStorage.getItem('ktl_pwa_dismissed_at');
+  if (dismissedAt && (Date.now() - Number(dismissedAt)) < 7 * 24 * 60 * 60 * 1000) return;
+  document.getElementById('pwa-install-banner')?.classList.add('show');
+});
+
+async function triggerPwaInstall() {
+  const banner = document.getElementById('pwa-install-banner');
+  if (!_deferredInstallPrompt) { banner?.classList.remove('show'); return; }
+  _deferredInstallPrompt.prompt();
+  await _deferredInstallPrompt.userChoice;
+  _deferredInstallPrompt = null;
+  banner?.classList.remove('show');
+}
+
+function dismissPwaInstall() {
+  document.getElementById('pwa-install-banner')?.classList.remove('show');
+  localStorage.setItem('ktl_pwa_dismissed_at', String(Date.now()));
+}
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('pwa-install-banner')?.classList.remove('show');
+  _deferredInstallPrompt = null;
+});
 async function doLogin() {
   const email = document.getElementById('login-email').value.trim();
   const pass  = document.getElementById('login-pass').value;
@@ -10450,5 +10491,15 @@ function addLeadSource(){const inp=document.getElementById('new-source-inp');con
 function addCustomStage(){const name=prompt('New stage name:');if(!name||!name.trim())return;document.getElementById('crm-stages-list').insertAdjacentHTML('beforeend',`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-bottom:0.5px solid var(--brd);font-size:12.5px;"><span>🔵 ${name.trim()}</span><button class="btn btn-sm" style="font-size:10px;padding:2px 8px;">Edit</button></div>`);}
 function saveCRMSettings(){alert('✅ CRM settings saved!');}
 </script>
+<div id="pwa-install-banner">
+  <div id="pwa-install-text">
+    <div id="pwa-install-title">Add KTLSALES to your home screen</div>
+    <div id="pwa-install-sub">Works offline and opens faster as an installed app</div>
+  </div>
+  <div id="pwa-install-actions">
+    <button class="pwa-btn pwa-btn-dismiss" onclick="dismissPwaInstall()">Not now</button>
+    <button class="pwa-btn pwa-btn-install" onclick="triggerPwaInstall()">Install</button>
+  </div>
+</div>
 </body>
 </html>
