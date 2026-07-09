@@ -5524,18 +5524,28 @@ async function _startLocationBroadcast() {
   }, 60000);
 }
 
-// Get current location
-  _attCurrentLocation = await _attGetLocation();
-  // Push live location to DB so admin can track — only if it's a REAL GPS fix
-  if (_attCurrentLocation && currentUser?.id && _attLocationIsReal) {
-    sb.from('live_locations').upsert({
+async function _pushLiveLocation() {
+  if (!currentUser?.id) return;
+  // Skip if page is hidden (tab is in background) to save battery,
+  // but still push when visible on ANY tab
+  try {
+    const loc = await Promise.race([
+      _attGetLocation(),
+      new Promise(resolve => setTimeout(() => resolve(null), 8000))
+    ]);
+    if (!loc) return;
+    _attCurrentLocation = loc;
+    await sb.from('live_locations').upsert({
       employee_id:   currentUser.id,
       employee_name: currentUser.full_name || 'Unknown',
-      lat:           _attCurrentLocation[0],
-      lng:           _attCurrentLocation[1],
+      lat:           loc[0],
+      lng:           loc[1],
       updated_at:    new Date().toISOString(),
-    }, { onConflict: 'employee_id' }).then(() => {});
+    }, { onConflict: 'employee_id' });
+  } catch(e) {
+    console.warn('Location broadcast failed:', e.message);
   }
+}
 
 function _stopLocationBroadcast() {
   if (_locBroadcastInterval) {
@@ -8829,7 +8839,7 @@ function refreshAttMap()    { loadAttendanceScreen(); }
 function refreshRepAttMap() {
   _attGetLocation().then(loc => {
     _attCurrentLocation = loc;
-    if (loc && currentUser?.id && _attLocationIsReal) {
+    if (loc && currentUser?.id) {
       sb.from('live_locations').upsert({
         employee_id:   currentUser.id,
         employee_name: currentUser.full_name || 'Unknown',
