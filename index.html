@@ -9,11 +9,12 @@
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/> 
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="KTLSALES"/>
+<meta name="apple-mobile-web-app-title" content="KTLSALES"/> 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{--royal:#1a3a6b;--royal-mid:#2451a0;--royal-light:#e8eef8;--royal-border:#b8c8e8;--gold:#b8860b;--gold-light:#fdf3d0;--gold-mid:#d4a017;--bg:#fff;--bg2:#eef2f8;--bg3:#e4ecf7;--txt:#1a1a18;--txt2:#6b6b67;--txt3:#9b9b96;--brd:rgba(26,58,107,0.12);--brd2:rgba(26,58,107,0.2);}
@@ -651,10 +652,26 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                 <div style="font-size:15px;font-weight:700;color:var(--txt);">Recent Attendance — All Staff</div>
                 <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Filter by date or search by name</div>
               </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                <div style="position:relative;">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--txt3)" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                  <input type="date" id="att-filter-date" style="padding:8px 10px 8px 32px;border:0.5px solid var(--brd2);border-radius:9px;font-size:12px;font-family:inherit;outline:none;background:var(--bg2);color:var(--txt);width:160px;" onchange="loadAttendanceTable()" onfocus="this.style.borderColor='var(--royal)'" onblur="this.style.borderColor='var(--brd2)'"/>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+                <div style="display:flex;flex-direction:column;gap:3px;">
+                  <label style="font-size:9.5px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;">Range</label>
+                  <select id="att-range-preset" onchange="onAttRangePresetChange()" style="padding:8px 10px;border:0.5px solid var(--brd2);border-radius:9px;font-size:12px;font-family:inherit;background:var(--bg2);color:var(--txt);cursor:pointer;">
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="this_week" selected>This Week</option>
+                    <option value="last7">Last 7 Days</option>
+                    <option value="this_month">This Month</option>
+                    <option value="last30">Last 30 Days</option>
+                    <option value="custom">Custom Range</option>
+                  </select>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:3px;">
+                  <label style="font-size:9.5px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;">From</label>
+                  <input type="date" id="att-filter-from" style="padding:8px 10px;border:0.5px solid var(--brd2);border-radius:9px;font-size:12px;font-family:inherit;outline:none;background:var(--bg2);color:var(--txt);width:150px;" onchange="onAttCustomDateChange()" onfocus="this.style.borderColor='var(--royal)'" onblur="this.style.borderColor='var(--brd2)'"/>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:3px;">
+                  <label style="font-size:9.5px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;">To</label>
+                  <input type="date" id="att-filter-to" style="padding:8px 10px;border:0.5px solid var(--brd2);border-radius:9px;font-size:12px;font-family:inherit;outline:none;background:var(--bg2);color:var(--txt);width:150px;" onchange="onAttCustomDateChange()" onfocus="this.style.borderColor='var(--royal)'" onblur="this.style.borderColor='var(--brd2)'"/>
                 </div>
                 <div style="position:relative;">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--txt3)" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
@@ -662,7 +679,7 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                 </div>
                 <button onclick="exportAttendanceCSV()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;background:var(--gold-mid);color:#fff;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;box-shadow:0 2px 6px rgba(212,160,23,0.3);transition:all 0.15s;" onmouseover="this.style.background='var(--gold)'" onmouseout="this.style.background='var(--gold-mid)'">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  Export CSV
+                  Export Excel
                 </button>
               </div>
             </div>
@@ -7875,8 +7892,10 @@ async function _loadAdminAttendanceView() {
   // Start real-time greeting & clock
   _startAttAdminClock();
 
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('att-filter-date').value = today;
+  const { from: _attInitFrom, to: _attInitTo } = _attGetRangeDates('this_week');
+  document.getElementById('att-range-preset').value = 'this_week';
+  document.getElementById('att-filter-from').value = _attInitFrom;
+  document.getElementById('att-filter-to').value = _attInitTo;
 
   // Load all users
   const { data: allUsers } = await sb.from('users').select('id,full_name,role').order('full_name');
@@ -8032,27 +8051,77 @@ async function _loadMyTodayRecord(view) {
   }
 }
 
+function _attGetRangeDates(preset) {
+  const today = new Date();
+  const fmt = d => d.toISOString().split('T')[0];
+  let from, to;
+  if (preset === 'today') {
+    from = to = fmt(today);
+  } else if (preset === 'yesterday') {
+    const d = new Date(today); d.setDate(d.getDate() - 1);
+    from = to = fmt(d);
+  } else if (preset === 'this_week') {
+    const d = new Date(today); d.setDate(d.getDate() - d.getDay());
+    from = fmt(d); to = fmt(today);
+  } else if (preset === 'last7') {
+    const d = new Date(today); d.setDate(d.getDate() - 6);
+    from = fmt(d); to = fmt(today);
+  } else if (preset === 'this_month') {
+    from = fmt(new Date(today.getFullYear(), today.getMonth(), 1)); to = fmt(today);
+  } else if (preset === 'last30') {
+    const d = new Date(today); d.setDate(d.getDate() - 29);
+    from = fmt(d); to = fmt(today);
+  } else {
+    from = document.getElementById('att-filter-from')?.value || fmt(today);
+    to   = document.getElementById('att-filter-to')?.value   || fmt(today);
+  }
+  return { from, to };
+}
+
+function onAttRangePresetChange() {
+  const preset = document.getElementById('att-range-preset').value;
+  const fromEl = document.getElementById('att-filter-from');
+  const toEl   = document.getElementById('att-filter-to');
+  if (preset === 'custom') {
+    if (!fromEl.value) fromEl.value = new Date().toISOString().split('T')[0];
+    if (!toEl.value)   toEl.value   = new Date().toISOString().split('T')[0];
+    loadAttendanceTable();
+    return;
+  }
+  const { from, to } = _attGetRangeDates(preset);
+  fromEl.value = from;
+  toEl.value   = to;
+  loadAttendanceTable();
+}
+
+function onAttCustomDateChange() {
+  document.getElementById('att-range-preset').value = 'custom';
+  loadAttendanceTable();
+}
+
 async function loadAttendanceTable() {
-  const tbody = document.getElementById('att-tbody');
-  const dateVal = document.getElementById('att-filter-date')?.value || new Date().toISOString().split('T')[0];
+  const tbody  = document.getElementById('att-tbody');
+  const preset = document.getElementById('att-range-preset')?.value || 'this_week';
+  const { from, to } = _attGetRangeDates(preset);
   const nameVal = (document.getElementById('att-filter-name')?.value || '').toLowerCase();
 
   tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:16px;color:var(--txt3);">Loading…</td></tr>';
 
-  const { data: recs, error } = await sb.from('attendance').select('*').gte('clock_in', dateVal + 'T00:00:00').lte('clock_in', dateVal + 'T23:59:59').order('clock_in', { ascending: false });
+  const { data: recs, error } = await sb.from('attendance').select('*').gte('clock_in', from + 'T00:00:00').lte('clock_in', to + 'T23:59:59').order('clock_in', { ascending: false });
 
   if (error) { tbody.innerHTML = `<tr><td colspan="8" style="color:#A32D2D;text-align:center;padding:16px;">Error: ${error.message}</td></tr>`; return; }
 
   let rows = recs || [];
   if (nameVal) rows = rows.filter(r => (r.employee_name || '').toLowerCase().includes(nameVal));
 
-  if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--txt3);">No records for this date.</td></tr>'; return; }
+  if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--txt3);">No records for this range.</td></tr>'; return; }
 
   tbody.innerHTML = rows.map(r => {
     const inTime  = new Date(r.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const outTime = r.clock_out ? new Date(r.clock_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--';
     const hours   = r.clock_out ? _attFormatDuration(r.clock_in, r.clock_out) : _attRunningHours(r.clock_in) + ' ▶';
     const initials = (r.employee_name || 'E').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    const rowDate = r.clock_in.split('T')[0];
     const inH = new Date(r.clock_in).getHours();
     const isLate = inH >= 9;
     return `<tr>
@@ -8060,7 +8129,7 @@ async function loadAttendanceTable() {
         <div style="width:32px;height:32px;border-radius:50%;background:var(--royal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">${initials}</div>
         <div><div style="font-weight:500;font-size:12.5px;">${r.employee_name || '—'}</div><div style="font-size:10.5px;color:var(--txt3);">${r.employee_id?.slice(0,8)||'—'}</div></div>
       </div></td>
-      <td style="font-size:11.5px;">${dateVal}</td>
+      <td style="font-size:11.5px;">${rowDate}</td>
       <td><span style="font-weight:700;color:${isLate?'#E8891A':'#1D9E75'};">${inTime}</span>${isLate ? ' <span class="badge ba" style="font-size:9px;">Late</span>' : ''}</td>
       <td style="font-weight:${r.clock_out?'700':'400'};color:${r.clock_out?'var(--txt)':'var(--txt3)'};">${outTime}</td>
       <td style="font-size:12px;font-weight:600;color:var(--royal);">${hours}</td>
@@ -8072,18 +8141,110 @@ async function loadAttendanceTable() {
 }
 
 async function exportAttendanceCSV() {
-  const dateVal = document.getElementById('att-filter-date')?.value || new Date().toISOString().split('T')[0];
-  const { data: recs } = await sb.from('attendance').select('*').gte('clock_in', dateVal + 'T00:00:00').lte('clock_in', dateVal + 'T23:59:59').order('clock_in', { ascending: false });
-  const rows = [['Employee','Date','Clock In','Clock Out','Hours','Status','Location']];
-  (recs || []).forEach(r => {
-    const inTime  = new Date(r.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    const outTime = r.clock_out ? new Date(r.clock_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
-    const hours   = r.clock_out ? _attFormatDuration(r.clock_in, r.clock_out) : 'Running';
-    rows.push([r.employee_name || '', dateVal, inTime, outTime, hours, r.clock_out ? 'Completed' : 'In', r.clock_in_location || '']);
+  const preset = document.getElementById('att-range-preset')?.value || 'this_week';
+  const { from, to } = _attGetRangeDates(preset);
+  const nameVal = (document.getElementById('att-filter-name')?.value || '').trim();
+  const { data: recs } = await sb.from('attendance').select('*').gte('clock_in', from + 'T00:00:00').lte('clock_in', to + 'T23:59:59').order('clock_in', { ascending: false });
+  let rows = recs || [];
+  if (nameVal) rows = rows.filter(r => (r.employee_name || '').toLowerCase().includes(nameVal.toLowerCase()));
+
+  if (rows.length === 0) {
+    alert(nameVal ? `No attendance records found for "${nameVal}" in this range.` : 'No attendance records found for this range.');
+    return;
+  }
+
+  if (typeof ExcelJS === 'undefined') {
+    alert('Export library did not load. Check your connection and try again.');
+    return;
+  }
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'KTLSALES';
+  wb.created = new Date();
+  const ws = wb.addWorksheet('Attendance', { views: [{ state: 'frozen', ySplit: 4 }] });
+
+  ws.columns = [
+    { key: 'employee', width: 24 },
+    { key: 'date',     width: 13 },
+    { key: 'in',       width: 13 },
+    { key: 'out',      width: 12 },
+    { key: 'hours',    width: 10 },
+    { key: 'status',   width: 14 },
+    { key: 'location', width: 46 },
+    { key: 'verified', width: 11 },
+  ];
+
+  // Title
+  ws.mergeCells('A1:H1');
+  const title = ws.getCell('A1');
+  title.value = 'Kingdom Trading Ltd — Attendance Report';
+  title.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF1A3A6B' } };
+  ws.getRow(1).height = 26;
+
+ // Subtitle
+  ws.mergeCells('A2:H2');
+  const sub = ws.getCell('A2');
+  const filterLabel = nameVal ? `  ·  Employee: ${nameVal}` : '';
+  sub.value = `Range: ${from} to ${to}${filterLabel}  ·  Generated ${new Date().toLocaleString('en-UG',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}`;
+  sub.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF6B6B67' } };
+  ws.getRow(2).height = 16;
+  ws.getRow(3).height = 6;
+
+  // Header row
+  const headerRow = ws.getRow(4);
+  headerRow.values = ['Employee','Date','Clock In','Clock Out','Hours','Status','Location','Verified'];
+  headerRow.height = 20;
+  headerRow.eachCell(cell => {
+    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A3A6B' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+    cell.border = { top: { style: 'thin', color: { argb: 'FFB8C8E8' } }, bottom: { style: 'thin', color: { argb: 'FFB8C8E8' } } };
   });
-  const csv = rows.map(r => r.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
-  const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  a.download = `Attendance_${dateVal}.csv`; a.click();
+
+  // Data rows
+  rows.forEach((r, i) => {
+    const inTime  = new Date(r.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const outTime = r.clock_out ? new Date(r.clock_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+    const hours   = r.clock_out ? _attFormatDuration(r.clock_in, r.clock_out) : _attRunningHours(r.clock_in);
+    const status  = r.clock_out ? 'Completed' : 'Clocked In';
+    const dateStr = r.clock_in.split('T')[0];
+    const isLate  = new Date(r.clock_in).getHours() >= 9;
+
+    const row = ws.addRow({
+      employee: r.employee_name || '—',
+      date:     dateStr,
+      in:       inTime + (isLate ? ' (Late)' : ''),
+      out:      outTime,
+      hours:    hours,
+      status:   status,
+      location: r.clock_in_location || (r.clock_in_lat ? `${r.clock_in_lat.toFixed(3)}, ${r.clock_in_lng.toFixed(3)}` : '—'),
+      verified: r.clock_in_photo_url ? '✓ Yes' : '—',
+    });
+
+    if (i % 2 === 1) row.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F7FC' } }; });
+
+    row.eachCell((cell, col) => {
+      cell.font = { name: 'Calibri', size: 10.5, ...(cell.font || {}) };
+      cell.border = { bottom: { style: 'hair', color: { argb: 'FFE0E5EE' } } };
+      if (col === 3 && isLate) cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FFE8891A' } };
+      if (col === 6) cell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: status === 'Completed' ? 'FF1D9E75' : 'FF2451A0' } };
+    });
+  });
+
+  // Footer
+  const totalRow = ws.addRow({ status: 'Total records:', location: rows.length });
+  totalRow.getCell(6).font = { bold: true, size: 10.5 };
+  totalRow.getCell(7).font = { bold: true, size: 10.5, color: { argb: 'FF1A3A6B' } };
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const safeName = nameVal ? '_' + nameVal.replace(/[^a-z0-9]+/gi, '_') : '';
+  a.download = `KTL_Attendance${safeName}_${from}_to_${to}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 
