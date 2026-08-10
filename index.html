@@ -217,7 +217,7 @@ tr:hover td{background:var(--bg2);}
   .card{overflow:hidden!important;}
   [style*="overflow-x:auto"]{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;}
   table{min-width:500px;}
-  #products-table-wrap,#att-table-wrap,#att-rep-history-tbody,#orders-report-tbody,#wadmin-table-wrap,.saved-listings-panel,#client-products-table,#client-listable-table,#client-listed-table,#client-notbought-table{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;display:block!important;width:100%!important;}
+  #products-table-wrap,#att-table-wrap,#att-rep-history-wrap,#orders-report-tbody,#wadmin-table-wrap,.saved-listings-panel,#client-products-table,#client-listable-table,#client-listed-table,#client-notbought-table{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;display:block!important;width:100%!important;}
   .two-col{grid-template-columns:1fr;}
   .fgrid{grid-template-columns:1fr;}
   .content{padding:10px;overflow-x:auto!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;}
@@ -693,13 +693,14 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                     <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Clock Out</th>
                     <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Hours</th>
                     <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Status</th>
-                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Location</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Clock In Location</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Clock Out Location</th>
                     <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">Verified</th>
                   </tr>
                 </thead>
                 <tbody id="att-tbody">
                   <tr>
-                    <td colspan="8" style="text-align:center;padding:40px 20px;">
+                    <td colspan="9" style="text-align:center;padding:40px 20px;">
                       <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
                         <div style="width:52px;height:52px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;">
                           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4A6FD4" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
@@ -856,7 +857,7 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                 View All History
               </button>
             </div>
-            <div style="overflow-x:auto;">
+            <div style="overflow-x:auto;" id="att-rep-history-wrap">
               <table style="width:100%;">
                 <thead>
                   <tr style="background:#F8FAFF;">
@@ -865,7 +866,8 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                     <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">CLOCK OUT</th>
                     <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">HOURS</th>
                     <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">STATUS</th>
-                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">LOCATION</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">CLOCK IN LOCATION</th>
+                    <th style="padding:10px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.07em;border-bottom:0.5px solid var(--brd);">CLOCK OUT LOCATION</th>
                   </tr>
                 </thead>
                 <tbody id="att-rep-history-tbody">
@@ -7892,6 +7894,7 @@ async function _loadAdminAttendanceView() {
   // Start real-time greeting & clock
   _startAttAdminClock();
 
+  const today = new Date().toISOString().split('T')[0];
   const { from: _attInitFrom, to: _attInitTo } = _attGetRangeDates('this_week');
   document.getElementById('att-range-preset').value = 'this_week';
   document.getElementById('att-filter-from').value = _attInitFrom;
@@ -8105,16 +8108,16 @@ async function loadAttendanceTable() {
   const { from, to } = _attGetRangeDates(preset);
   const nameVal = (document.getElementById('att-filter-name')?.value || '').toLowerCase();
 
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:16px;color:var(--txt3);">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:16px;color:var(--txt3);">Loading…</td></tr>';
 
   const { data: recs, error } = await sb.from('attendance').select('*').gte('clock_in', from + 'T00:00:00').lte('clock_in', to + 'T23:59:59').order('clock_in', { ascending: false });
 
-  if (error) { tbody.innerHTML = `<tr><td colspan="8" style="color:#A32D2D;text-align:center;padding:16px;">Error: ${error.message}</td></tr>`; return; }
+  if (error) { tbody.innerHTML = `<tr><td colspan="9" style="color:#A32D2D;text-align:center;padding:16px;">Error: ${error.message}</td></tr>`; return; }
 
   let rows = recs || [];
   if (nameVal) rows = rows.filter(r => (r.employee_name || '').toLowerCase().includes(nameVal));
 
-  if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--txt3);">No records for this range.</td></tr>'; return; }
+  if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--txt3);">No records for this range.</td></tr>'; return; }
 
   tbody.innerHTML = rows.map(r => {
     const inTime  = new Date(r.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -8124,6 +8127,8 @@ async function loadAttendanceTable() {
     const rowDate = r.clock_in.split('T')[0];
     const inH = new Date(r.clock_in).getHours();
     const isLate = inH >= 9;
+    const inLoc  = r.clock_in_location  || (r.clock_in_lat  ? r.clock_in_lat.toFixed(3)  + ', ' + r.clock_in_lng.toFixed(3)  : '—');
+    const outLoc = r.clock_out ? (r.clock_out_location || (r.clock_out_lat ? r.clock_out_lat.toFixed(3) + ', ' + r.clock_out_lng.toFixed(3) : '—')) : '—';
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:9px;">
         <div style="width:32px;height:32px;border-radius:50%;background:var(--royal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">${initials}</div>
@@ -8134,7 +8139,8 @@ async function loadAttendanceTable() {
       <td style="font-weight:${r.clock_out?'700':'400'};color:${r.clock_out?'var(--txt)':'var(--txt3)'};">${outTime}</td>
       <td style="font-size:12px;font-weight:600;color:var(--royal);">${hours}</td>
       <td><span class="badge ${r.clock_out ? 'bg' : 'bb'}">${r.clock_out ? 'Completed' : 'Clocked In'}</span></td>
-      <td style="font-size:11px;color:var(--txt3);">${r.clock_in_location || (r.clock_in_lat ? r.clock_in_lat.toFixed(3) + ', ' + r.clock_in_lng.toFixed(3) : '—')}</td>
+      <td style="font-size:11px;color:var(--txt3);">${inLoc}</td>
+      <td style="font-size:11px;color:${r.clock_out ? 'var(--txt3)' : 'var(--txt3)'};font-style:${r.clock_out ? 'normal' : 'italic'};">${outLoc}</td>
       <td><span style="width:22px;height:22px;border-radius:50%;background:${r.clock_in_photo_url?'#EAF3DE':'var(--brd)'};color:${r.clock_in_photo_url?'#1D9E75':'var(--txt3)'};display:inline-flex;align-items:center;justify-content:center;font-size:12px;">✓</span></td>
     </tr>`;
   }).join('');
@@ -8170,19 +8176,20 @@ async function exportAttendanceCSV() {
     { key: 'out',      width: 12 },
     { key: 'hours',    width: 10 },
     { key: 'status',   width: 14 },
-    { key: 'location', width: 46 },
+    { key: 'inloc',    width: 40 },
+    { key: 'outloc',   width: 40 },
     { key: 'verified', width: 11 },
   ];
 
   // Title
-  ws.mergeCells('A1:H1');
+  ws.mergeCells('A1:I1');
   const title = ws.getCell('A1');
   title.value = 'Kingdom Trading Ltd — Attendance Report';
   title.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF1A3A6B' } };
   ws.getRow(1).height = 26;
 
  // Subtitle
-  ws.mergeCells('A2:H2');
+  ws.mergeCells('A2:I2');
   const sub = ws.getCell('A2');
   const filterLabel = nameVal ? `  ·  Employee: ${nameVal}` : '';
   sub.value = `Range: ${from} to ${to}${filterLabel}  ·  Generated ${new Date().toLocaleString('en-UG',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}`;
@@ -8192,7 +8199,7 @@ async function exportAttendanceCSV() {
 
   // Header row
   const headerRow = ws.getRow(4);
-  headerRow.values = ['Employee','Date','Clock In','Clock Out','Hours','Status','Location','Verified'];
+  headerRow.values = ['Employee','Date','Clock In','Clock Out','Hours','Status','Clock In Location','Clock Out Location','Verified'];
   headerRow.height = 20;
   headerRow.eachCell(cell => {
     cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -8217,7 +8224,8 @@ async function exportAttendanceCSV() {
       out:      outTime,
       hours:    hours,
       status:   status,
-      location: r.clock_in_location || (r.clock_in_lat ? `${r.clock_in_lat.toFixed(3)}, ${r.clock_in_lng.toFixed(3)}` : '—'),
+      inloc:    r.clock_in_location  || (r.clock_in_lat  ? `${r.clock_in_lat.toFixed(3)}, ${r.clock_in_lng.toFixed(3)}`   : '—'),
+      outloc:   r.clock_out ? (r.clock_out_location || (r.clock_out_lat ? `${r.clock_out_lat.toFixed(3)}, ${r.clock_out_lng.toFixed(3)}` : '—')) : '—',
       verified: r.clock_in_photo_url ? '✓ Yes' : '—',
     });
 
@@ -8232,7 +8240,7 @@ async function exportAttendanceCSV() {
   });
 
   // Footer
-  const totalRow = ws.addRow({ status: 'Total records:', location: rows.length });
+  const totalRow = ws.addRow({ status: 'Total records:', inloc: rows.length });
   totalRow.getCell(6).font = { bold: true, size: 10.5 };
   totalRow.getCell(7).font = { bold: true, size: 10.5, color: { argb: 'FF1A3A6B' } };
 
@@ -8350,19 +8358,22 @@ async function _loadRepHistory() {
   const tbody = document.getElementById('att-rep-history-tbody');
   const { data: recs } = await sb.from('attendance').select('*').eq('employee_id', currentUser.id).order('clock_in', { ascending: false }).limit(20);
   const rows = recs || [];
-  if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--txt3);">No records yet.</td></tr>'; return; }
+  if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--txt3);">No records yet.</td></tr>'; return; }
   tbody.innerHTML = rows.map(r => {
     const dateStr = new Date(r.clock_in).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     const inTime  = new Date(r.clock_in).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const outTime = r.clock_out ? new Date(r.clock_out).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:--';
     const hours   = r.clock_out ? _attFormatDuration(r.clock_in, r.clock_out) : _attRunningHours(r.clock_in) + ' ▶';
+    const inLoc   = r.clock_in_location  || (r.clock_in_lat  ? r.clock_in_lat.toFixed(3)  + ', ' + r.clock_in_lng.toFixed(3)  : '—');
+    const outLoc  = r.clock_out ? (r.clock_out_location || (r.clock_out_lat ? r.clock_out_lat.toFixed(3) + ', ' + r.clock_out_lng.toFixed(3) : '—')) : '—';
     return `<tr>
       <td style="font-size:11.5px;">${dateStr}</td>
       <td style="font-weight:700;color:#1D9E75;">${inTime}</td>
       <td style="font-weight:${r.clock_out?'700':'400'};color:${r.clock_out?'var(--txt)':'var(--txt3)'};">${outTime}</td>
       <td style="font-size:12px;font-weight:600;color:var(--royal);">${hours}</td>
       <td><span class="badge ${r.clock_out?'bg':'bb'}">${r.clock_out?'Completed':'Running'}</span></td>
-      <td style="font-size:11px;color:var(--txt3);">${r.clock_in_location || (r.clock_in_lat ? r.clock_in_lat.toFixed(3) + ', ' + r.clock_in_lng.toFixed(3) : '—')}</td>
+      <td style="font-size:11px;color:var(--txt3);">${inLoc}</td>
+      <td style="font-size:11px;color:var(--txt3);">${outLoc}</td>
     </tr>`;
   }).join('');
 }
