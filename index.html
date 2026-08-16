@@ -72,12 +72,17 @@ nav{flex:1;padding:8px;overflow-y:auto;}
 .topbar-greeting{display:flex;flex-direction:column;justify-content:center;}
 .topbar-greeting-name{font-size:15px;font-weight:700;color:var(--txt);letter-spacing:-0.01em;line-height:1.1;}
 .topbar-greeting-sub{font-size:11px;color:var(--txt3);margin-top:1px;}
-.topbar-right{display:flex;align-items:center;gap:10px;}
-#sync-status{font-size:11px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;}
-.sync-btn{padding:6px 13px;border-radius:8px;background:var(--gold-mid);color:#fff;border:none;cursor:pointer;font-size:12px;font-family:inherit;font-weight:500;box-shadow:0 1px 4px rgba(212,160,23,0.3);transition:all 0.15s;}
+.topbar-right{display:flex;align-items:center;gap:10px;flex-shrink:0;white-space:nowrap;}
+/* Client/product counts hidden — the element stays so existing JS keeps working */
+#sync-status{display:none;}
+/* Every control in the topbar shares one height so they sit on a common baseline */
+.topbar-right > *{height:34px;flex-shrink:0;}
+#topbar-datetime{height:34px;}
+#lv-bell{margin-left:6px;margin-right:2px;}
+.sync-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 14px;border-radius:9px;background:var(--gold-mid);color:#fff;border:none;cursor:pointer;font-size:12px;line-height:1;font-family:inherit;font-weight:600;letter-spacing:0.01em;box-shadow:0 1px 4px rgba(212,160,23,0.3);transition:all 0.15s;}
 .sync-btn:hover{background:var(--gold);box-shadow:0 2px 8px rgba(212,160,23,0.4);}
-.signout-btn{padding:5px 11px;border-radius:7px;border:0.5px solid var(--brd2);background:transparent;cursor:pointer;font-size:11px;color:var(--txt3);font-family:inherit;transition:all 0.15s;}
-.signout-btn:hover{background:var(--bg2);color:var(--txt);}
+.signout-btn{display:inline-flex;align-items:center;justify-content:center;padding:0 14px;border-radius:9px;border:0.5px solid var(--brd2);background:var(--bg);cursor:pointer;font-size:12px;line-height:1;color:var(--txt2);font-family:inherit;font-weight:500;transition:all 0.15s;}
+.signout-btn:hover{background:var(--bg2);color:var(--txt);border-color:var(--royal-border);}
 .content{flex:1;overflow-y:auto;padding:18px;}
 .screen{display:none;}
 .screen.active{display:block;}
@@ -87,6 +92,45 @@ nav{flex:1;padding:8px;overflow-y:auto;}
 .mc-lbl{font-size:10.5px;font-weight:600;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.07em;}
 .mc-val{font-size:22px;font-weight:700;letter-spacing:-0.03em;line-height:1;}
 .mc-sub{font-size:10.5px;margin-top:4px;color:var(--txt3);}
+
+/* ── Dashboard metric cards — scoped so Attendance/Wallet cards stay as they are ── */
+#screen-dashboard .metrics-grid{gap:14px;margin-bottom:18px;}
+#screen-dashboard .mc{background:var(--bg);border:0.5px solid var(--brd);border-radius:14px;padding:16px 18px;box-shadow:0 1px 3px rgba(16,24,40,0.04),0 1px 2px rgba(16,24,40,0.03);transition:box-shadow 0.18s,transform 0.18s;}
+#screen-dashboard .mc:hover{box-shadow:0 6px 20px rgba(16,24,40,0.08);transform:translateY(-1px);}
+#screen-dashboard .mc::after{content:none;}
+#screen-dashboard .mc-lbl{font-size:12px;font-weight:500;color:var(--txt2);text-transform:none;letter-spacing:0;margin-bottom:5px;}
+#screen-dashboard .mc-val{font-size:26px;font-weight:700;letter-spacing:-0.03em;line-height:1.05;color:var(--txt);}
+#screen-dashboard .mc-sub{font-size:11px;color:var(--txt3);margin-top:3px;}
+
+/* ── Attendance metric cards — match Dashboard sizing exactly ── */
+#screen-attendance .metrics-grid{gap:14px;margin-bottom:18px;}
+#screen-attendance .mc{background:var(--bg);border:0.5px solid var(--brd);border-radius:14px;padding:16px 18px;box-shadow:0 1px 3px rgba(16,24,40,0.04),0 1px 2px rgba(16,24,40,0.03);transition:box-shadow 0.18s,transform 0.18s;}
+#screen-attendance .mc:hover{box-shadow:0 6px 20px rgba(16,24,40,0.08);transform:translateY(-1px);}
+#screen-attendance .mc::after{content:none;}
+#screen-attendance .mc-lbl{font-size:12px;font-weight:500;color:var(--txt2);text-transform:none;letter-spacing:0;margin-bottom:5px;}
+#screen-attendance .mc-val{font-size:26px;font-weight:700;letter-spacing:-0.03em;line-height:1.05;color:var(--txt);}
+#screen-attendance .mc-sub{font-size:11px;color:var(--txt3);margin-top:3px;}
+.mc-top{display:flex;align-items:flex-start;gap:13px;}
+.mc-ico{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.mc-body{flex:1;min-width:0;}
+.mc-dots{position:absolute;top:13px;right:15px;color:var(--txt3);font-size:13px;line-height:1;letter-spacing:1.5px;user-select:none;}
+.mc-delta{display:none;align-items:center;gap:4px;font-size:11px;font-weight:600;margin-top:6px;}
+.mc-delta.show{display:inline-flex;}
+.mc-delta.up{color:#1D9E75;}
+.mc-delta.down{color:#E24B4A;}
+.mc-delta span.note{color:var(--txt3);font-weight:500;}
+
+/* ── Topbar user chip ── */
+.tb-user{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 11px 0 4px;border-radius:999px;border:0.5px solid var(--brd2);background:var(--bg);cursor:pointer;transition:all 0.15s;}
+.tb-user:hover{background:var(--bg2);border-color:var(--royal-border);}
+.tb-av{width:26px;height:26px;border-radius:50%;background:var(--royal);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.tb-name{font-size:12px;font-weight:600;color:var(--txt);white-space:nowrap;}
+.tb-chev{font-size:9px;color:var(--txt3);}
+.tb-menu{position:fixed;top:52px;right:20px;min-width:196px;background:var(--bg);border:0.5px solid var(--brd2);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,0.16);padding:6px;display:none;z-index:9400;}
+.tb-menu.open{display:block;}
+.tb-menu-hd{padding:9px 11px 10px;border-bottom:0.5px solid var(--brd);margin-bottom:5px;}
+.tb-menu-item{padding:9px 11px;border-radius:8px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:9px;color:var(--txt);}
+.tb-menu-item:hover{background:var(--bg2);}
 .card{background:var(--bg);border:0.5px solid var(--brd);border-radius:11px;padding:16px;margin-bottom:14px;box-shadow:0 1px 5px rgba(0,0,0,0.05),0 0 0 0.5px rgba(0,0,0,0.04);}
 .card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:8px;}
 .card-title{font-size:13px;font-weight:600;color:var(--txt);letter-spacing:-0.01em;}
@@ -230,10 +274,13 @@ tr:hover td{background:var(--bg2);}
   .topbar-greeting-sub{display:none;}
   #topbar-datetime{padding:4px 9px!important;gap:5px!important;}
   #topbar-datetime span{font-size:11px!important;}
-  .topbar-right{gap:6px;width:100%;justify-content:flex-end;padding-bottom:2px;}
-  .sync-btn{padding:5px 10px;font-size:11px;}
+  .topbar-right{gap:7px;width:100%;justify-content:flex-end;padding-bottom:2px;}
+  .topbar-right > *{height:31px;}
+  #topbar-datetime{height:31px;}
+  #lv-bell{margin-left:2px;margin-right:0;width:31px;}
+  .sync-btn{padding:0 11px;font-size:11px;}
   .signout-btn{display:none;}
-  #sync-status{display:none;}
+  .tb-user{display:none;}
   .mc{padding:11px 13px;}
   .mc-val{font-size:20px;}
   .mc-lbl{font-size:9.5px;}
@@ -437,6 +484,7 @@ body.role-admin .sidebar           { background: var(--royal); }
 /* Rep topbar status label */
 body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
 </style>
+<link rel="stylesheet" href="ktl-theme.css"/>
 </head>
 <body>
 
@@ -583,8 +631,25 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
       <!-- Row 2: action buttons -->
       <div class="topbar-right">
         <span id="sync-status">Syncing...</span>
-        <button class="sync-btn" id="sync-zoho-btn" onclick="openSyncModal()">&#8635; Sync Zoho</button>
-        <button class="signout-btn" onclick="signOut()">Sign out</button>
+        <button class="sync-btn" id="sync-zoho-btn" onclick="openSyncModal()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 11-2.64-6.36M21 3v6h-6"/></svg>
+          Sync Zoho
+        </button>
+        <div class="tb-user" onclick="toggleUserMenu(event)">
+          <div class="tb-av" id="tb-av">U</div>
+          <span class="tb-name" id="tb-uname">User</span>
+          <span class="tb-chev">▾</span>
+        </div>
+      </div>
+      <div class="tb-menu" id="tb-menu">
+        <div class="tb-menu-hd">
+          <div style="font-size:12.5px;font-weight:600;" id="tb-menu-name">User</div>
+          <div style="font-size:11px;color:var(--txt3);margin-top:1px;" id="tb-urole">Role</div>
+        </div>
+        <div class="tb-menu-item" onclick="signOut()">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M10 11l3-3-3-3M13 8H6"/></svg>
+          Sign out
+        </div>
       </div>
     </div>
     <div class="content">
@@ -599,25 +664,57 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
 
           <!-- Stat cards -->
           <div class="metrics-grid" style="margin-bottom:14px;">
-            <div class="mc" style="background:linear-gradient(135deg,#5B8DEF,#4A6FD4);border:none;">
-              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Present Today</div>
-              <div class="mc-val" id="att-present" style="color:#fff;">—</div>
-              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Clocked in</div>
+            <div class="mc">
+              <div class="mc-dots">•••</div>
+              <div class="mc-top">
+                <div class="mc-ico" style="background:#E7F7F0;color:#12A171;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+                </div>
+                <div class="mc-body">
+                  <div class="mc-lbl">Present Today</div>
+                  <div class="mc-val" id="att-present">—</div>
+                  <div class="mc-sub">Clocked in</div>
+                </div>
+              </div>
             </div>
-            <div class="mc" style="background:linear-gradient(135deg,#F06B6B,#E04545);border:none;">
-              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Absent Today</div>
-              <div class="mc-val" id="att-absent" style="color:#fff;">—</div>
-              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Not clocked in</div>
+            <div class="mc">
+              <div class="mc-dots">•••</div>
+              <div class="mc-top">
+                <div class="mc-ico" style="background:#FDECEC;color:#E24B4A;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+                </div>
+                <div class="mc-body">
+                  <div class="mc-lbl">Absent Today</div>
+                  <div class="mc-val" id="att-absent">—</div>
+                  <div class="mc-sub">Not clocked in</div>
+                </div>
+              </div>
             </div>
-            <div class="mc" style="background:linear-gradient(135deg,#4DB896,#2E9E75);border:none;">
-              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Clocked Out</div>
-              <div class="mc-val" id="att-clocked-out" style="color:#fff;">—</div>
-              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Completed today</div>
+            <div class="mc">
+              <div class="mc-dots">•••</div>
+              <div class="mc-top">
+                <div class="mc-ico" style="background:#EAF2FE;color:#2451a0;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+                </div>
+                <div class="mc-body">
+                  <div class="mc-lbl">Clocked Out</div>
+                  <div class="mc-val" id="att-clocked-out">—</div>
+                  <div class="mc-sub">Completed today</div>
+                </div>
+              </div>
             </div>
-            <div class="mc" style="background:linear-gradient(135deg,#F5A623,#E8891A);border:none;">
-              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Late Arrivals</div>
-              <div class="mc-val" id="att-late" style="color:#fff;">—</div>
-              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">After 9:00 AM</div>
+            <div class="mc">
+              <div class="mc-dots">•••</div>
+              <div class="mc-top">
+                <div class="mc-ico" style="background:#FEF3E2;color:#E8891A;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                </div>
+                <div class="mc-body">
+                  <div class="mc-lbl">Late Arrivals</div>
+                  <div class="mc-val" id="att-late">—</div>
+                  <div class="mc-sub">After 9:00 AM</div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -642,6 +739,26 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                 <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Your personal clock in/out record</div>
               </div>
               <div id="att-my-card-admin"></div>
+            </div>
+          </div>
+
+          <!-- Field Visits — Punch In / Punch Out (admin/manager) -->
+          <div style="background:var(--bg);border:0.5px solid var(--brd);border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07);margin-bottom:14px;">
+            <div style="padding:16px 18px 14px;border-bottom:0.5px solid var(--brd);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+              <div>
+                <div style="font-size:15px;font-weight:700;color:var(--txt);">Field Visits</div>
+                <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Punch in when you reach a stop, punch out when you leave</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button onclick="exportFieldVisitsExcel()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;background:var(--gold-mid);color:#fff;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;box-shadow:0 2px 6px rgba(212,160,23,0.3);">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Export Excel
+                </button>
+                <button onclick="openActivityModal()" style="display:flex;align-items:center;gap:6px;padding:8px 15px;border-radius:9px;background:var(--royal);color:#fff;border:none;cursor:pointer;font-size:12.5px;font-weight:700;font-family:inherit;box-shadow:0 2px 8px rgba(26,58,107,0.3);">📍 Punch In</button>
+              </div>
+            </div>
+            <div id="att-punch-list-admin" style="padding:6px 18px 14px;">
+              <div class="empty-state" style="padding:16px;">Loading…</div>
             </div>
           </div>
 
@@ -723,25 +840,57 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
 
           <!-- Rep stat cards -->
           <div class="metrics-grid" style="margin-bottom:14px;">
-            <div class="mc" style="background:linear-gradient(135deg,#5B8DEF,#4A6FD4);border:none;">
-              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Today's Status</div>
-              <div class="mc-val" id="rep-att-status" style="color:#fff;font-size:14px;">—</div>
-              <div class="mc-sub" id="rep-att-since" style="color:rgba(255,255,255,0.65);">—</div>
+            <div class="mc">
+              <div class="mc-dots">•••</div>
+              <div class="mc-top">
+                <div class="mc-ico" style="background:#EEF0FF;color:#5B5BD6;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M6 21v-1a6 6 0 0112 0v1"/></svg>
+                </div>
+                <div class="mc-body">
+                  <div class="mc-lbl">Today's Status</div>
+                  <div class="mc-val" id="rep-att-status" style="font-size:14px;">—</div>
+                  <div class="mc-sub" id="rep-att-since">—</div>
+                </div>
+              </div>
             </div>
-            <div class="mc" style="background:linear-gradient(135deg,#4DB896,#2E9E75);border:none;">
-              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Hours Today</div>
-              <div class="mc-val" id="rep-att-hours" style="color:#fff;">—</div>
-              <div class="mc-sub" style="color:rgba(255,255,255,0.65);" id="rep-att-running">—</div>
+            <div class="mc">
+              <div class="mc-dots">•••</div>
+              <div class="mc-top">
+                <div class="mc-ico" style="background:#E7F7F0;color:#12A171;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                </div>
+                <div class="mc-body">
+                  <div class="mc-lbl">Hours Today</div>
+                  <div class="mc-val" id="rep-att-hours">—</div>
+                  <div class="mc-sub" id="rep-att-running">—</div>
+                </div>
+              </div>
             </div>
-            <div class="mc" style="background:linear-gradient(135deg,#F5A623,#E8891A);border:none;">
-              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">This Week</div>
-              <div class="mc-val" id="rep-att-week" style="color:#fff;">—</div>
-              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Hours worked</div>
+            <div class="mc">
+              <div class="mc-dots">•••</div>
+              <div class="mc-top">
+                <div class="mc-ico" style="background:#FEF3E2;color:#E8891A;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                </div>
+                <div class="mc-body">
+                  <div class="mc-lbl">This Week</div>
+                  <div class="mc-val" id="rep-att-week">—</div>
+                  <div class="mc-sub">Hours worked</div>
+                </div>
+              </div>
             </div>
-            <div class="mc" style="background:linear-gradient(135deg,#4DB896,#2E9E75);border:none;">
-              <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">This Month</div>
-              <div class="mc-val" id="rep-att-month" style="color:#fff;">—</div>
-              <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Days present</div>
+            <div class="mc">
+              <div class="mc-dots">•••</div>
+              <div class="mc-top">
+                <div class="mc-ico" style="background:#EAF2FE;color:#2451a0;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+                </div>
+                <div class="mc-body">
+                  <div class="mc-lbl">This Month</div>
+                  <div class="mc-val" id="rep-att-month">—</div>
+                  <div class="mc-sub">Days present</div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -845,6 +994,26 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
             </div>
           </div>
 
+          <!-- Field Visits — Punch In / Punch Out -->
+          <div style="background:var(--bg);border:0.5px solid var(--brd);border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07);margin-top:14px;">
+            <div style="padding:16px 18px 14px;border-bottom:0.5px solid var(--brd);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+              <div>
+                <div style="font-size:15px;font-weight:700;color:var(--txt);">Field Visits</div>
+                <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Punch in when you reach a stop, punch out when you leave</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button onclick="exportFieldVisitsExcel()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;background:var(--gold-mid);color:#fff;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;box-shadow:0 2px 6px rgba(212,160,23,0.3);">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Export Excel
+                </button>
+                <button onclick="openActivityModal()" style="display:flex;align-items:center;gap:6px;padding:8px 15px;border-radius:9px;background:var(--royal);color:#fff;border:none;cursor:pointer;font-size:12.5px;font-weight:700;font-family:inherit;box-shadow:0 2px 8px rgba(26,58,107,0.3);">📍 Punch In</button>
+              </div>
+            </div>
+            <div id="att-punch-list" style="padding:6px 18px 14px;">
+              <div class="empty-state" style="padding:16px;">Loading…</div>
+            </div>
+          </div>
+
           <!-- My attendance history — Image 1 style -->
           <div style="background:var(--bg);border:0.5px solid var(--brd);border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07);">
             <div style="padding:16px 18px 14px;border-bottom:0.5px solid var(--brd);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -931,32 +1100,68 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
       <!-- DASHBOARD -->
       <div class="screen" id="screen-dashboard">
 <div class="metrics-grid">
-  <!-- My Clients - Blue Gradient -->
-  <div class="mc" style="background:linear-gradient(135deg,#5B8DEF 0%,#4A6FD4 100%);border:none;">
-    <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">My Clients</div>
-    <div class="mc-val" id="m-clients" style="color:#fff;">—</div>
-    <div class="mc-sub" id="m-clients-sub" style="color:rgba(255,255,255,0.65);">Assigned to you</div>
+  <!-- My Clients -->
+  <div class="mc">
+    <div class="mc-dots">•••</div>
+    <div class="mc-top">
+      <div class="mc-ico" style="background:#EEF0FF;color:#5B5BD6;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      </div>
+      <div class="mc-body">
+        <div class="mc-lbl">My Clients</div>
+        <div class="mc-val" id="m-clients">—</div>
+        <div class="mc-delta" id="m-clients-delta"></div>
+        <div class="mc-sub" id="m-clients-sub">Total active clients</div>
+      </div>
+    </div>
   </div>
 
-  <!-- Active SKUs - Green Gradient -->
-  <div class="mc" style="background:linear-gradient(135deg,#4DB896 0%,#2E9E75 100%);border:none;">
-    <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Active SKUs</div>
-    <div class="mc-val" id="m-skus" style="color:#fff;">—</div>
-    <div class="mc-sub" style="color:rgba(255,255,255,0.65);">In catalogue</div>
+  <!-- Active SKUs -->
+  <div class="mc">
+    <div class="mc-dots">•••</div>
+    <div class="mc-top">
+      <div class="mc-ico" style="background:#E7F7F0;color:#12A171;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>
+      </div>
+      <div class="mc-body">
+        <div class="mc-lbl">Active SKUs</div>
+        <div class="mc-val" id="m-skus">—</div>
+        <div class="mc-delta" id="m-skus-delta"></div>
+        <div class="mc-sub">Items in catalogue</div>
+      </div>
+    </div>
   </div>
 
-  <!-- Listings Today - Orange/Gold Gradient -->
-  <div class="mc" style="background:linear-gradient(135deg,#F5A623 0%,#E8891A 100%);border:none;">
-    <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Listings Today</div>
-    <div class="mc-val" id="m-orders" style="color:#fff;">—</div>
-    <div class="mc-sub" id="m-orders-sub" style="color:rgba(255,255,255,0.65);">Items listed</div>
+  <!-- Listings Today -->
+  <div class="mc">
+    <div class="mc-dots">•••</div>
+    <div class="mc-top">
+      <div class="mc-ico" style="background:#EAF2FE;color:#2451a0;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6a1 1 0 011 1v2H8V3a1 1 0 011-1z"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><path d="M9 12h6M9 16h4"/></svg>
+      </div>
+      <div class="mc-body">
+        <div class="mc-lbl">Listings Today</div>
+        <div class="mc-val" id="m-orders">—</div>
+        <div class="mc-delta" id="m-orders-delta"></div>
+        <div class="mc-sub" id="m-orders-sub">Listings submitted</div>
+      </div>
+    </div>
   </div>
 
-  <!-- Stock Alerts - Red Gradient -->
-  <div class="mc" style="background:linear-gradient(135deg,#F06B6B 0%,#E04545 100%);border:none;">
-    <div class="mc-lbl" style="color:rgba(255,255,255,0.75);">Stock Alerts</div>
-    <div class="mc-val" id="m-alerts" style="color:#fff;">—</div>
-    <div class="mc-sub" style="color:rgba(255,255,255,0.65);">Low/out of stock</div>
+  <!-- Stock Alerts -->
+  <div class="mc">
+    <div class="mc-dots">•••</div>
+    <div class="mc-top">
+      <div class="mc-ico" style="background:#FDECEC;color:#E24B4A;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+      </div>
+      <div class="mc-body">
+        <div class="mc-lbl">Stock Alerts</div>
+        <div class="mc-val" id="m-alerts">—</div>
+        <div class="mc-delta" id="m-alerts-delta"></div>
+        <div class="mc-sub">Low / out of stock</div>
+      </div>
+    </div>
   </div>
 </div>
         <div class="two-col">
@@ -975,9 +1180,26 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
             <div id="stock-alerts-list"><div class="empty-state">Loading stock data...</div></div>
           </div>
         </div>
-        <div class="card">
-          <div class="card-hdr"><span class="card-title">Target Progress</span><button class="btn btn-sm" onclick="goTo('targets')">View all →</button></div>
-          <div id="target-progress-list"><div class="empty-state">No targets set yet.</div></div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-hdr">
+              <span class="card-title">Top Sales Reps by Listings</span>
+              <select class="sel" style="font-size:11px;padding:4px 8px;" onchange="loadTopListers(this.value)">
+                <option value="month">This month</option>
+                <option value="30">Last 30 days</option>
+                <option value="all">All time</option>
+              </select>
+            </div>
+            <div id="top-listers"><div class="empty-state" style="padding:24px;">Loading…</div></div>
+            <div style="text-align:center;border-top:0.5px solid var(--brd);padding-top:11px;margin-top:4px;">
+              <button class="btn btn-sm" onclick="goTo('team')" style="color:var(--royal);border:none;">View full leaderboard →</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-hdr"><span class="card-title">Team Leave Calendar</span>
+              <button class="btn btn-sm" onclick="goTo('leave')">Open →</button></div>
+            <div id="dash-leave-cal"></div>
+          </div>
         </div>
       </div>
 
@@ -1457,11 +1679,10 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
           </select>
           <select class="sel" id="activities-status-filter" onchange="filterActivities()">
             <option value="">All Statuses</option>
-            <option value="Planned">Planned</option>
-            <option value="Done">Done</option>
-            <option value="Overdue">Overdue</option>
+            <option value="Punched In">Punched In</option>
+            <option value="Completed">Completed</option>
           </select>
-          <button class="btn btn-royal" onclick="openActivityModal()">+ Log Activity</button>
+          <button class="btn btn-royal" onclick="openActivityModal()">📍 Punch In</button>
         </div>
         <div class="two-col">
           <div class="card">
@@ -1469,8 +1690,8 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
             <div id="activities-feed"><div class="empty-state">No activities yet.</div></div>
           </div>
           <div class="card">
-            <div class="card-hdr"><span class="card-title">Upcoming</span></div>
-            <div id="activities-upcoming"><div class="empty-state">No upcoming activities.</div></div>
+            <div class="card-hdr"><span class="card-title">Currently Punched In</span></div>
+            <div id="activities-upcoming"><div class="empty-state">Nobody currently punched in.</div></div>
           </div>
         </div>
       </div>
@@ -1805,9 +2026,8 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
           <label class="flbl">Filter by Status</label>
           <select class="fin" id="crm-act-filter-status" onchange="renderActivitiesReport(document.getElementById('crm-act-filter-type').value, this.value)" style="font-size:12px;">
             <option value="">All Statuses</option>
-            <option>Planned</option>
-            <option>Done</option>
-            <option>Overdue</option>
+            <option>Punched In</option>
+            <option>Completed</option>
           </select>
         </div>
       </div>
@@ -2263,7 +2483,12 @@ const NAV = [
   {id:'clients',   label:'Clients',   sec:'Main', icon:'M8 8a3 3 0 100-6 3 3 0 000 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3z'},
   {id:'orders',    label:'Place Listing', sec:'Main', icon:'M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1zm1 3h6M5 7h6M5 10h3'},
 
-  {id:'crm', label:'CRM', sec:'CRM', icon:'M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z', isCrmParent:true},
+  // ── CRM temporarily disabled — Human Resource Management takes this slot ──
+  // The HR section is injected by ktl-leave.js, which places it directly
+  // above "Performance" (exactly where CRM used to sit).
+  // To bring CRM back: uncomment the line below and restore 'crm' in the two
+  // id lists inside buildNav().
+  // {id:'crm', label:'CRM', sec:'CRM', icon:'M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z', isCrmParent:true},
 
   {id:'targets',   label:'Targets',       sec:'Performance', icon:'M8 1a7 7 0 100 14A7 7 0 008 1zm0 4a3 3 0 100 6 3 3 0 000-6zm0 2a1 1 0 100 2 1 1 0 000-2z'},
   {id:'wallet',    label:'My Wallet',     sec:'Performance', icon:'M8 1a7 7 0 100 14A7 7 0 008 1zm0 3v4l3 2'},
@@ -2277,8 +2502,8 @@ function buildNav(containerId, withClose=false) {
   const el = document.getElementById(containerId); if (!el) return;
 
   // Role-specific nav items
-  const repOnlyIds  = ['attendance','dashboard','clients','orders','wallet','crm'];
-const managerIds  = ['dashboard','clients','orders','wallet','targets','reports','team','admin','crm','attendance'];
+  const repOnlyIds  = ['attendance','dashboard','clients','orders','wallet'];
+const managerIds  = ['dashboard','clients','orders','wallet','targets','reports','team','admin','attendance'];
   // Admin gets everything
 
   let html = '', lastSec = '';
@@ -2504,9 +2729,9 @@ function updateUserUI() {
   if (!currentUser) return;
   const initials  = (currentUser.full_name||'U').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
   const roleLabel = (currentUser.role||'').replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase());
-  ['sb-av','d-av'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=initials;});
-  ['sb-uname','d-uname'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=currentUser.full_name||'User';});
-  ['sb-urole','d-urole'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=roleLabel;});
+  ['sb-av','d-av','tb-av'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=initials;});
+  ['sb-uname','d-uname','tb-uname','tb-menu-name'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=currentUser.full_name||'User';});
+  ['sb-urole','d-urole','tb-urole'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=roleLabel;});
   _startTopbarClock();
 }
 
@@ -2528,6 +2753,29 @@ function _startTopbarClock() {
   }
   _updateTopbar();
   _topbarClockInterval = setInterval(_updateTopbar, 1000);
+}
+
+// ─── TOPBAR USER MENU ──────────────────────────────────────────────────────
+function toggleUserMenu(e) {
+  e.stopPropagation();
+  document.getElementById('tb-menu')?.classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  const menu = document.getElementById('tb-menu');
+  if (menu && menu.classList.contains('open') && !menu.contains(e.target)) menu.classList.remove('open');
+});
+
+// ─── METRIC CARD DELTAS ────────────────────────────────────────────────────
+// setMcDelta('m-orders-delta', 12.4, 'vs yesterday')  → green ▲ 12.4% vs yesterday
+// setMcDelta('m-orders-delta', -5.6, 'vs yesterday')  → red   ▼ 5.6% vs yesterday
+// setMcDelta('m-orders-delta', null)                  → hides the row
+function setMcDelta(id, pct, note) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (pct === null || pct === undefined || isNaN(pct)) { el.className = 'mc-delta'; el.innerHTML = ''; return; }
+  const up = pct >= 0;
+  el.className = 'mc-delta show ' + (up ? 'up' : 'down');
+  el.innerHTML = `${up ? '▲' : '▼'} ${Math.abs(pct).toFixed(1)}% <span class="note">${note || ''}</span>`;
 }
 
 function signOut() {
@@ -2654,9 +2902,75 @@ async function loadProducts() {
 
 // ─── DASHBOARD ─────────────────────────────────────────────────────────────────
 async function loadDashboard() {
-  if (isSalesRep())  { await loadRepDashboard();     return; }
-  if (canManage() && !canAdmin()) { await loadManagerDashboard(); return; }
-  await loadAdminDashboard();
+  if (isSalesRep())                    { await loadRepDashboard(); }
+  else if (canManage() && !canAdmin()) { await loadManagerDashboard(); }
+  else                                 { await loadAdminDashboard(); }
+  loadTopListers();
+  if (window.Leave?.mini) window.Leave.mini('dash-leave-cal');
+}
+
+
+// ── TOP SALES REPS BY LISTINGS ─────────────────────────────────────────────
+// Ranks reps by how many products they have listed (sum of item_count).
+let _topListPeriod = 'month';
+async function loadTopListers(period) {
+  if (period) _topListPeriod = period;
+  const host = document.getElementById('top-listers');
+  if (!host) return;
+  host.innerHTML = '<div class="empty-state" style="padding:24px;">Loading…</div>';
+
+  const now = new Date();
+  let from = null;
+  if (_topListPeriod === 'month')   from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  else if (_topListPeriod === '30') from = new Date(Date.now() - 30*86400000).toISOString().split('T')[0];
+
+  let q = sb.from('orders').select('created_by,item_count,order_date').neq('status','draft').limit(5000);
+  if (from) q = q.gte('order_date', from);
+
+  const { data, error } = await q;
+  if (error) { host.innerHTML = `<div class="empty-state" style="padding:24px;color:#A32D2D;">Could not load listings: ${error.message}</div>`; return; }
+
+  const tally = {};
+  (data || []).forEach(o => {
+    if (!o.created_by) return;
+    const k = String(o.created_by);
+    if (!tally[k]) tally[k] = { items: 0, listings: 0 };
+    tally[k].items    += Number(o.item_count || 0);
+    tally[k].listings += 1;
+  });
+
+  await _ensureRepCache();
+  const rows = Object.entries(tally)
+    .map(([id, v]) => ({ id, name: _repNameCache[id] || 'Unknown user', ...v }))
+    .sort((a, b) => b.items - a.items)
+    .slice(0, 5);
+
+  if (!rows.length) {
+    host.innerHTML = `<div class="empty-state" style="padding:26px;">
+      <div style="font-size:24px;margin-bottom:8px;">📋</div>
+      <div style="font-weight:600;font-size:12.5px;margin-bottom:3px;">No listings in this period</div>
+      <div>Submitted listings appear here as reps place them.</div></div>`;
+    return;
+  }
+
+  const top   = rows[0].items || 1;
+  const medal = ['#d4a017','#9AA5B4','#C08457'];
+  host.innerHTML = rows.map((r, i) => {
+    const pct = Math.round((r.items / top) * 100);
+    const ini = (r.name || 'U').split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0,2);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--brd);">
+      <span style="width:19px;height:19px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;background:${medal[i] || 'var(--txt3)'};">${i+1}</span>
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--royal-light);color:var(--royal);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;flex-shrink:0;">${ini}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+          <span style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.name}</span>
+          <span style="font-size:11.5px;font-weight:700;color:var(--royal);white-space:nowrap;">${r.items.toLocaleString()} items</span>
+        </div>
+        <div class="pbar" style="margin-top:5px;"><div class="pfill" style="width:${pct}%;background:linear-gradient(90deg,var(--royal-mid),var(--royal));"></div></div>
+        <div style="font-size:10.5px;color:var(--txt3);margin-top:3px;">${r.listings} listing${r.listings === 1 ? '' : 's'} · ${pct}% of leader</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── ADMIN DASHBOARD ────────────────────────────────────────────────────────────
@@ -2869,7 +3183,9 @@ async function loadRepDashboard() {
 
 // ── Shared target progress renderer ──────────────────────────────────────────
 function _renderTargetProgress(targets) {
-  document.getElementById('target-progress-list').innerHTML = targets.length===0
+  const tpEl = document.getElementById('target-progress-list');
+  if (!tpEl) return;   // Target Progress card removed from the dashboard — nothing to render
+  tpEl.innerHTML = targets.length===0
     ? '<div class="empty-state">No targets set yet.</div>'
     : targets.map(t=>{
         const pct=t.target_qty>0?Math.min(100,Math.round((t.sold_qty||0)/t.target_qty*100)):0;
@@ -7893,6 +8209,7 @@ async function loadAttendanceScreen() {
 async function _loadAdminAttendanceView() {
   // Start real-time greeting & clock
   _startAttAdminClock();
+  loadAttPunchList();
 
   const today = new Date().toISOString().split('T')[0];
   const { from: _attInitFrom, to: _attInitTo } = _attGetRangeDates('this_week');
@@ -8255,6 +8572,95 @@ async function exportAttendanceCSV() {
   URL.revokeObjectURL(url);
 }
 
+async function exportFieldVisitsExcel() {
+  if (typeof ExcelJS === 'undefined') { alert('Export library did not load. Check your connection and try again.'); return; }
+
+  const presetEl = document.getElementById('att-range-preset');
+  const preset = presetEl ? presetEl.value : 'this_week';
+  const { from, to } = _attGetRangeDates(preset);
+
+  let acts = isSalesRep() ? crmActivities.filter(a => a.created_by === currentUser?.id) : crmActivities;
+  acts = acts.filter(a => {
+    const d = a.date || (a.punch_in_time ? a.punch_in_time.split('T')[0] : '');
+    return d >= from && d <= to;
+  });
+
+  if (acts.length === 0) { alert('No field visits found for this range.'); return; }
+  if (!isSalesRep()) await _ensureRepCache();
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'KTLSALES';
+  wb.created = new Date();
+  const ws = wb.addWorksheet('Field Visits', { views: [{ state: 'frozen', ySplit: 4 }] });
+
+  ws.columns = [
+    { key: 'rep',      width: 22 }, { key: 'type',     width: 18 },
+    { key: 'contact',  width: 26 }, { key: 'phone',    width: 15 },
+    { key: 'date',     width: 12 }, { key: 'in_time',  width: 11 },
+    { key: 'in_loc',   width: 34 }, { key: 'out_time', width: 11 },
+    { key: 'out_loc',  width: 34 }, { key: 'duration', width: 11 },
+    { key: 'status',   width: 13 }, { key: 'feedback', width: 40 },
+  ];
+
+  ws.mergeCells('A1:L1');
+  const title = ws.getCell('A1');
+  title.value = 'Kingdom Trading Ltd — Field Visits Report';
+  title.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF1A3A6B' } };
+  ws.getRow(1).height = 26;
+
+  ws.mergeCells('A2:L2');
+  const sub = ws.getCell('A2');
+  sub.value = `Range: ${from} to ${to}  ·  Generated ${new Date().toLocaleString('en-UG',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}`;
+  sub.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF6B6B67' } };
+  ws.getRow(2).height = 16;
+  ws.getRow(3).height = 6;
+
+  const headerRow = ws.getRow(4);
+  headerRow.values = ['Rep','Type','Contact','Phone','Date','Punch In','In Location','Punch Out','Out Location','Duration','Status','Feedback / Notes'];
+  headerRow.height = 20;
+  headerRow.eachCell(cell => {
+    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A3A6B' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+    cell.border = { top: { style: 'thin', color: { argb: 'FFB8C8E8' } }, bottom: { style: 'thin', color: { argb: 'FFB8C8E8' } } };
+  });
+
+  acts.sort((a,b) => (b.punch_in_time||'').localeCompare(a.punch_in_time||''));
+
+  acts.forEach((a, i) => {
+    const repName  = a.created_by === currentUser?.id ? (currentUser?.full_name||'Me') : (_repNameCache[a.created_by] || '—');
+    const inTime   = a.punch_in_time  ? new Date(a.punch_in_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '—';
+    const outTime  = a.punch_out_time ? new Date(a.punch_out_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '--:--';
+    const duration = (a.punch_in_time && a.punch_out_time) ? _attFormatDuration(a.punch_in_time, a.punch_out_time) : (a.status==='Punched In' ? _attRunningHours(a.punch_in_time) : '—');
+    const status   = a.status || '—';
+
+    const row = ws.addRow({
+      rep: repName, type: a.type || '—', contact: a.contact_name || '—', phone: a.phone || '—',
+      date: a.date || (a.punch_in_time ? a.punch_in_time.split('T')[0] : '—'),
+      in_time: inTime, in_loc: a.punch_in_location || '—',
+      out_time: outTime, out_loc: a.punch_out_location || '—',
+      duration, status, feedback: a.feedback || a.notes || '',
+    });
+
+    if (i % 2 === 1) row.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F7FC' } }; });
+    row.eachCell(c => { c.font = { name: 'Calibri', size: 10.5, ...(c.font||{}) }; c.border = { bottom: { style: 'hair', color: { argb: 'FFE0E5EE' } } }; });
+    row.getCell(11).font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: status==='Completed'?'FF1D9E75':'FFE8891A' } };
+  });
+
+  const totalRow = ws.addRow({ status: 'Total visits:', feedback: acts.length });
+  totalRow.getCell(11).font = { bold: true, size: 10.5 };
+  totalRow.getCell(12).font = { bold: true, size: 10.5, color: { argb: 'FF1A3A6B' } };
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `KTL_FieldVisits_${from}_to_${to}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 
 // ── Real-time greeting & clock for ADMIN attendance header ──
 let _attAdminClockInterval = null;
@@ -8312,9 +8718,60 @@ function _startAttRepClock() {
 // ─────────────────────────────────────────────────────────────
 // SALES REP VIEW
 // ─────────────────────────────────────────────────────────────
+function loadAttPunchList() {
+  ['att-punch-list', 'att-punch-list-admin'].forEach(id => _renderAttPunchList(id));
+}
+
+function _renderAttPunchList(elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const mine = crmActivities.filter(a => a.created_by === currentUser?.id);
+  const active = mine.filter(a => a.status === 'Punched In');
+  const recent = mine.filter(a => a.status === 'Completed').slice(0, 5);
+
+  if (active.length === 0 && recent.length === 0) {
+    el.innerHTML = '<div class="empty-state" style="padding:16px;">No visits logged yet today.</div>';
+    return;
+  }
+
+  const icon = t => ({Call:'📞',Meeting:'🤝',Visit:'🚶','Order Generation':'📋',Collections:'💰'}[t] || '📌');
+
+  let html = '';
+  active.forEach(a => {
+    const inTime = a.punch_in_time ? new Date(a.punch_in_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '';
+    html += `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
+      <div style="font-size:20px;">${icon(a.type)}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.subject||''}</div>
+        <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${a.contact_name||'—'} · since ${inTime}</div>
+        ${a.punch_in_location?`<div style="font-size:10.5px;color:var(--royal);margin-top:3px;">📍 ${a.punch_in_location}</div>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+        <span class="badge ba">Active</span>
+        <button class="btn btn-sm btn-royal" style="font-size:10px;padding:3px 9px;" onclick="openActivityModal('${a.id}')">🏁 Punch Out</button>
+      </div>
+    </div>`;
+  });
+  recent.forEach(a => {
+    const inTime  = a.punch_in_time  ? new Date(a.punch_in_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '';
+    const outTime = a.punch_out_time ? new Date(a.punch_out_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '';
+    const duration = (a.punch_in_time && a.punch_out_time) ? _attFormatDuration(a.punch_in_time, a.punch_out_time) : '';
+    html += `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
+      <div style="font-size:20px;">${icon(a.type)}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.subject||''}</div>
+        <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${a.contact_name||'—'} · ${inTime} → ${outTime}${duration?` · ${duration}`:''}</div>
+      </div>
+      <span class="badge bg" style="align-self:flex-start;">Completed</span>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
 async function _loadRepAttendanceView() {
   _startAttRepClock();
   _loadMyTodayRecord('rep');
+  loadAttPunchList();
 
   // Week hours
   const weekStart = _attWeekStart();
@@ -9067,90 +9524,165 @@ async function _attRetryLocation() {
   if (isSalesRep()) { _loadRepAttendanceView(); } else { _renderAdminMyCard(); }
 }
 
-async function _attReverseGeocode(lat, lng) {
+// ─── REVERSE GEOCODING ────────────────────────────────────────────────────
+// Nominatim allows ~1 request/sec per IP. Requests are queued and spaced,
+// then retried at a coarser zoom, then handed to a second provider.
+const _geoCache = new Map();
+let _geoQueue = Promise.resolve();
+
+function _geoThrottle(fn) {
+  const run = _geoQueue.then(fn);
+  const gap = () => new Promise(r => setTimeout(r, 1100));
+  _geoQueue = run.then(gap, gap);
+  return run;
+}
+
+async function _geoFetch(url, ms = 8000) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
   try {
-    // First call: zoom=19 for fine-grained building-level detail
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=19&addressdetails=1&namedetails=1`,
-      { headers: { 'Accept-Language': 'en' } }
-    );
-    const data = await res.json();
-    if (!data || !data.address) return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json', 'Accept-Language': 'en' }, signal: ctl.signal });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
 
-    const a    = data.address;
-    const name = data.name || data.namedetails?.name || null; // named place (e.g. "Shoprite Lugogo")
+function _geoBuildOSM(data, lat, lng) {
+  const a = data.address || {};
+  let placeName = data.name || data.namedetails?.name
+    || a.amenity || a.shop || a.office || a.tourism || a.leisure
+    || a.building || a.man_made || a.craft || a.historic || null;
 
-    // ── LAYER 1: Named building / amenity / POI ──────────────────────────────
-    // Nominatim returns the place's proper name in data.name when zoomed in
-    const placeName =
-      name                                                       // e.g. "Kampala Capital City Authority"
-      || a.amenity        // restaurant, bank, school …
-      || a.shop           // supermarket, pharmacy …
-      || a.office         // company office
-      || a.tourism        // hotel, museum …
-      || a.leisure        // park, sports centre …
-      || a.building       // generic building tag
-      || a.man_made       // tower, bridge …
-      || a.craft          // tailor, bakery …
-      || a.historic       // monument …
-      || null;
-
-    // ── LAYER 2: Nearest road ────────────────────────────────────────────────
-    const houseNo = a.house_number || null;
-    const road    =
-      a.road           // most common
-      || a.pedestrian
-      || a.path
-      || a.footway
-      || a.cycleway
-      || a.service
-      || null;
-    const streetPart = houseNo && road ? `${houseNo} ${road}`
-                     : road            ? road
-                     : houseNo         ? houseNo
-                     : null;
-
-    // ── LAYER 3: Neighbourhood / estate ─────────────────────────────────────
-    const neighbourhood =
-      a.neighbourhood
-      || a.quarter
-      || a.estate
-      || a.residential
-      || a.allotments
-      || null;
-
-    // ── LAYER 4: Suburb / village ────────────────────────────────────────────
-    const suburb = a.suburb || a.village || a.hamlet || null;
-
-    // ── LAYER 5: City ────────────────────────────────────────────────────────
-    const city = a.city || a.town || a.municipality || a.city_district || null;
-
-    // ── ASSEMBLE: deduplicate, then join ─────────────────────────────────────
-    const seen  = new Set();
-    const parts = [placeName, streetPart, neighbourhood, suburb, city]
-      .filter(p => {
-        if (!p) return false;
-        const key = p.toLowerCase().trim();
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-
-    // Ideal result: "Shoprite Lugogo, Lugogo Bypass, Nakawa, Kampala"
-    if (parts.length >= 1) return parts.slice(0, 4).join(', ');
-
-    // ── FALLBACK: use display_name but strip country & trim ──────────────────
-    if (data.display_name) {
-      const segs = data.display_name.split(',').map(s => s.trim())
-        .filter(s => s.toLowerCase() !== 'uganda');
-      return segs.slice(0, 3).join(', ');
-    }
-
-    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-
-  } catch (e) {
-    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  // Nominatim snaps to the NEAREST mapped feature, which may be a shop across
+  // the road. If its centre is more than ~150m from the actual GPS point, the
+  // name describes somewhere else — drop it and fall back to street/area.
+  if (placeName && data.lat && data.lon) {
+    const away = _attDistKm([+lat, +lng], [+data.lat, +data.lon]);
+    if (away > 0.15) placeName = null;
   }
+
+  const houseNo = a.house_number || null;
+  const road    = a.road || a.pedestrian || a.path || a.footway || a.cycleway || a.service || null;
+  const street  = houseNo && road ? `${houseNo} ${road}` : road || houseNo || null;
+
+  const hood   = a.neighbourhood || a.quarter || a.estate || a.residential || a.allotments || null;
+  const suburb = a.suburb || a.village || a.hamlet || null;
+  const city   = a.city || a.town || a.municipality || a.city_district || null;
+  const region = a.county || a.state_district || a.state || null;
+
+  const seen = new Set();
+  const push = (arr, p) => {
+    if (!p) return;
+    const k = String(p).toLowerCase().trim();
+    if (seen.has(k)) return;
+    seen.add(k); arr.push(String(p).trim());
+  };
+  const parts = [];
+  [placeName, street, hood, suburb, city].forEach(p => push(parts, p));
+
+  // A location must always carry an area, so "Badr" can never stand alone.
+  const hasArea = !!(hood || suburb || city);
+  if (!hasArea) {
+    if (region) push(parts, region);
+    if (data.display_name) {
+      data.display_name.split(',').map(s => s.trim())
+        .filter(s => s && !/^uganda$/i.test(s) && !/^\d{3,}$/.test(s))
+        .forEach(s => { if (parts.length < 4) push(parts, s); });
+    }
+  }
+
+  // Still a single bare token with no context — treat as a failed lookup so
+  // the next provider gets a chance rather than storing a meaningless name.
+  if (parts.length < 2) return null;
+  return parts.slice(0, 4).join(', ');
+}
+
+async function _geoNominatim(lat, lng, zoom) {
+  const d = await _geoFetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=${zoom}&addressdetails=1&namedetails=1`);
+  if (!d || d.error || !d.address) return null;
+  return _geoBuildOSM(d, lat, lng);
+}
+
+// Free, no key, no rate limit, CORS-enabled. Coarser than OSM (no POI names)
+// but reliably returns a locality, which beats printing coordinates.
+async function _geoBigDataCloud(lat, lng) {
+  const d = await _geoFetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`);
+  if (!d) return null;
+  const seen = new Set();
+  const parts = [d.locality, d.city, d.principalSubdivision].filter(p => {
+    if (!p) return false;
+    const k = String(p).toLowerCase().trim();
+    if (seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+  return parts.length ? parts.join(', ') : null;
+}
+
+async function _attReverseGeocode(lat, lng) {
+  if (lat == null || lng == null) return '—';
+  const key = `${(+lat).toFixed(5)},${(+lng).toFixed(5)}`;
+  if (_geoCache.has(key)) return _geoCache.get(key);
+
+  const attempts = [
+    () => _geoThrottle(() => _geoNominatim(lat, lng, 19)),  // building level
+    () => _geoThrottle(() => _geoNominatim(lat, lng, 16)),  // street / area level
+    () => _geoBigDataCloud(lat, lng),                       // different provider
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const result = await attempt();
+      if (result) { _geoCache.set(key, result); return result; }
+    } catch (e) {
+      console.warn('[geocode] attempt failed:', e.message);
+    }
+  }
+  // Failures are deliberately NOT cached, so a later retry can still succeed.
+  return `${(+lat).toFixed(5)}, ${(+lng).toFixed(5)}`;
+}
+
+// ─── BACKFILL: re-resolve rows that were saved as raw coordinates ──────────
+// Run from the browser console as an admin:  repairAttendanceAddresses()
+async function repairAttendanceAddresses(limit = 300) {
+  // Rewrite anything unusable: raw coordinates, blanks, or a bare single name
+  // with no area context ("Badr", "Kyaliwajjala").
+  const looksLikeCoords = v => {
+    if (!v) return true;
+    const s = String(v).trim();
+    if (/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(s)) return true;
+    if (!s.includes(',')) return true;
+    return false;
+  };
+
+  const { data, error } = await sb.from('attendance')
+    .select('id,clock_in_lat,clock_in_lng,clock_in_location,clock_out_lat,clock_out_lng,clock_out_location')
+    .order('clock_in', { ascending: false }).limit(limit);
+  if (error) { console.error('Load failed:', error.message); return; }
+
+  const todo = (data || []).filter(r =>
+    (r.clock_in_lat  && looksLikeCoords(r.clock_in_location)) ||
+    (r.clock_out_lat && looksLikeCoords(r.clock_out_location)));
+
+  console.log(`Repairing ${todo.length} of ${data.length} records — roughly ${Math.ceil(todo.length * 1.2)}s.`);
+  let fixed = 0;
+
+  for (const r of todo) {
+    const patch = {};
+    if (r.clock_in_lat && looksLikeCoords(r.clock_in_location)) {
+      const a = await _attReverseGeocode(r.clock_in_lat, r.clock_in_lng);
+      if (!looksLikeCoords(a)) patch.clock_in_location = a;
+    }
+    if (r.clock_out_lat && looksLikeCoords(r.clock_out_location)) {
+      const a = await _attReverseGeocode(r.clock_out_lat, r.clock_out_lng);
+      if (!looksLikeCoords(a)) patch.clock_out_location = a;
+    }
+    if (Object.keys(patch).length) {
+      const { error: e } = await sb.from('attendance').update(patch).eq('id', r.id);
+      if (e) console.warn('Update failed for', r.id, e.message);
+      else { fixed++; console.log(`✓ ${r.id}`, patch); }
+    }
+  }
+  console.log(`Done — ${fixed} record${fixed === 1 ? '' : 's'} repaired. Reload the attendance screen to see them.`);
 }
 
 function _attDistKm(a, b) {
@@ -9404,7 +9936,7 @@ function viewContact(contactId) {
         ${relDeals.length===0?'<div class="empty-state">No deals linked.</div>':relDeals.map(d=>`<div style="padding:9px;border-bottom:0.5px solid var(--brd);font-size:12.5px;"><strong>${d.name}</strong> · UGX ${Number(d.value||0).toLocaleString()} · <span class="badge bb">${d.stage}</span></div>`).join('')}
       </div>
       <div class="tc" id="ctc-activity" style="padding:14px;">
-        ${relActivities.length===0?'<div class="empty-state">No activity yet.</div>':relActivities.map(a=>`<div style="padding:9px;border-bottom:0.5px solid var(--brd);font-size:12.5px;display:flex;gap:8px;"><span style="font-size:16px;">${{Call:'📞',Meeting:'🤝',Email:'✉️',WhatsApp:'💬',Visit:'🚶'}[a.type]||'📌'}</span><div><div style="font-weight:500;">${a.type}: ${a.subject||''}</div><div style="color:var(--txt3);font-size:11px;">${a.date||''}</div></div></div>`).join('')}
+        ${relActivities.length===0?'<div class="empty-state">No activity yet.</div>':relActivities.map(a=>`<div style="padding:9px;border-bottom:0.5px solid var(--brd);font-size:12.5px;display:flex;gap:8px;"><span style="font-size:16px;">${{Call:'📞',Meeting:'🤝',Email:'✉️',WhatsApp:'💬',Visit:'🚶'}[a.type]||'📌'}</span><div><div style="font-weight:500;">${a.type}</div><div style="color:var(--txt3);font-size:11px;">${a.contact_name||''} · ${a.date||''}</div></div></div>`).join('')}
       </div>
       <div class="tc" id="ctc-notes" style="padding:14px;">
         ${relNotes.length===0?'<div class="empty-state">No notes yet.</div>':relNotes.map(n=>`<div style="padding:9px;border-bottom:0.5px solid var(--brd);font-size:12.5px;"><div style="font-weight:500;">${n.title}</div><div style="color:var(--txt3);font-size:11px;margin-top:3px;">${n.body?.slice(0,80)||''}</div></div>`).join('')}
@@ -9695,13 +10227,20 @@ function exportDealsCSV() {
 function loadActivitiesScreen() {
   filterActivities();
   const myActivities = isSalesRep() ? crmActivities.filter(a => a.created_by === currentUser?.id) : crmActivities;
-  const upcoming = myActivities.filter(a=>a.date>=new Date().toISOString().split('T')[0]&&a.status!=='Done').slice(0,8);
-  document.getElementById('activities-upcoming').innerHTML = upcoming.length===0?'<div class="empty-state">No upcoming.</div>'
-    :upcoming.map(a=>`<div style="display:flex;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--brd);">
-      <div style="font-size:20px;">${{Call:'📞',Meeting:'🤝',Visit:'🚶','Order Generation':'📋',Collections:'💰'}[a.type]||'📌'}</div>
-      <div style="flex:1;"><div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.subject||''}</div><div style="font-size:10.5px;color:var(--txt3);">${a.contact_name||''} · ${a.date}</div></div>
-      <span class="badge ${a.priority==='High'?'br':a.priority==='Medium'?'ba':'bb'}">${a.priority||''}</span>
-    </div>`).join('');
+  const active = myActivities.filter(a=>a.status==='Punched In').slice(0,8);
+  document.getElementById('activities-upcoming').innerHTML = active.length===0?'<div class="empty-state">Nobody currently punched in.</div>'
+    :active.map(a=>{
+      const inTime = a.punch_in_time ? new Date(a.punch_in_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '';
+      return `<div style="display:flex;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--brd);">
+        <div style="font-size:20px;">${{Call:'📞',Meeting:'🤝',Visit:'🚶','Order Generation':'📋',Collections:'💰'}[a.type]||'📌'}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12.5px;font-weight:500;">${a.type}</div>
+          <div style="font-size:10.5px;color:var(--txt3);">${a.contact_name||''} · since ${inTime}</div>
+          ${a.punch_in_location?`<div style="font-size:10px;color:var(--royal);margin-top:2px;">📍 ${a.punch_in_location}</div>`:''}
+        </div>
+        <span class="badge ba" style="align-self:flex-start;">Active</span>
+      </div>`;
+    }).join('');
 }
 
 function filterActivities() {
@@ -9712,55 +10251,69 @@ function filterActivities() {
   if(status) filtered=filtered.filter(a=>a.status===status);
   document.getElementById('activities-count').textContent=filtered.length;
   document.getElementById('activities-feed').innerHTML=filtered.length===0?'<div class="empty-state">No activities.</div>'
-    :filtered.slice(0,20).map(a=>`<div style="display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
-      <div style="font-size:20px;">${{Call:'📞',Meeting:'🤝',Visit:'🚶','Order Generation':'📋',Collections:'�'}[a.type]||'📌'}</div>
-      <div style="flex:1;">
-        <div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.subject||''}</div>
-        <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${a.contact_name||'—'} · ${a.date||'—'}</div>
-        ${a.notes?`<div style="font-size:11.5px;color:var(--txt2);margin-top:3px;">${a.notes.slice(0,60)}</div>`:''}
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-        <span class="badge ${a.status==='Done'?'bg':a.status==='Overdue'?'br':'bb'}">${a.status||'Planned'}</span>
-        ${a.status!=='Done'?`<button class="btn btn-sm btn-green" style="font-size:10px;padding:2px 8px;" onclick="markActivityDone('${a.id}')">✓ Done</button>`:''}
-      </div>
-    </div>`).join('');
+    :filtered.slice(0,20).map(a=>{
+      const icon = {Call:'📞',Meeting:'🤝',Visit:'🚶','Order Generation':'📋',Collections:'💰'}[a.type]||'📌';
+      const isActive = a.status === 'Punched In';
+      const badgeCls = isActive ? 'ba' : (a.status==='Completed'?'bg':'bb');
+      const inTime  = a.punch_in_time  ? new Date(a.punch_in_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '';
+      const outTime = a.punch_out_time ? new Date(a.punch_out_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '';
+      const duration = (a.punch_in_time && a.punch_out_time) ? _attFormatDuration(a.punch_in_time, a.punch_out_time) : '';
+      return `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
+        <div style="font-size:20px;">${icon}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12.5px;font-weight:500;">${a.type}</div>
+          <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${a.contact_name||'—'} · ${a.date||'—'}</div>
+          ${a.punch_in_location?`<div style="font-size:10.5px;color:var(--royal);margin-top:3px;">📍 In: ${inTime} · ${a.punch_in_location}</div>`:''}
+          ${a.punch_out_location?`<div style="font-size:10.5px;color:#1D9E75;margin-top:2px;">🏁 Out: ${outTime} · ${a.punch_out_location}${duration?` · ${duration}`:''}</div>`:''}
+          ${a.feedback?`<div style="font-size:11.5px;color:var(--txt2);margin-top:3px;">💬 ${a.feedback.slice(0,60)}</div>`:(a.notes?`<div style="font-size:11.5px;color:var(--txt2);margin-top:3px;">${a.notes.slice(0,60)}</div>`:'')}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+          <span class="badge ${badgeCls}">${a.status||'Punched In'}</span>
+          ${isActive?`<button class="btn btn-sm btn-royal" style="font-size:10px;padding:3px 9px;" onclick="openActivityModal('${a.id}')">🏁 Punch Out</button>`:''}
+        </div>
+      </div>`;
+    }).join('');
 }
 
-function markActivityDone(actId) {
-  const act=crmActivities.find(a=>a.id===actId); if(act) act.status='Done';
-  saveCRM('activities',crmActivities); loadActivitiesScreen();
-}
-
-function openActivityModal() {
+function openActivityModal(existingId = null) {
+  const isPunchOut = !!existingId;
+  const existing = isPunchOut ? crmActivities.find(a => a.id === existingId) : null;
   const d=document.createElement('div'); d.id='crm-activity-modal';
   d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(3px);';
-  d.innerHTML=`<div style="background:#fff;border-radius:16px;width:90%;max-width:460px;box-shadow:0 16px 60px rgba(0,0,0,0.25);">
+  const clientNames = (isSalesRep() ? visibleClients : allClients).map(c=>c.name);
+  const clientOptions = clientNames.map(n=>`<option value="${n}">`).join('');
+  const typeOpts = ['Call','Meeting','Visit','Order Generation','Collections'];
+  const roField = isPunchOut ? 'readonly style="background:var(--bg2);color:var(--txt2);"' : '';
+  d.innerHTML=`<div style="background:#fff;border-radius:16px;width:90%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 16px 60px rgba(0,0,0,0.25);">
     <div style="padding:18px 22px;border-bottom:0.5px solid var(--brd);display:flex;justify-content:space-between;align-items:center;">
-      <div style="font-size:15px;font-weight:700;">Log Activity</div>
+      <div style="font-size:15px;font-weight:700;">${isPunchOut ? '🏁 Punch Out — Log Visit' : '📍 Punch In — Log Visit'}</div>
       <button onclick="document.getElementById('crm-activity-modal').remove()" style="width:28px;height:28px;border-radius:7px;background:var(--bg2);border:0.5px solid var(--brd2);cursor:pointer;font-size:16px;">×</button>
     </div>
     <div style="padding:20px 22px;">
       <div class="fgrid">
-        <div class="fg"><label class="flbl">Type</label>
-          <select class="fin" id="act-type"><option>Call</option><option>Meeting</option><option>Visit</option><option>Order Generation</option><option>Collections</option></select>
-        </div>
-        <div class="fg"><label class="flbl">Contact Name</label>
-          <select class="fin" id="act-contact">
-            <option value="">— Select client —</option>
-            ${(isSalesRep() ? visibleClients : allClients).map(c=>`<option value="${c.name}">${c.name}</option>`).join('')}
+        <div class="fg"><label class="flbl">Activity Type</label>
+          <select class="fin" id="act-type" onchange="toggleActTypeOther()" ${isPunchOut?'disabled':''}>
+            ${typeOpts.map(t=>`<option ${existing?.type===t?'selected':''}>${t}</option>`).join('')}
+            <option value="__other__" ${existing && !typeOpts.includes(existing.type)?'selected':''}>+ Other (specify)</option>
           </select>
         </div>
-        <div class="fg"><label class="flbl">Subject</label><input class="fin" id="act-subject" placeholder="e.g. Follow-up call"/></div>
-        <div class="fg"><label class="flbl">Contact Number</label><input class="fin" type="tel" id="act-phone" placeholder="e.g. 0712 345 678"/></div>
-        <div class="fg"><label class="flbl">Calendar</label><input class="fin" type="date" id="act-date" value="${new Date().toISOString().split('T')[0]}"/></div>
-        <div class="fg"><label class="flbl">Status</label>
-          <select class="fin" id="act-status"><option>Planned</option><option>Done</option><option>Overdue</option></select>
+        <div class="fg"><label class="flbl">Contact Name</label>
+          <input class="fin" id="act-contact" list="act-contact-datalist" placeholder="Type or search client name..." value="${existing?.contact_name||''}" ${roField} autocomplete="off"/>
+          <datalist id="act-contact-datalist">${clientOptions}</datalist>
         </div>
-        <div class="fg" style="grid-column:1/-1;"><label class="flbl">Notes</label><textarea class="fin" id="act-notes" rows="3" style="resize:vertical;"></textarea></div>
+        <div class="fg ${existing && !typeOpts.includes(existing.type)?'':'hidden'}" id="act-type-other-wrap" style="grid-column:1/-1;"><label class="flbl">Custom Activity Type</label><input class="fin" id="act-type-other" placeholder="e.g. Product training" value="${existing && !typeOpts.includes(existing.type)?existing.type:''}" ${isPunchOut?'readonly style="background:var(--bg2);"':''}/></div>
+        <div class="fg"><label class="flbl">Contact Number</label><input class="fin" type="tel" id="act-phone" placeholder="e.g. 0712 345 678" value="${existing?.phone||''}" ${roField}/></div>
+        <div class="fg"><label class="flbl">Calendar</label><input class="fin" type="date" id="act-date" value="${existing?.date || new Date().toISOString().split('T')[0]}" ${roField}/></div>
+        <div class="fg" style="grid-column:1/-1;"><label class="flbl">${isPunchOut ? 'Feedback' : 'Notes'}</label><textarea class="fin" id="act-notes" rows="3" style="resize:vertical;" placeholder="${isPunchOut ? _actFeedbackPlaceholder(existing?.type) : ''}">${isPunchOut ? '' : (existing?.notes||'')}</textarea></div>
       </div>
-      <div style="display:flex;gap:8px;margin-top:4px;">
+      <div class="alert ai" style="font-size:11.5px;margin-top:4px;">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;margin-top:1px;"><circle cx="8" cy="8" r="7"/><path d="M8 5v3M8 11v.5"/></svg>
+        ${isPunchOut ? 'Punching out records your live location and time now.' : 'Punching in records your live location and time now. Come back and Punch Out when you finish at this stop.'}
+      </div>
+      <div id="act-punchin-status" style="display:none;font-size:12px;color:var(--royal);margin-top:8px;text-align:center;">📍 Getting your location…</div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
         <button class="btn" style="flex:1;justify-content:center;" onclick="document.getElementById('crm-activity-modal').remove()">Cancel</button>
-        <button class="btn btn-royal" style="flex:2;justify-content:center;" onclick="saveActivity()">Save Activity</button>
+        <button class="btn btn-royal" style="flex:2;justify-content:center;" id="act-punchin-btn" onclick="${isPunchOut?`confirmPunchOut('${existingId}')`:'punchInActivity()'}">${isPunchOut ? '🏁 Punch Out' : '📍 Punch In'}</button>
       </div>
     </div>
   </div>`;
@@ -9768,15 +10321,106 @@ function openActivityModal() {
   d.addEventListener('click',e=>{if(e.target===d)d.remove();});
 }
 
-function saveActivity() {
-  const subject=document.getElementById('act-subject').value.trim(); if(!subject){alert('Subject required.');return;}
-  const act={id:'act_'+Date.now(),type:document.getElementById('act-type').value,subject,contact_name:document.getElementById('act-contact').value.trim(),phone:document.getElementById('act-phone')?.value?.trim()||'',date:document.getElementById('act-date').value,priority:'Medium',status:document.getElementById('act-status').value,notes:document.getElementById('act-notes').value.trim(),created_by:currentUser?.id,created_at:new Date().toISOString()};
-  crmActivities.unshift(act); saveCRM('activities',crmActivities);
-  document.getElementById('crm-activity-modal')?.remove();
-  if(currentScreen==='crm-activities') loadActivitiesScreen();
-  else if(currentScreen==='crm-calendar') renderCRMCalendar();
+function toggleActTypeOther() {
+  const isOther = document.getElementById('act-type').value === '__other__';
+  document.getElementById('act-type-other-wrap').classList.toggle('hidden', !isOther);
 }
 
+function _actFeedbackPlaceholder(type) {
+  const prompts = {
+    'Call': 'What was discussed on the call? Any follow-up needed?',
+    'Meeting': 'What was discussed in the meeting? Any agreements or outcomes?',
+    'Visit': 'What happened during the visit? Any issues or opportunities noted?',
+    'Order Generation': 'Did they place an order? What items and quantities?',
+    'Collections': 'How much was collected? Any balance still owed?',
+  };
+  return prompts[type] || 'How did it go? Any feedback…';
+}
+
+async function punchInActivity() {
+  const typeSel = document.getElementById('act-type').value;
+  const type = typeSel === '__other__' ? document.getElementById('act-type-other').value.trim() : typeSel;
+  if (!type) { alert('Please specify the activity type.'); return; }
+
+  const contact_name = document.getElementById('act-contact').value.trim();
+  if (!contact_name) { alert('Please select or enter a customer name.'); return; }
+
+  const btn = document.getElementById('act-punchin-btn');
+  const statusEl = document.getElementById('act-punchin-status');
+  btn.disabled = true; btn.textContent = 'Punching in…';
+  statusEl.style.display = 'block';
+
+  const loc  = await _attGetLocation();
+  const addr = await _attReverseGeocode(loc[0], loc[1]);
+
+  const act = {
+    id: 'act_' + Date.now(),
+    type, contact_name,
+    phone: document.getElementById('act-phone')?.value?.trim() || '',
+    date: document.getElementById('act-date').value,
+    notes: document.getElementById('act-notes').value.trim(),
+    feedback: '',
+    status: 'Punched In',
+    punch_in_time: new Date().toISOString(),
+    punch_in_lat: loc[0], punch_in_lng: loc[1],
+    punch_in_location: addr,
+    punch_out_time: null, punch_out_lat: null, punch_out_lng: null, punch_out_location: null,
+    created_by: currentUser?.id,
+    created_at: new Date().toISOString(),
+  };
+  crmActivities.unshift(act);
+  saveCRM('activities', crmActivities);
+  document.getElementById('crm-activity-modal')?.remove();
+  if (currentScreen === 'crm-activities') loadActivitiesScreen();
+  else if (currentScreen === 'crm-calendar') renderCRMCalendar();
+  loadAttPunchList?.();
+  alert(`✅ Punched in at ${addr}`);
+}
+
+async function confirmPunchOut(actId) {
+  const act = crmActivities.find(a => a.id === actId);
+  if (!act) return;
+
+  const btn = document.getElementById('act-punchin-btn');
+  const statusEl = document.getElementById('act-punchin-status');
+  btn.disabled = true; btn.textContent = 'Punching out…';
+  statusEl.style.display = 'block';
+
+  const feedback = document.getElementById('act-notes').value.trim();
+  const loc  = await _attGetLocation();
+  const addr = await _attReverseGeocode(loc[0], loc[1]);
+
+  act.status = 'Completed';
+  act.feedback = feedback;
+  act.punch_out_time = new Date().toISOString();
+  act.punch_out_lat = loc[0]; act.punch_out_lng = loc[1];
+  act.punch_out_location = addr;
+
+  saveCRM('activities', crmActivities);
+  document.getElementById('crm-activity-modal')?.remove();
+  if (currentScreen === 'crm-activities') loadActivitiesScreen();
+  loadAttPunchList?.();
+  alert(`✅ Punched out at ${addr}`);
+}
+
+async function punchOutActivity(actId) {
+  const act = crmActivities.find(a => a.id === actId);
+  if (!act) return;
+  if (!confirm(`Punch out of "${act.subject}" at ${act.contact_name}?`)) return;
+
+  const loc  = await _attGetLocation();
+  const addr = await _attReverseGeocode(loc[0], loc[1]);
+
+  act.status = 'Completed';
+  act.punch_out_time = new Date().toISOString();
+  act.punch_out_lat = loc[0]; act.punch_out_lng = loc[1];
+  act.punch_out_location = addr;
+
+  saveCRM('activities', crmActivities);
+  if (currentScreen === 'crm-activities') loadActivitiesScreen();
+  loadAttPunchList();
+  alert(`✅ Punched out at ${addr}`);
+}
 // ════════════════════ CALENDAR ════════════════════
 function renderCRMCalendar() {
   const y=crmCalDate.getFullYear(), m=crmCalDate.getMonth();
@@ -10512,7 +11156,7 @@ async function loadCRMReports(){
 
 function renderCRMActivitiesRows(activities) {
   const typeIcons = {Call:'📞',Meeting:'🤝',WhatsApp:'💬',Email:'✉️',Visit:'🚶',Collections:'💰',Delivery:'📦'};
-  const statusBadge = { Done:'bg', Planned:'bb', Overdue:'br' };
+  const statusBadge = { Completed:'bg', 'Punched In':'ba' };
   if (activities.length === 0) {
     return `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt3);">No activities logged yet.</td></tr>`;
   }
@@ -10572,15 +11216,16 @@ function renderActivitiesReport(filterType='', filterStatus='', filterRep='') {
   if (filterRep)    acts = acts.filter(a => a.created_by === filterRep);
 
   // Summary metrics
-  const totalActs = acts.length;
-  const doneActs  = acts.filter(a => a.status === 'Done').length;
-  const byType    = {};
+  const totalActs  = acts.length;
+  const doneActs   = acts.filter(a => a.status === 'Completed').length;
+  const activeActs = acts.filter(a => a.status === 'Punched In').length;
+  const byType     = {};
   acts.forEach(a => { byType[a.type] = (byType[a.type]||0) + 1; });
 
   document.getElementById('crm-act-total').textContent = totalActs;
   document.getElementById('crm-act-done').textContent  = doneActs;
-  document.getElementById('crm-act-pending').textContent = acts.filter(a=>a.status!=='Done').length;
-  document.getElementById('crm-act-overdue').textContent = acts.filter(a=>a.status==='Overdue').length;
+  document.getElementById('crm-act-pending').textContent = activeActs;
+  document.getElementById('crm-act-overdue').textContent = 0;
 
   // Type breakdown bar chart
   const typeEl = document.getElementById('crm-act-type-breakdown');
@@ -10615,7 +11260,7 @@ function renderActivitiesReport(filterType='', filterStatus='', filterRep='') {
           </span></td>
           <td style="font-weight:500;">${a.subject || '—'}</td>
           <td style="font-size:12px;">${a.contact_name || '—'}</td>
-          <td><span class="badge ${a.status==='Done'?'bg':a.status==='Overdue'?'br':'bb'}" style="font-size:10px;">${a.status||'Planned'}</span></td>
+          <td><span class="badge ${a.status==='Completed'?'bg':'ba'}" style="font-size:10px;">${a.status||'Punched In'}</span></td>
           <td style="font-size:11.5px;color:var(--txt3);">${repName}</td>
         </tr>`;
       }).join('');
@@ -10664,7 +11309,7 @@ function addCustomStage(){const name=prompt('New stage name:');if(!name||!name.t
 function saveCRMSettings(){alert('✅ CRM settings saved!');}
 </script>
 <div id="pwa-install-banner">
-  <div id="pwa-install-text">
+  <div id="pwa-install-text"> 
     <div id="pwa-install-title">Add KTLSALES to your home screen</div>
     <div id="pwa-install-sub">Listing Generates Revenue - 10B - BOOM </div>
   </div>
@@ -10673,5 +11318,7 @@ function saveCRMSettings(){alert('✅ CRM settings saved!');}
     <button class="pwa-btn pwa-btn-install" onclick="triggerPwaInstall()">Install</button>
   </div>
 </div>
+<script src="ktl-leave.js"></script>
+<script src="ktl-reports.js"></script>
 </body>
 </html>
