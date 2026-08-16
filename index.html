@@ -258,13 +258,17 @@ tr:hover td{background:var(--bg2);}
   .metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;overflow:hidden!important;width:100%!important;}
   .mc{min-width:0!important;overflow:hidden!important;word-break:break-word!important;}
   /* Allow tables and inner wrappers to scroll horizontally */
-  .card{overflow:hidden!important;}
-  [style*="overflow-x:auto"]{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;}
+  .card{overflow:hidden!important;min-width:0!important;}
+  /* Grid and flex children default to min-width:auto, which makes them refuse
+     to shrink below their content. That is what pushes the page sideways. */
+  .two-col > *,.listing-layout > *,#clients-grid > *,.screen > *{min-width:0!important;}
+  .app{overflow-x:hidden!important;}
+  [style*="overflow-x:auto"]{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;max-width:100%!important;}
   table{min-width:500px;}
   #products-table-wrap,#att-table-wrap,#att-rep-history-wrap,#orders-report-tbody,#wadmin-table-wrap,.saved-listings-panel,#client-products-table,#client-listable-table,#client-listed-table,#client-notbought-table{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;display:block!important;width:100%!important;}
   .two-col{grid-template-columns:1fr;}
   .fgrid{grid-template-columns:1fr;}
-  .content{padding:10px;overflow-x:auto!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;}
+ .content{padding:10px;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;}
   .card{padding:12px;margin-bottom:10px;}
   #clients-grid{grid-template-columns:1fr!important;}
   .listing-layout{grid-template-columns:1fr!important;}
@@ -294,16 +298,28 @@ tr:hover td{background:var(--bg2);}
   #screen-orders .listing-layout{
     display:flex;
     flex-direction:column;
+    min-width:0;
+    max-width:100%;
   }
   /* Right column (Listing Summary + My Saved Listings) comes AFTER products */
   #screen-orders .listing-layout > div:last-child{
     order:3;
+    min-width:0;
+    max-width:100%;
   }
   /* Left column (Listing Details + Select Products) comes first */
   #screen-orders .listing-layout > div:first-child{
     order:1;
+    min-width:0;
+    max-width:100%;
   }
-}   
+  /* The product list scrolls inside its own panel, not with the page */
+  #screen-orders #products-table-wrap{
+    overflow-x:auto!important;
+    max-width:100%!important;
+    -webkit-overflow-scrolling:touch!important;
+  }
+}  
   .mob-bar{height:50px;}
   .mc::after{display:none;}
   .date-range-strip{gap:6px;}
