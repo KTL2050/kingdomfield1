@@ -1,0 +1,1061 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   KTLSALES — LEDGER DESIGN SYSTEM
+   The visual language from the Reports Centre, made reusable screen by screen.
+
+   Install: add ONE line at the end of <head> in clockin.html, after the
+   Leaflet stylesheet and after the inline <style> block:
+
+       <link rel="stylesheet" href="ktl-theme.css"/>
+
+   Load order matters — this file must come last so it can refine the
+   existing styles rather than fight them.
+
+   Applied so far:  every screen — Attendance · Dashboard · Clients ·
+                    Place Listing · Targets · Wallet · Sales Team ·
+                    User Management · Leave Management
+                    (Reports carries its own copy of this language.)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── 1. TOKENS ────────────────────────────────────────────────────────────
+   Shared by every screen we convert. Derived from the existing navy-and-gold
+   brand, with the ink, rule and figure colours the Reports Centre uses.      */
+:root{
+  --lg-ink:#12233F;          /* display type, totals, emphasis            */
+  --lg-royal:#1A3A6B;        /* existing brand navy                       */
+  --lg-royal-soft:#EAF0F8;
+  --lg-gold:#A97406;         /* rules, stamps, starred items              */
+  --lg-gold-soft:#FAF2DE;
+  --lg-teal:#0F766E;         /* attendance accent                         */
+  --lg-teal-soft:#E3F1EF;
+  --lg-paper:#FFFFFF;
+  --lg-canvas:#F6F7F9;
+  --lg-rule:#EAEAE4;         /* hairline                                  */
+  --lg-rule-mid:#D8D9D3;
+  --lg-txt:#1F2024;
+  --lg-txt2:#575C68;
+  --lg-txt3:#8B909B;
+  --lg-pos:#1D7A5A;
+  --lg-neg:#A32D2D;
+  --lg-serif:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,'Times New Roman',serif;
+}
+
+/* Figures line up in columns wherever they appear. */
+.lg-fig,
+#screen-targets td,#screen-targets th,#screen-targets .mc-val,
+#screen-wallet td,#screen-wallet th,
+#screen-team td,#screen-team th,
+#screen-admin td,#screen-admin th,#screen-admin .mc-val,
+#screen-leave td,#screen-leave th,
+#screen-clients td,#screen-clients th,
+#screen-orders td,#screen-orders th,#screen-orders .fin,
+#screen-dashboard .mc-val,
+#screen-dashboard td,
+#screen-dashboard th,
+.lg-scope .mc-val,
+.lg-scope td,
+.lg-scope th,
+.lg-scope .badge{
+  font-variant-numeric:tabular-nums lining-nums;
+  font-feature-settings:"tnum" 1,"lnum" 1;
+}
+
+/* ─── 2. REUSABLE COMPONENTS ───────────────────────────────────────────────
+   Use these class names on new markup. Existing screens are converted with
+   the scoped rules in section 3 until their markup is updated.              */
+.lg-masthead{margin-bottom:20px;}
+.lg-kicker{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--lg-gold);}
+.lg-h1{font-family:var(--lg-serif);font-size:28px;font-weight:600;letter-spacing:-.015em;line-height:1.1;color:var(--lg-ink);margin-top:5px;}
+.lg-lede{font-size:12.5px;color:var(--lg-txt2);margin-top:6px;max-width:56ch;line-height:1.55;}
+.lg-panel{background:var(--lg-paper);border:1px solid var(--lg-rule);border-radius:3px;box-shadow:0 1px 3px rgba(18,35,63,.05);overflow:hidden;margin-bottom:14px;}
+.lg-panel-hd{padding:17px 22px 14px;border-bottom:1px solid var(--lg-rule);display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;}
+.lg-title{font-family:var(--lg-serif);font-size:18px;font-weight:600;letter-spacing:-.01em;color:var(--lg-ink);line-height:1.2;}
+.lg-sub{font-size:11.5px;color:var(--lg-txt2);margin-top:4px;}
+.lg-label{font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--lg-txt3);}
+.lg-rule{height:1px;background:var(--lg-rule);border:none;margin:0;}
+.lg-rule-strong{height:2px;background:var(--lg-ink);border:none;margin:0;}
+
+/* ─── 3. ATTENDANCE ────────────────────────────────────────────────────────
+   Scoped entirely to #screen-attendance. Several panels carry inline styles
+   from the original build, so a few rules use !important to refine them —
+   these disappear once that markup moves to .lg-panel.                       */
+
+#screen-attendance{color:var(--lg-txt);}
+
+/* 3a. Stat cards ---------------------------------------------------------- */
+#screen-attendance .metrics-grid{gap:1px;background:var(--lg-rule);border:1px solid var(--lg-rule);border-radius:3px;overflow:hidden;box-shadow:0 1px 3px rgba(18,35,63,.05);}
+#screen-attendance .mc{background:var(--lg-paper)!important;border:none!important;border-radius:0!important;box-shadow:none!important;padding:18px 20px!important;transition:background .15s;}
+#screen-attendance .mc:hover{background:#FCFCFB!important;transform:none!important;}
+#screen-attendance .mc::after{content:none!important;}
+#screen-attendance .mc-dots{display:none;}
+#screen-attendance .mc-top{gap:14px;}
+#screen-attendance .mc-ico{width:34px;height:34px;border-radius:2px;}
+#screen-attendance .mc-ico svg{width:17px;height:17px;}
+#screen-attendance .mc-lbl{font-size:8.5px!important;font-weight:700!important;letter-spacing:.14em!important;text-transform:uppercase!important;color:var(--lg-txt3)!important;margin-bottom:7px!important;}
+#screen-attendance .mc-val{font-family:var(--lg-serif);font-size:27px!important;font-weight:600!important;letter-spacing:-.02em!important;line-height:1!important;color:var(--lg-ink)!important;}
+#screen-attendance .mc-sub{font-size:11px!important;color:var(--lg-txt2)!important;margin-top:7px!important;}
+
+/* 3b. Panels — map, my attendance, field visits, recent table ------------- */
+#screen-attendance [style*="border-radius:14px"]{
+  border-radius:3px!important;
+  border:1px solid var(--lg-rule)!important;
+  box-shadow:0 1px 3px rgba(18,35,63,.05)!important;
+}
+/* Panel headings and their captions */
+#screen-attendance [style*="font-size:15px"]{
+  font-family:var(--lg-serif);
+  font-size:18px!important;
+  font-weight:600!important;
+  letter-spacing:-.01em;
+  color:var(--lg-ink)!important;
+  line-height:1.2;
+}
+#screen-attendance [style*="font-size:11.5px"][style*="var(--txt3)"]{
+  font-size:11.5px!important;color:var(--lg-txt2)!important;margin-top:4px!important;
+}
+/* Micro-caps field labels above the filters */
+#screen-attendance label[style*="uppercase"]{
+  font-size:8.5px!important;font-weight:700!important;letter-spacing:.14em!important;color:var(--lg-txt3)!important;
+}
+
+/* 3c. Controls ------------------------------------------------------------ */
+#screen-attendance select,
+#screen-attendance input[type="date"],
+#screen-attendance input[type="text"],
+#screen-attendance input[type="search"]{
+  border-radius:3px!important;
+  border:1px solid var(--lg-rule-mid)!important;
+  background:var(--lg-paper)!important;
+  font-size:12.5px!important;
+  color:var(--lg-ink)!important;
+  padding:8px 11px!important;
+  transition:border-color .15s;
+}
+#screen-attendance select:focus,
+#screen-attendance input:focus{outline:none;border-color:var(--lg-royal)!important;}
+#screen-attendance button[style*="border-radius:9px"],
+#screen-attendance .btn{
+  border-radius:3px!important;
+  font-size:12px!important;
+  letter-spacing:.01em;
+  box-shadow:none!important;
+}
+#screen-attendance button[style*="var(--gold-mid)"]{background:var(--lg-gold)!important;}
+#screen-attendance button[style*="var(--royal)"]{background:var(--lg-royal)!important;}
+#screen-attendance :focus-visible{outline:2px solid var(--lg-royal);outline-offset:2px;}
+
+/* 3d. Tables — the heart of this screen ---------------------------------- */
+#screen-attendance table{border-collapse:collapse;width:100%;}
+#screen-attendance thead th{
+  background:var(--lg-paper)!important;
+  padding:13px 14px 9px!important;
+  font-size:9px!important;
+  font-weight:700!important;
+  letter-spacing:.13em!important;
+  text-transform:uppercase!important;
+  color:var(--lg-txt3)!important;
+  border-bottom:1px solid var(--lg-rule-mid)!important;
+  white-space:nowrap;
+}
+#screen-attendance tbody td{
+  padding:12px 14px!important;
+  font-size:12.5px!important;
+  border-bottom:1px solid var(--lg-rule)!important;
+  color:var(--lg-txt);
+  line-height:1.45;
+  vertical-align:middle;
+}
+#screen-attendance tbody tr{transition:background .12s;}
+#screen-attendance tbody tr:hover{background:var(--lg-canvas)!important;}
+/* Employee name — first cell of each row carries the weight */
+#screen-attendance tbody td:first-child{font-weight:600;color:var(--lg-ink);}
+/* The avatar discs the table script draws become squares, like the report glyphs */
+#screen-attendance tbody td div[style*="border-radius:50%"]{
+  border-radius:2px!important;
+  font-family:var(--lg-serif);
+  font-weight:600!important;
+  letter-spacing:.02em;
+}
+
+/* 3e. Badges become chips ------------------------------------------------- */
+#screen-attendance .badge{
+  border-radius:2px!important;
+  font-size:10px!important;
+  font-weight:700!important;
+  letter-spacing:.07em!important;
+  text-transform:uppercase!important;
+  padding:3px 8px!important;
+}
+#screen-attendance .badge.bg{background:var(--lg-teal-soft)!important;color:var(--lg-teal)!important;}
+#screen-attendance .badge.bb{background:var(--lg-royal-soft)!important;color:var(--lg-royal)!important;}
+#screen-attendance .badge.ba,
+#screen-attendance .badge.bgold{background:var(--lg-gold-soft)!important;color:var(--lg-gold)!important;}
+#screen-attendance .badge.br{background:#FBEBEB!important;color:var(--lg-neg)!important;}
+
+/* 3f. Empty and loading states ------------------------------------------- */
+#screen-attendance .empty-state{
+  padding:44px 22px!important;
+  text-align:center;
+  color:var(--lg-txt2)!important;
+  font-size:12.5px!important;
+}
+#screen-attendance .empty-state::before{
+  content:'—';
+  display:block;
+  font-family:var(--lg-serif);
+  font-size:30px;
+  color:var(--lg-rule-mid);
+  line-height:1;
+  margin-bottom:12px;
+}
+
+/* 3g. Map corners follow the panel radius -------------------------------- */
+#screen-attendance #att-map-wrap,
+#screen-attendance .leaflet-container{border-radius:0 0 2px 2px;}
+
+/* 3h. Motion and small screens ------------------------------------------- */
+@media(prefers-reduced-motion:reduce){
+  #screen-attendance *{animation:none!important;transition:none!important;}
+}
+@media(max-width:768px){
+  #screen-attendance .metrics-grid{gap:1px;}
+  #screen-attendance .mc{padding:15px 16px!important;}
+  #screen-attendance .mc-val{font-size:23px!important;}
+  #screen-attendance thead th{padding:11px 10px 8px!important;}
+  #screen-attendance tbody td{padding:11px 10px!important;font-size:12px!important;}
+}
+
+
+/* ─── 4. DASHBOARD ─────────────────────────────────────────────────────────
+   The morning screen. Same ledger language as Attendance, but the figures
+   carry more weight here because this is the first thing anyone reads.
+
+   NOTE: this supersedes the "#screen-dashboard .mc" rules added earlier to
+   the inline <style> block. Those can be deleted once you're happy with this
+   file — they're harmless until then, this loads after and wins.            */
+
+#screen-dashboard{color:var(--lg-txt);}
+
+/* 4a. Headline figures ---------------------------------------------------- */
+#screen-dashboard .metrics-grid{
+  gap:1px;
+  background:var(--lg-rule);
+  border:1px solid var(--lg-rule);
+  border-radius:3px;
+  overflow:hidden;
+  box-shadow:0 1px 3px rgba(18,35,63,.05);
+  margin-bottom:16px;
+}
+#screen-dashboard .mc{
+  background:var(--lg-paper)!important;
+  border:none!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  padding:20px 22px!important;
+  transition:background .15s;
+}
+#screen-dashboard .mc:hover{background:#FCFCFB!important;transform:none!important;box-shadow:none!important;}
+#screen-dashboard .mc::after{content:none!important;}
+#screen-dashboard .mc-dots{display:none;}
+#screen-dashboard .mc-top{gap:14px;}
+#screen-dashboard .mc-ico{width:34px;height:34px;border-radius:2px;}
+#screen-dashboard .mc-ico svg{width:17px;height:17px;}
+#screen-dashboard .mc-lbl{
+  font-size:8.5px!important;font-weight:700!important;letter-spacing:.14em!important;
+  text-transform:uppercase!important;color:var(--lg-txt3)!important;margin-bottom:8px!important;
+}
+#screen-dashboard .mc-val{
+  font-family:var(--lg-serif);font-size:30px!important;font-weight:600!important;
+  letter-spacing:-.025em!important;line-height:1!important;color:var(--lg-ink)!important;
+}
+#screen-dashboard .mc-sub{font-size:11px!important;color:var(--lg-txt2)!important;margin-top:7px!important;}
+#screen-dashboard .mc-delta{font-size:10.5px!important;font-weight:700!important;letter-spacing:.03em;margin-top:7px!important;}
+#screen-dashboard .mc-delta.up{color:var(--lg-pos)!important;}
+#screen-dashboard .mc-delta.down{color:var(--lg-neg)!important;}
+
+/* 4b. Panels -------------------------------------------------------------- */
+#screen-dashboard .two-col{gap:16px;}
+#screen-dashboard .card{
+  background:var(--lg-paper);
+  border:1px solid var(--lg-rule);
+  border-radius:3px;
+  box-shadow:0 1px 3px rgba(18,35,63,.05);
+  padding:0;
+  overflow:hidden;
+}
+#screen-dashboard .card-hdr{
+  padding:17px 22px 14px;
+  margin:0;
+  border-bottom:1px solid var(--lg-rule);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+}
+#screen-dashboard .card-title{
+  font-family:var(--lg-serif);font-size:18px;font-weight:600;
+  letter-spacing:-.01em;color:var(--lg-ink);line-height:1.2;
+}
+/* Everything the panels render sits inside this padding */
+#screen-dashboard .card > *:not(.card-hdr){padding-left:22px;padding-right:22px;}
+#screen-dashboard .card > *:last-child{padding-bottom:16px;}
+#screen-dashboard .card > div[style*="overflow-x:auto"]{padding-left:0;padding-right:0;}
+
+/* 4c. Tables inside panels ------------------------------------------------ */
+#screen-dashboard table{border-collapse:collapse;width:100%;}
+#screen-dashboard thead th{
+  background:var(--lg-paper)!important;
+  padding:12px 14px 8px!important;
+  font-size:9px!important;font-weight:700!important;letter-spacing:.13em!important;
+  text-transform:uppercase!important;color:var(--lg-txt3)!important;
+  border-bottom:1px solid var(--lg-rule-mid)!important;white-space:nowrap;text-align:left;
+}
+#screen-dashboard thead th:first-child,
+#screen-dashboard tbody td:first-child{padding-left:22px!important;}
+#screen-dashboard thead th:last-child,
+#screen-dashboard tbody td:last-child{padding-right:22px!important;}
+#screen-dashboard tbody td{
+  padding:11px 14px!important;font-size:12.5px!important;
+  border-bottom:1px solid var(--lg-rule)!important;color:var(--lg-txt);line-height:1.45;
+}
+#screen-dashboard tbody tr{transition:background .12s;}
+#screen-dashboard tbody tr:hover{background:var(--lg-canvas)!important;}
+#screen-dashboard tbody td:first-child{font-weight:600!important;color:var(--lg-ink);}
+#screen-dashboard tbody tr:last-child td{border-bottom:none!important;}
+
+/* 4d. Badges and alert lines --------------------------------------------- */
+#screen-dashboard .badge{
+  border-radius:2px!important;font-size:10px!important;font-weight:700!important;
+  letter-spacing:.07em!important;text-transform:uppercase!important;padding:3px 8px!important;
+}
+#screen-dashboard .badge.bg{background:var(--lg-teal-soft)!important;color:var(--lg-teal)!important;}
+#screen-dashboard .badge.bb{background:var(--lg-royal-soft)!important;color:var(--lg-royal)!important;}
+#screen-dashboard .badge.ba,
+#screen-dashboard .badge.bgold{background:var(--lg-gold-soft)!important;color:var(--lg-gold)!important;}
+#screen-dashboard .badge.br{background:#FBEBEB!important;color:var(--lg-neg)!important;}
+/* Stock alert rows read as ruled entries, not coloured boxes */
+#screen-dashboard .alert{
+  border-radius:0!important;border:none!important;border-left:2px solid transparent!important;
+  background:transparent!important;padding:9px 0 9px 12px!important;
+  border-bottom:1px solid var(--lg-rule)!important;margin-bottom:0!important;
+  font-size:12px!important;color:var(--lg-txt)!important;align-items:flex-start;
+}
+#screen-dashboard .alert strong{font-weight:700;color:var(--lg-ink);}
+#screen-dashboard .alert.ad{border-left-color:var(--lg-neg)!important;}
+#screen-dashboard .alert.ad span:first-child{color:var(--lg-neg);}
+#screen-dashboard .alert.aw{border-left-color:var(--lg-gold)!important;}
+#screen-dashboard .alert.aw span:first-child{color:var(--lg-gold);}
+#screen-dashboard .alert.ai{border-left-color:var(--lg-royal)!important;}
+#screen-dashboard .alert.ag{border-left-color:var(--lg-teal)!important;}
+
+/* 4e. Leaderboard — rank, name, share rule ------------------------------- */
+/* The rank disc becomes a serif numeral, the way ranked reports read */
+#screen-dashboard #top-listers > div > span:first-child{
+  border-radius:2px!important;background:transparent!important;
+  font-family:var(--lg-serif)!important;font-size:14px!important;font-weight:600!important;
+  color:var(--lg-txt3)!important;width:18px!important;justify-content:flex-start!important;
+}
+#screen-dashboard #top-listers > div:first-child > span:first-child{color:var(--lg-gold)!important;}
+/* Initials tile, squared off */
+#screen-dashboard #top-listers > div > div[style*="border-radius:50%"]{
+  border-radius:2px!important;background:var(--lg-royal-soft)!important;color:var(--lg-royal)!important;
+  font-family:var(--lg-serif);font-size:11.5px!important;
+}
+/* The bar becomes a hairline share rule */
+#screen-dashboard .pbar{height:2px!important;background:var(--lg-rule)!important;border-radius:0!important;}
+#screen-dashboard .pfill{background:var(--lg-royal)!important;border-radius:0!important;opacity:.9;}
+#screen-dashboard #top-listers > div{border-bottom:1px solid var(--lg-rule)!important;padding:12px 0!important;}
+#screen-dashboard #top-listers > div:last-child{border-bottom:none!important;}
+
+/* 4f. Team leave calendar ------------------------------------------------- */
+#screen-dashboard .lv-mini-m{font-family:var(--lg-serif);font-size:15px;font-weight:600;color:var(--lg-ink);}
+#screen-dashboard .lv-mini-btn{border-radius:2px;border:1px solid var(--lg-rule-mid);color:var(--lg-txt2);}
+#screen-dashboard .lv-mini-dow{font-size:8.5px;letter-spacing:.14em;color:var(--lg-txt3);}
+#screen-dashboard .lv-mini-d{border-radius:2px;font-size:11px;color:var(--lg-txt2);}
+#screen-dashboard .lv-mini-d.today{box-shadow:inset 0 0 0 1.5px var(--lg-gold);color:var(--lg-gold);}
+#screen-dashboard .lv-mini-list{border-top:1px solid var(--lg-rule);}
+#screen-dashboard .lv-mini-bar{border-radius:0;width:2px;}
+
+/* 4g. Controls ------------------------------------------------------------ */
+#screen-dashboard .sel,
+#screen-dashboard select,
+#screen-dashboard input[type="text"],
+#screen-dashboard input[type="date"]{
+  border-radius:3px!important;border:1px solid var(--lg-rule-mid)!important;
+  background:var(--lg-paper)!important;font-size:12px!important;color:var(--lg-ink)!important;
+  padding:7px 10px!important;
+}
+#screen-dashboard select:focus,#screen-dashboard input:focus{outline:none;border-color:var(--lg-royal)!important;}
+#screen-dashboard .btn{border-radius:3px!important;font-size:11.5px!important;box-shadow:none!important;letter-spacing:.01em;}
+#screen-dashboard :focus-visible{outline:2px solid var(--lg-royal);outline-offset:2px;}
+
+/* 4h. Empty states -------------------------------------------------------- */
+#screen-dashboard .empty-state{
+  padding:38px 22px!important;text-align:center;color:var(--lg-txt2)!important;font-size:12.5px!important;
+}
+#screen-dashboard .empty-state::before{
+  content:'—';display:block;font-family:var(--lg-serif);font-size:28px;
+  color:var(--lg-rule-mid);line-height:1;margin-bottom:11px;
+}
+/* The stock-alerts "all clear" line is a statement, not an empty state */
+#screen-dashboard #stock-alerts-list .empty-state{color:var(--lg-teal)!important;font-weight:600;}
+#screen-dashboard #stock-alerts-list .empty-state::before{content:'✓';color:var(--lg-teal);font-size:22px;}
+
+/* 4i. Motion and small screens ------------------------------------------- */
+@media(prefers-reduced-motion:reduce){
+  #screen-dashboard *{animation:none!important;transition:none!important;}
+}
+@media(max-width:768px){
+  #screen-dashboard .mc{padding:16px 17px!important;}
+  #screen-dashboard .mc-val{font-size:25px!important;}
+  #screen-dashboard .card-hdr{padding:15px 16px 12px;}
+  #screen-dashboard .card > *:not(.card-hdr){padding-left:16px;padding-right:16px;}
+  #screen-dashboard thead th:first-child,
+  #screen-dashboard tbody td:first-child{padding-left:16px!important;}
+  #screen-dashboard thead th:last-child,
+  #screen-dashboard tbody td:last-child{padding-right:16px!important;}
+  #screen-dashboard tbody td{padding:10px 11px!important;font-size:12px!important;}
+}
+
+
+/* ─── 5. CLIENTS ───────────────────────────────────────────────────────────
+   A directory beside a record. The left column is an index; the right is the
+   client's file. Selection has to be unmistakable, because everything on the
+   right belongs to whichever name is lit on the left.                        */
+
+#screen-clients{color:var(--lg-txt);}
+
+/* 5a. The index --------------------------------------------------------- */
+#screen-clients #clients-list{
+  background:var(--lg-paper);
+  border:1px solid var(--lg-rule);
+  border-radius:3px;
+  padding:0;
+  box-shadow:0 1px 3px rgba(18,35,63,.05);
+}
+#screen-clients .cli-item{
+  border-radius:0!important;
+  border:none!important;
+  border-bottom:1px solid var(--lg-rule)!important;
+  border-left:2px solid transparent!important;
+  margin-bottom:0!important;
+  padding:11px 13px!important;
+  transition:background .12s,border-color .12s;
+}
+#screen-clients .cli-item:last-child{border-bottom:none!important;}
+#screen-clients .cli-item:hover{background:var(--lg-canvas)!important;border-left-color:var(--lg-rule-mid)!important;}
+#screen-clients .cli-item.sel{
+  background:var(--lg-royal-soft)!important;
+  border-left-color:var(--lg-royal)!important;
+}
+#screen-clients .cli-item.sel div[style*="font-weight:500"]{font-weight:700!important;color:var(--lg-ink)!important;}
+#screen-clients .cli-av{
+  border-radius:2px!important;width:32px!important;height:32px!important;
+  font-family:var(--lg-serif);font-size:11.5px!important;font-weight:600!important;letter-spacing:.02em;
+}
+#screen-clients #rep-client-count{
+  font-size:8.5px!important;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--lg-txt3)!important;padding:0 0 9px 2px!important;
+}
+#screen-clients .search-row .si,#screen-clients #client-search{
+  border-radius:3px!important;border:1px solid var(--lg-rule-mid)!important;
+  padding:9px 12px!important;font-size:12.5px!important;background:var(--lg-paper)!important;
+}
+#screen-clients #client-search:focus{outline:none;border-color:var(--lg-royal)!important;}
+
+/* 5b. The record -------------------------------------------------------- */
+#screen-clients .card{
+  background:var(--lg-paper);border:1px solid var(--lg-rule);border-radius:3px;
+  box-shadow:0 1px 3px rgba(18,35,63,.05);padding:0;overflow:hidden;
+}
+#screen-clients .card > *:not(.tabs):not(.tc){padding-left:22px;padding-right:22px;}
+#screen-clients .card-title,
+#screen-clients #client-detail-panel [style*="font-size:16px"],
+#screen-clients #client-detail-panel [style*="font-size:15px"]{
+  font-family:var(--lg-serif);font-size:20px!important;font-weight:600!important;
+  letter-spacing:-.015em;color:var(--lg-ink)!important;line-height:1.15;
+}
+
+/* 5c. Tabs — a filing index, not buttons -------------------------------- */
+#screen-clients .tabs{
+  border-bottom:1px solid var(--lg-rule-mid);padding:0 22px;gap:0;margin-bottom:0;
+  overflow-x:auto;
+}
+#screen-clients .tab{
+  padding:12px 16px;font-size:11px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--lg-txt3);border-bottom:2px solid transparent;
+  margin-bottom:-1px;white-space:nowrap;
+}
+#screen-clients .tab:hover{color:var(--lg-ink);background:transparent;}
+#screen-clients .tab.active{color:var(--lg-ink);border-bottom-color:var(--lg-gold);background:transparent;}
+#screen-clients .tc{padding:0 0 18px;}
+
+/* 5d. Date strip -------------------------------------------------------- */
+#screen-clients .date-range-strip{
+  background:var(--lg-canvas);border-bottom:1px solid var(--lg-rule);padding:11px 22px;gap:9px;
+}
+#screen-clients .date-range-strip label{
+  font-size:8.5px!important;font-weight:700!important;letter-spacing:.14em!important;
+  text-transform:uppercase;color:var(--lg-txt3)!important;
+}
+#screen-clients .date-range-strip input[type=date]{
+  border-radius:3px!important;border:1px solid var(--lg-rule-mid)!important;
+  background:var(--lg-paper)!important;font-size:12px!important;padding:6px 10px!important;
+}
+#screen-clients .date-preset-btn{
+  border-radius:2px!important;border:1px solid var(--lg-rule-mid)!important;
+  font-size:10px!important;font-weight:700!important;letter-spacing:.08em;
+  padding:5px 10px!important;background:var(--lg-paper)!important;color:var(--lg-txt2)!important;
+}
+#screen-clients .date-preset-btn:hover,
+#screen-clients .date-preset-btn.active{
+  background:var(--lg-ink)!important;border-color:var(--lg-ink)!important;color:#fff!important;
+}
+
+/* 5e. Tables ------------------------------------------------------------ */
+#screen-clients table{border-collapse:collapse;width:100%;}
+#screen-clients thead th{
+  background:var(--lg-paper)!important;padding:12px 14px 8px!important;
+  font-size:9px!important;font-weight:700!important;letter-spacing:.13em!important;
+  text-transform:uppercase!important;color:var(--lg-txt3)!important;
+  border-bottom:1px solid var(--lg-rule-mid)!important;text-align:left;white-space:nowrap;
+}
+#screen-clients thead th:first-child,#screen-clients tbody td:first-child{padding-left:22px!important;}
+#screen-clients thead th:last-child,#screen-clients tbody td:last-child{padding-right:22px!important;}
+#screen-clients tbody td{
+  padding:11px 14px!important;font-size:12.5px!important;
+  border-bottom:1px solid var(--lg-rule)!important;color:var(--lg-txt);line-height:1.45;
+}
+#screen-clients tbody tr:hover{background:var(--lg-canvas)!important;}
+#screen-clients tbody td:first-child{font-weight:600;color:var(--lg-ink);}
+
+/* 5f. Chips, buttons, states -------------------------------------------- */
+#screen-clients .badge{
+  border-radius:2px!important;font-size:10px!important;font-weight:700!important;
+  letter-spacing:.07em!important;text-transform:uppercase!important;padding:3px 8px!important;
+}
+#screen-clients .badge.bg{background:var(--lg-teal-soft)!important;color:var(--lg-teal)!important;}
+#screen-clients .badge.bb{background:var(--lg-royal-soft)!important;color:var(--lg-royal)!important;}
+#screen-clients .badge.ba,#screen-clients .badge.bgold{background:var(--lg-gold-soft)!important;color:var(--lg-gold)!important;}
+#screen-clients .badge.br{background:#FBEBEB!important;color:var(--lg-neg)!important;}
+#screen-clients .btn{border-radius:3px!important;font-size:11.5px!important;box-shadow:none!important;}
+#screen-clients .btn-royal{background:var(--lg-ink)!important;}
+#screen-clients .empty-state{padding:44px 22px!important;color:var(--lg-txt2)!important;font-size:12.5px!important;}
+#screen-clients .empty-state::before{
+  content:'—';display:block;font-family:var(--lg-serif);font-size:30px;
+  color:var(--lg-rule-mid);line-height:1;margin-bottom:12px;
+}
+#screen-clients :focus-visible{outline:2px solid var(--lg-royal);outline-offset:2px;}
+
+
+/* ─── 6. PLACE LISTING ─────────────────────────────────────────────────────
+   A form that becomes a document. The left column is where the listing is
+   built; the right column is the running tally and what you do with it.
+   The tally is the one place on this screen that gets to shout.             */
+
+#screen-orders{color:var(--lg-txt);}
+
+/* 6a. Instruction line — a note, not an alert --------------------------- */
+#screen-orders > .alert.ai{
+  background:transparent!important;border:none!important;
+  border-left:2px solid var(--lg-gold)!important;border-radius:0!important;
+  padding:2px 0 2px 14px!important;margin-bottom:20px!important;
+  font-size:12.5px!important;color:var(--lg-txt2)!important;line-height:1.55;
+}
+#screen-orders > .alert.ai svg{color:var(--lg-gold);}
+
+/* 6b. Panels ------------------------------------------------------------ */
+#screen-orders .card{
+  background:var(--lg-paper);border:1px solid var(--lg-rule);border-radius:3px;
+  box-shadow:0 1px 3px rgba(18,35,63,.05);padding:0;overflow:hidden;margin-bottom:16px;
+}
+#screen-orders .card-hdr{
+  padding:17px 22px 14px;margin-bottom:0;border-bottom:1px solid var(--lg-rule);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+}
+#screen-orders .card-title{
+  font-family:var(--lg-serif);font-size:18px!important;font-weight:600!important;
+  letter-spacing:-.01em;color:var(--lg-ink)!important;line-height:1.2;
+}
+#screen-orders .card > *:not(.card-hdr):not(.saved-listings-tabs){padding-left:22px;padding-right:22px;}
+#screen-orders .card > .fgrid{padding-top:18px;padding-bottom:6px;}
+#screen-orders .card > div[style*="overflow-x:auto"]{padding-left:0;padding-right:0;}
+
+/* 6c. Form fields — labelled like a form, set like a ledger ------------- */
+#screen-orders .fgrid{gap:14px 18px;}
+#screen-orders .flbl{
+  font-size:8.5px!important;font-weight:700!important;letter-spacing:.14em!important;
+  text-transform:uppercase!important;color:var(--lg-txt3)!important;margin-bottom:2px;
+}
+#screen-orders .fin,#screen-orders .si{
+  border-radius:3px!important;border:1px solid var(--lg-rule-mid)!important;
+  background:var(--lg-paper)!important;font-size:13px!important;color:var(--lg-ink)!important;
+  padding:10px 12px!important;transition:border-color .15s;
+}
+#screen-orders .fin:focus,#screen-orders .si:focus{outline:none;border-color:var(--lg-royal)!important;}
+#screen-orders .fin[readonly]{
+  background:var(--lg-canvas)!important;color:var(--lg-txt2)!important;border-style:dashed!important;
+}
+#screen-orders #order-ref{font-family:var(--lg-serif)!important;font-size:14px!important;letter-spacing:.04em;}
+
+/* 6d. Product picker ---------------------------------------------------- */
+#screen-orders table{border-collapse:collapse;width:100%;}
+#screen-orders thead th{
+  background:var(--lg-paper)!important;padding:12px 14px 8px!important;
+  font-size:9px!important;font-weight:700!important;letter-spacing:.13em!important;
+  text-transform:uppercase!important;color:var(--lg-txt3)!important;
+  border-bottom:1px solid var(--lg-rule-mid)!important;text-align:left;white-space:nowrap;
+}
+#screen-orders thead th:first-child,#screen-orders tbody td:first-child{padding-left:22px!important;}
+#screen-orders thead th:last-child,#screen-orders tbody td:last-child{padding-right:22px!important;}
+#screen-orders tbody td{
+  padding:11px 14px!important;font-size:12.5px!important;
+  border-bottom:1px solid var(--lg-rule)!important;color:var(--lg-txt);
+}
+#screen-orders tbody tr:hover{background:var(--lg-canvas)!important;}
+#screen-orders tbody td:first-child{font-family:var(--lg-serif);font-size:13px!important;color:var(--lg-ink);letter-spacing:.02em;}
+/* A ticked row should be visible at a glance while scanning a long list */
+#screen-orders tbody tr:has(input[type="checkbox"]:checked){background:var(--lg-gold-soft)!important;}
+#screen-orders tbody tr:has(input[type="checkbox"]:checked) td:first-child{color:var(--lg-gold);}
+#screen-orders input[type="checkbox"]{accent-color:var(--lg-ink);width:15px;height:15px;cursor:pointer;}
+
+/* 6e. The tally — the loudest thing on the screen ----------------------- */
+#screen-orders .order-sum{
+  background:transparent!important;border:none!important;border-radius:0!important;
+  border-top:1px solid var(--lg-rule)!important;padding:14px 0!important;
+}
+#screen-orders [style*="var(--gold-light)"]{
+  background:transparent!important;border:none!important;border-radius:0!important;
+  border-top:1px solid var(--lg-rule)!important;border-bottom:2px solid var(--lg-ink)!important;
+  padding:14px 0 16px!important;margin-top:0!important;
+}
+#screen-orders [style*="var(--gold-light)"] > div:first-child{
+  font-size:8.5px!important;font-weight:700!important;letter-spacing:.14em!important;
+  color:var(--lg-txt3)!important;margin-bottom:9px!important;
+}
+#screen-orders #order-total{
+  font-family:var(--lg-serif)!important;font-size:34px!important;font-weight:600!important;
+  letter-spacing:-.03em!important;color:var(--lg-ink)!important;line-height:1;
+}
+
+/* 6f. Actions ----------------------------------------------------------- */
+#screen-orders .btn{border-radius:3px!important;font-size:12.5px!important;box-shadow:none!important;letter-spacing:.01em;}
+#screen-orders .btn-royal{background:var(--lg-ink)!important;font-weight:600!important;padding:12px!important;}
+#screen-orders .btn-royal:hover{background:#0C1A31!important;}
+#screen-orders .share-panel{
+  background:var(--lg-ink)!important;border-radius:3px!important;padding:18px 20px!important;
+}
+#screen-orders .share-panel-title{
+  font-size:8.5px!important;font-weight:700!important;letter-spacing:.16em!important;
+  opacity:.65;margin-bottom:13px!important;
+}
+#screen-orders .share-btn{border-radius:2px!important;font-size:11.5px!important;letter-spacing:.02em;}
+
+/* 6g. Saved listings ---------------------------------------------------- */
+#screen-orders .saved-listings-tabs{border-bottom:1px solid var(--lg-rule);}
+#screen-orders .saved-listings-tab{
+  font-size:10px!important;font-weight:700!important;letter-spacing:.12em!important;
+  text-transform:uppercase;color:var(--lg-txt3)!important;padding:11px 16px!important;
+}
+#screen-orders .saved-listings-tab.active{color:var(--lg-ink)!important;border-bottom-color:var(--lg-gold)!important;}
+#screen-orders .badge{
+  border-radius:2px!important;font-size:10px!important;font-weight:700!important;
+  letter-spacing:.07em!important;text-transform:uppercase!important;padding:3px 8px!important;
+}
+#screen-orders .badge.bb{background:var(--lg-royal-soft)!important;color:var(--lg-royal)!important;}
+#screen-orders .badge.bg{background:var(--lg-teal-soft)!important;color:var(--lg-teal)!important;}
+#screen-orders .badge.ba,#screen-orders .badge.bgold{background:var(--lg-gold-soft)!important;color:var(--lg-gold)!important;}
+#screen-orders .empty-state{padding:36px 22px!important;color:var(--lg-txt2)!important;font-size:12.5px!important;}
+#screen-orders .empty-state::before{
+  content:'—';display:block;font-family:var(--lg-serif);font-size:28px;
+  color:var(--lg-rule-mid);line-height:1;margin-bottom:11px;
+}
+#screen-orders :focus-visible{outline:2px solid var(--lg-royal);outline-offset:2px;}
+
+/* 6h. Motion and small screens ------------------------------------------ */
+@media(prefers-reduced-motion:reduce){
+  #screen-clients *,#screen-orders *{animation:none!important;transition:none!important;}
+}
+@media(max-width:768px){
+  #screen-clients .card > *:not(.tabs):not(.tc),
+  #screen-orders .card > *:not(.card-hdr):not(.saved-listings-tabs){padding-left:16px;padding-right:16px;}
+  #screen-clients .tabs,#screen-clients .date-range-strip{padding-left:16px;padding-right:16px;}
+  #screen-clients thead th:first-child,#screen-clients tbody td:first-child,
+  #screen-orders thead th:first-child,#screen-orders tbody td:first-child{padding-left:16px!important;}
+  #screen-clients thead th:last-child,#screen-clients tbody td:last-child,
+  #screen-orders thead th:last-child,#screen-orders tbody td:last-child{padding-right:16px!important;}
+  #screen-orders #order-total{font-size:28px!important;}
+  #screen-orders .card-hdr,#screen-clients .card-hdr{padding:15px 16px 12px;}
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   7. SHARED BASE — Targets · Wallet · Sales Team · User Management · Leave
+   These five screens use the same components, so they share one block. Any
+   screen-specific work follows in sections 8–11.
+   ═══════════════════════════════════════════════════════════════════════════ */
+#screen-targets,#screen-wallet,#screen-team,#screen-admin,#screen-leave{color:var(--lg-txt);}
+
+/* 7a. Figure blocks ------------------------------------------------------- */
+#screen-targets .metrics-grid,
+#screen-wallet .metrics-grid,
+#screen-admin .metrics-grid{
+  gap:1px;background:var(--lg-rule);border:1px solid var(--lg-rule);border-radius:3px;
+  overflow:hidden;box-shadow:0 1px 3px rgba(18,35,63,.05);margin-bottom:16px;
+}
+#screen-targets .mc,
+#screen-wallet .mc,
+#screen-admin .mc{
+  background:var(--lg-paper)!important;border:none!important;border-radius:0!important;
+  box-shadow:none!important;padding:20px 22px!important;
+}
+#screen-targets .mc::after,#screen-wallet .mc::after,#screen-admin .mc::after{content:none!important;}
+#screen-targets .mc-dots,#screen-wallet .mc-dots,#screen-admin .mc-dots{display:none;}
+#screen-targets .mc-lbl,#screen-wallet .mc-lbl,#screen-admin .mc-lbl{
+  font-size:8.5px!important;font-weight:700!important;letter-spacing:.14em!important;
+  text-transform:uppercase!important;color:var(--lg-txt3)!important;margin-bottom:8px!important;
+}
+#screen-targets .mc-val,#screen-wallet .mc-val,#screen-admin .mc-val{
+  font-family:var(--lg-serif);font-size:30px!important;font-weight:600!important;
+  letter-spacing:-.025em!important;line-height:1!important;color:var(--lg-ink)!important;
+}
+#screen-targets .mc-sub,#screen-wallet .mc-sub,#screen-admin .mc-sub{
+  font-size:11px!important;color:var(--lg-txt2)!important;margin-top:7px!important;
+}
+/* Wallet and User Management still carry gradient fills inline — retire them.
+   The inline style also sets white text, so every child needs its colour back. */
+#screen-wallet .mc[style*="linear-gradient"],
+#screen-admin .mc[style*="linear-gradient"]{background:var(--lg-paper)!important;border:none!important;}
+#screen-wallet .mc[style*="linear-gradient"] .mc-lbl,
+#screen-admin .mc[style*="linear-gradient"] .mc-lbl{color:var(--lg-txt3)!important;}
+#screen-wallet .mc[style*="linear-gradient"] .mc-val,
+#screen-admin .mc[style*="linear-gradient"] .mc-val{color:var(--lg-ink)!important;}
+#screen-wallet .mc[style*="linear-gradient"] .mc-sub,
+#screen-admin .mc[style*="linear-gradient"] .mc-sub{color:var(--lg-txt2)!important;}
+/* Each figure keeps a colour, but as a 2px rule above it rather than a fill */
+#screen-wallet .metrics-grid .mc,
+#screen-admin .metrics-grid .mc{border-top:2px solid var(--lg-rule-mid)!important;}
+#screen-wallet .metrics-grid .mc:nth-child(1),
+#screen-admin .metrics-grid .mc:nth-child(1){border-top-color:var(--lg-royal)!important;}
+#screen-wallet .metrics-grid .mc:nth-child(2),
+#screen-admin .metrics-grid .mc:nth-child(2){border-top-color:var(--lg-teal)!important;}
+#screen-wallet .metrics-grid .mc:nth-child(3),
+#screen-admin .metrics-grid .mc:nth-child(3){border-top-color:var(--lg-gold)!important;}
+#screen-wallet .metrics-grid .mc:nth-child(4),
+#screen-admin .metrics-grid .mc:nth-child(4){border-top-color:var(--lg-neg)!important;}
+
+/* 7b. Panels -------------------------------------------------------------- */
+#screen-targets .card,#screen-wallet .card,#screen-team .card,
+#screen-admin .card,#screen-leave .card{
+  background:var(--lg-paper);border:1px solid var(--lg-rule);border-radius:3px;
+  box-shadow:0 1px 3px rgba(18,35,63,.05);padding:0;overflow:hidden;margin-bottom:16px;
+}
+#screen-targets .card-hdr,#screen-wallet .card-hdr,#screen-team .card-hdr,
+#screen-admin .card-hdr,#screen-leave .card-hdr{
+  padding:17px 22px 14px;margin-bottom:0;border-bottom:1px solid var(--lg-rule);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+}
+#screen-targets .card-title,#screen-wallet .card-title,#screen-team .card-title,
+#screen-admin .card-title,#screen-leave .card-title{
+  font-family:var(--lg-serif);font-size:18px!important;font-weight:600!important;
+  letter-spacing:-.01em;color:var(--lg-ink)!important;line-height:1.2;
+}
+#screen-targets .card > *:not(.card-hdr),#screen-wallet .card > *:not(.card-hdr),
+#screen-team .card > *:not(.card-hdr),#screen-admin .card > *:not(.card-hdr),
+#screen-leave .card > *:not(.card-hdr):not(.tabs){padding-left:22px;padding-right:22px;}
+#screen-targets .card > *:last-child,#screen-wallet .card > *:last-child,
+#screen-team .card > *:last-child,#screen-admin .card > *:last-child{padding-bottom:16px;}
+#screen-targets .card > div[style*="overflow-x:auto"],
+#screen-wallet .card > div[style*="overflow-x:auto"],
+#screen-team .card > div[style*="overflow-x:auto"],
+#screen-admin .card > div[style*="overflow-x:auto"]{padding-left:0;padding-right:0;padding-bottom:0;}
+
+/* 7c. Tables -------------------------------------------------------------- */
+#screen-targets table,#screen-wallet table,#screen-team table,
+#screen-admin table,#screen-leave table{border-collapse:collapse;width:100%;}
+#screen-targets thead th,#screen-wallet thead th,#screen-team thead th,
+#screen-admin thead th,#screen-leave thead th{
+  background:var(--lg-paper)!important;padding:12px 14px 8px!important;
+  font-size:9px!important;font-weight:700!important;letter-spacing:.13em!important;
+  text-transform:uppercase!important;color:var(--lg-txt3)!important;
+  border-bottom:1px solid var(--lg-rule-mid)!important;text-align:left;white-space:nowrap;
+}
+#screen-targets thead th:first-child,#screen-targets tbody td:first-child,
+#screen-wallet thead th:first-child,#screen-wallet tbody td:first-child,
+#screen-team thead th:first-child,#screen-team tbody td:first-child,
+#screen-admin thead th:first-child,#screen-admin tbody td:first-child,
+#screen-leave thead th:first-child,#screen-leave tbody td:first-child{padding-left:22px!important;}
+#screen-targets thead th:last-child,#screen-targets tbody td:last-child,
+#screen-wallet thead th:last-child,#screen-wallet tbody td:last-child,
+#screen-team thead th:last-child,#screen-team tbody td:last-child,
+#screen-admin thead th:last-child,#screen-admin tbody td:last-child,
+#screen-leave thead th:last-child,#screen-leave tbody td:last-child{padding-right:22px!important;}
+#screen-targets tbody td,#screen-wallet tbody td,#screen-team tbody td,
+#screen-admin tbody td,#screen-leave tbody td{
+  padding:11px 14px!important;font-size:12.5px!important;
+  border-bottom:1px solid var(--lg-rule)!important;color:var(--lg-txt);line-height:1.45;
+}
+#screen-targets tbody tr:hover,#screen-wallet tbody tr:hover,#screen-team tbody tr:hover,
+#screen-admin tbody tr:hover,#screen-leave tbody tr:hover{background:var(--lg-canvas)!important;}
+#screen-targets tbody td:first-child,#screen-team tbody td:first-child,
+#screen-admin tbody td:first-child,#screen-leave tbody td:first-child{
+  font-weight:600;color:var(--lg-ink);
+}
+
+/* 7d. Chips --------------------------------------------------------------- */
+#screen-targets .badge,#screen-wallet .badge,#screen-team .badge,
+#screen-admin .badge,#screen-leave .badge{
+  border-radius:2px!important;font-size:10px!important;font-weight:700!important;
+  letter-spacing:.07em!important;text-transform:uppercase!important;padding:3px 8px!important;
+}
+#screen-targets .badge.bg,#screen-wallet .badge.bg,#screen-team .badge.bg,
+#screen-admin .badge.bg,#screen-leave .badge.bg{background:var(--lg-teal-soft)!important;color:var(--lg-teal)!important;}
+#screen-targets .badge.bb,#screen-wallet .badge.bb,#screen-team .badge.bb,
+#screen-admin .badge.bb,#screen-leave .badge.bb{background:var(--lg-royal-soft)!important;color:var(--lg-royal)!important;}
+#screen-targets .badge.ba,#screen-wallet .badge.ba,#screen-team .badge.ba,
+#screen-admin .badge.ba,#screen-leave .badge.ba,
+#screen-targets .badge.bgold,#screen-wallet .badge.bgold,#screen-team .badge.bgold,
+#screen-admin .badge.bgold,#screen-leave .badge.bgold{background:var(--lg-gold-soft)!important;color:var(--lg-gold)!important;}
+#screen-targets .badge.br,#screen-wallet .badge.br,#screen-team .badge.br,
+#screen-admin .badge.br,#screen-leave .badge.br{background:#FBEBEB!important;color:var(--lg-neg)!important;}
+
+/* 7e. Controls ------------------------------------------------------------ */
+#screen-targets .sel,#screen-targets .si,#screen-targets .fin,
+#screen-wallet .sel,#screen-wallet .si,#screen-wallet .fin,
+#screen-team .sel,#screen-team .si,#screen-team .fin,
+#screen-admin .sel,#screen-admin .si,#screen-admin .fin,
+#screen-leave .sel,#screen-leave .si,#screen-leave .fin,
+#screen-targets select,#screen-wallet select,#screen-team select,#screen-admin select,#screen-leave select,
+#screen-targets input[type="text"],#screen-targets input[type="date"],
+#screen-team input[type="text"],#screen-admin input[type="text"],
+#screen-leave input[type="date"],#screen-leave input[type="text"]{
+  border-radius:3px!important;border:1px solid var(--lg-rule-mid)!important;
+  background:var(--lg-paper)!important;font-size:12.5px!important;color:var(--lg-ink)!important;
+  padding:8px 11px!important;
+}
+#screen-targets select:focus,#screen-wallet select:focus,#screen-team select:focus,
+#screen-admin select:focus,#screen-leave select:focus,
+#screen-targets input:focus,#screen-team input:focus,#screen-admin input:focus,#screen-leave input:focus{
+  outline:none;border-color:var(--lg-royal)!important;
+}
+#screen-targets .btn,#screen-wallet .btn,#screen-team .btn,#screen-admin .btn,#screen-leave .btn{
+  border-radius:3px!important;font-size:11.5px!important;box-shadow:none!important;letter-spacing:.01em;
+}
+#screen-targets .btn-royal,#screen-wallet .btn-royal,#screen-team .btn-royal,
+#screen-admin .btn-royal,#screen-leave .btn-royal{background:var(--lg-ink)!important;font-weight:600!important;}
+#screen-targets .btn-gold,#screen-wallet .btn-gold,#screen-admin .btn-gold{background:var(--lg-gold)!important;}
+#screen-targets :focus-visible,#screen-wallet :focus-visible,#screen-team :focus-visible,
+#screen-admin :focus-visible,#screen-leave :focus-visible{outline:2px solid var(--lg-royal);outline-offset:2px;}
+
+/* 7f. Empty states -------------------------------------------------------- */
+#screen-targets .empty-state,#screen-wallet .empty-state,#screen-team .empty-state,
+#screen-admin .empty-state,#screen-leave .empty-state{
+  padding:40px 22px!important;text-align:center;color:var(--lg-txt2)!important;font-size:12.5px!important;
+}
+#screen-targets .empty-state::before,#screen-wallet .empty-state::before,
+#screen-team .empty-state::before,#screen-admin .empty-state::before,
+#screen-leave .empty-state::before{
+  content:'—';display:block;font-family:var(--lg-serif);font-size:28px;
+  color:var(--lg-rule-mid);line-height:1;margin-bottom:11px;
+}
+
+/* 7g. Progress bars become share rules ------------------------------------ */
+#screen-targets .pbar,#screen-team .pbar,#screen-wallet .earner-bar{
+  height:2px!important;background:var(--lg-rule)!important;border-radius:0!important;
+}
+#screen-targets .pfill,#screen-team .pfill,#screen-wallet .earner-bar-fill{
+  border-radius:0!important;background:var(--lg-royal)!important;
+}
+
+
+/* ─── 8. WALLET ────────────────────────────────────────────────────────────
+   A statement of account. The hero stops being a gradient card and becomes
+   the header of that statement: solid ink, gold rule, figure in the serif.  */
+
+#screen-wallet .wallet-hero{
+  background:var(--lg-ink)!important;border-radius:3px!important;
+  padding:26px 28px!important;border-bottom:2px solid var(--lg-gold)!important;
+}
+#screen-wallet .wallet-hero::before,
+#screen-wallet .wallet-hero::after{content:none!important;}   /* decorative discs */
+#screen-wallet .wh-label{
+  font-size:8.5px!important;font-weight:700!important;letter-spacing:.16em!important;opacity:.6!important;
+}
+#screen-wallet .wh-points{
+  font-family:var(--lg-serif);font-size:46px!important;font-weight:600!important;letter-spacing:-.03em!important;
+}
+#screen-wallet .wh-pts-label{font-size:11px!important;opacity:.55!important;letter-spacing:.04em;}
+#screen-wallet .wh-ugx{font-size:17px!important;font-weight:500!important;opacity:.9;}
+#screen-wallet .wh-badge{
+  border-radius:2px!important;background:rgba(255,255,255,.09)!important;
+  border:1px solid rgba(255,255,255,.18)!important;font-size:10px!important;
+  letter-spacing:.08em;text-transform:uppercase;font-weight:700!important;
+}
+#screen-wallet .wh-meta{border-top:1px solid rgba(255,255,255,.16)!important;}
+#screen-wallet .wh-stat-val{font-family:var(--lg-serif);font-size:19px!important;font-weight:600!important;}
+#screen-wallet .wh-stat-lbl{font-size:8.5px!important;letter-spacing:.14em;text-transform:uppercase;opacity:.5!important;}
+#screen-wallet .pbar-wallet{height:3px!important;border-radius:0!important;background:rgba(255,255,255,.18)!important;}
+#screen-wallet .pfill-wallet{border-radius:0!important;background:var(--lg-gold)!important;}
+
+/* Top earners read like a ranked report */
+#screen-wallet .earner-row{border-bottom:1px solid var(--lg-rule)!important;padding:12px 0!important;}
+#screen-wallet .earner-rank{font-family:var(--lg-serif);font-size:14px!important;color:var(--lg-txt3)!important;}
+#screen-wallet .earner-row:first-child .earner-rank{color:var(--lg-gold)!important;}
+#screen-wallet .earner-av{border-radius:2px!important;font-family:var(--lg-serif);font-size:11.5px!important;}
+#screen-wallet .earner-name{font-size:12.5px!important;font-weight:600!important;color:var(--lg-ink)!important;}
+#screen-wallet .earner-pts{font-size:10.5px!important;color:var(--lg-txt3)!important;}
+#screen-wallet .earner-ugx{font-family:var(--lg-serif);font-size:14px!important;font-weight:600!important;color:var(--lg-ink)!important;}
+#screen-wallet .tl-icon{border-radius:2px!important;}
+#screen-wallet .tl-amount.earn{color:var(--lg-pos)!important;font-weight:700;}
+
+
+/* ─── 9. SALES TEAM ────────────────────────────────────────────────────────
+   Same index-beside-record shape as Clients, so it inherits that behaviour. */
+
+#screen-team #team-rep-list{padding:0!important;}
+#screen-team .cli-item{
+  border-radius:0!important;border:none!important;
+  border-bottom:1px solid var(--lg-rule)!important;border-left:2px solid transparent!important;
+  margin-bottom:0!important;padding:12px 22px!important;transition:background .12s,border-color .12s;
+}
+#screen-team .cli-item:last-child{border-bottom:none!important;}
+#screen-team .cli-item:hover{background:var(--lg-canvas)!important;border-left-color:var(--lg-rule-mid)!important;}
+#screen-team .cli-item.sel{background:var(--lg-royal-soft)!important;border-left-color:var(--lg-royal)!important;}
+#screen-team .cli-av{
+  border-radius:2px!important;width:32px!important;height:32px!important;
+  font-family:var(--lg-serif);font-size:11.5px!important;font-weight:600!important;
+}
+#screen-team .tabs{border-bottom:1px solid var(--lg-rule-mid);padding:0 22px;gap:0;margin-bottom:0;}
+#screen-team .tab{
+  padding:12px 16px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--lg-txt3);border-bottom:2px solid transparent;margin-bottom:-1px;
+}
+#screen-team .tab.active{color:var(--lg-ink);border-bottom-color:var(--lg-gold);}
+#screen-team .tc{padding:0 0 18px;}
+
+
+/* ─── 10. USER MANAGEMENT ──────────────────────────────────────────────────
+   An administrative register. Roles are the thing you scan for, so they get
+   the chip treatment and the account name carries the weight.               */
+
+#screen-admin .tabs{border-bottom:1px solid var(--lg-rule-mid);padding:0 22px;gap:0;margin-bottom:0;}
+#screen-admin .tab{
+  padding:12px 16px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--lg-txt3);border-bottom:2px solid transparent;margin-bottom:-1px;
+}
+#screen-admin .tab.active{color:var(--lg-ink);border-bottom-color:var(--lg-gold);}
+#screen-admin .tc{padding:0 0 18px;}
+#screen-admin .f-inp,#screen-admin .f-sel{
+  border-radius:3px!important;border:1px solid var(--lg-rule-mid)!important;font-size:12.5px!important;
+}
+#screen-admin .f-lbl{
+  font-size:8.5px!important;font-weight:700!important;letter-spacing:.14em!important;
+  text-transform:uppercase!important;color:var(--lg-txt3)!important;
+}
+#screen-admin .pw-eye{color:var(--lg-txt3);}
+/* Avatar discs in the user register square off like every other initials tile */
+#screen-admin td div[style*="border-radius:50%"]{
+  border-radius:2px!important;font-family:var(--lg-serif);font-weight:600!important;
+}
+
+
+/* ─── 11. LEAVE MANAGEMENT ─────────────────────────────────────────────────
+   The module ships its own styles; these refinements bring it in line without
+   touching ktl-leave.js. Approvals are the job here, so a pending request
+   should read as an open item rather than a card in a feed.                 */
+
+#screen-leave .lv-stats{
+  gap:1px;background:var(--lg-rule);border:1px solid var(--lg-rule);border-radius:3px;
+  overflow:hidden;box-shadow:0 1px 3px rgba(18,35,63,.05);
+}
+#screen-leave .lv-stat{
+  background:var(--lg-paper);border:none!important;border-radius:0!important;
+  box-shadow:none!important;padding:19px 20px!important;
+}
+#screen-leave .lv-stat-v{
+  font-family:var(--lg-serif);font-size:28px!important;font-weight:600!important;
+  letter-spacing:-.025em!important;line-height:1!important;
+}
+#screen-leave .lv-stat-l{
+  font-size:8.5px!important;font-weight:700!important;letter-spacing:.14em!important;
+  color:var(--lg-txt3)!important;margin-top:8px!important;
+}
+#screen-leave .lv-stat-s{font-size:11px!important;color:var(--lg-txt2)!important;margin-top:4px!important;}
+
+/* Screen heading */
+#screen-leave .lv-bar > div > div:first-child{
+  font-family:var(--lg-serif);font-size:24px!important;font-weight:600!important;
+  letter-spacing:-.02em!important;color:var(--lg-ink)!important;
+}
+#screen-leave .lv-bar > div > div:last-child{font-size:12.5px!important;color:var(--lg-txt2)!important;}
+
+/* Module tabs match every other filing index in the app */
+#screen-leave .tabs{border-bottom:1px solid var(--lg-rule-mid)!important;padding:0 22px;gap:0;}
+#screen-leave .tab{
+  padding:13px 16px!important;font-size:11px!important;font-weight:700!important;
+  letter-spacing:.1em!important;text-transform:uppercase!important;color:var(--lg-txt3)!important;
+  border-bottom:2px solid transparent!important;margin-bottom:-1px;
+}
+#screen-leave .tab.active{color:var(--lg-ink)!important;border-bottom-color:var(--lg-gold)!important;background:transparent!important;}
+#screen-leave .lv-tabcount{
+  border-radius:2px!important;background:var(--lg-neg)!important;font-size:9px!important;letter-spacing:.04em;
+}
+
+/* Pending requests — open items on a ruled list */
+#screen-leave .lv-req{
+  border:none!important;border-radius:0!important;box-shadow:none!important;
+  border-bottom:1px solid var(--lg-rule)!important;border-left:2px solid var(--lg-gold)!important;
+  padding:15px 18px!important;margin-bottom:0!important;background:var(--lg-paper)!important;
+}
+#screen-leave .lv-av{
+  border-radius:2px!important;font-family:var(--lg-serif);font-size:11.5px!important;
+  background:var(--lg-royal-soft)!important;color:var(--lg-royal)!important;
+}
+
+/* Calendar */
+#screen-leave .lv-cal{border:1px solid var(--lg-rule)!important;border-radius:3px!important;}
+#screen-leave .lv-cal-hd{background:var(--lg-canvas)!important;border-bottom:1px solid var(--lg-rule)!important;}
+#screen-leave .lv-cal-hd div{
+  font-size:8.5px!important;letter-spacing:.14em!important;color:var(--lg-txt3)!important;
+}
+#screen-leave .lv-day{border-color:var(--lg-rule)!important;}
+#screen-leave .lv-day.today{background:#FFFDF5!important;box-shadow:inset 0 0 0 1.5px var(--lg-gold)!important;}
+#screen-leave .lv-day.today .lv-daynum{color:var(--lg-gold)!important;}
+#screen-leave .lv-chip{border-radius:2px!important;font-size:9.5px!important;letter-spacing:.02em;}
+#screen-leave .lv-pill{border-radius:2px!important;font-size:10px!important;font-weight:700!important;letter-spacing:.08em;text-transform:uppercase;}
+#screen-leave .lv-pill.on{background:var(--lg-ink)!important;border-color:var(--lg-ink)!important;}
+#screen-leave .lv-legend{font-size:10px!important;color:var(--lg-txt3)!important;}
+#screen-leave .lv-lgd{border-radius:1px!important;}
+
+/* Request detail — a record, read as label/value pairs */
+#screen-leave .lv-kv{font-size:12.5px;}
+#screen-leave .lv-k{
+  font-size:8.5px!important;font-weight:700!important;letter-spacing:.14em!important;
+  text-transform:uppercase;color:var(--lg-txt3)!important;
+}
+#screen-leave .lv-modal{border-radius:3px!important;}
+#screen-leave .lv-modal-hd,#screen-leave .lv-modal-ft{border-color:var(--lg-rule)!important;}
+
+
+/* ─── 12. MOTION AND SMALL SCREENS (sections 7–11) ─────────────────────── */
+@media(prefers-reduced-motion:reduce){
+  #screen-targets *,#screen-wallet *,#screen-team *,#screen-admin *,#screen-leave *{
+    animation:none!important;transition:none!important;
+  }
+}
+@media(max-width:768px){
+  #screen-targets .mc,#screen-wallet .mc,#screen-admin .mc{padding:16px 17px!important;}
+  #screen-targets .mc-val,#screen-wallet .mc-val,#screen-admin .mc-val{font-size:25px!important;}
+  #screen-wallet .wallet-hero{padding:20px!important;}
+  #screen-wallet .wh-points{font-size:36px!important;}
+  #screen-leave .lv-stat{padding:15px 16px!important;}
+  #screen-leave .lv-stat-v{font-size:23px!important;}
+  #screen-targets .card-hdr,#screen-wallet .card-hdr,#screen-team .card-hdr,
+  #screen-admin .card-hdr,#screen-leave .card-hdr{padding:15px 16px 12px;}
+  #screen-targets .card > *:not(.card-hdr),#screen-wallet .card > *:not(.card-hdr),
+  #screen-team .card > *:not(.card-hdr),#screen-admin .card > *:not(.card-hdr),
+  #screen-leave .card > *:not(.card-hdr):not(.tabs){padding-left:16px;padding-right:16px;}
+  #screen-team .tabs,#screen-admin .tabs,#screen-leave .tabs{padding-left:16px;padding-right:16px;}
+  #screen-targets thead th:first-child,#screen-targets tbody td:first-child,
+  #screen-wallet thead th:first-child,#screen-wallet tbody td:first-child,
+  #screen-team thead th:first-child,#screen-team tbody td:first-child,
+  #screen-admin thead th:first-child,#screen-admin tbody td:first-child,
+  #screen-leave thead th:first-child,#screen-leave tbody td:first-child{padding-left:16px!important;}
+  #screen-team .cli-item{padding-left:16px!important;padding-right:16px!important;}
+}
