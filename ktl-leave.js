@@ -50,6 +50,8 @@ const S = {
   users:       [],              // id, full_name, email, role, is_active
   approvers:   [],              // { employee_id, manager_id }
   requests:    [],
+  roster:      [],              // approved leave for everyone — visible to all
+  repTab:      'mine',          // mine | roster
   notifs:      [],
   teamIds:     null,            // null = every employee (admin)
   calMode:     'month',         // month | week | day
@@ -144,7 +146,11 @@ function userName(id) {
 function covers(r, dISO) { return r.start_date <= dISO && r.end_date >= dISO; }
 
 /** Requests opened from a notification may sit outside the loaded scope. */
-function getReq(id) { return S.requests.find(x => x.id === id) || null; }
+function getReq(id) {
+  return S.requests.find(x => x.id === id)
+      || S.roster.find(x => x.id === id)      // colleagues' leave opened from the roster
+      || null;
+}
 function cacheReq(r) {
   if (!r) return;
   const i = S.requests.findIndex(x => x.id === r.id);
@@ -288,6 +294,18 @@ async function resolveScope() {
   const ids = new Set((data || []).map(r => String(r.employee_id)));
   ids.add(String(u.id));                       // managers see their own leave too
   S.teamIds = [...ids];
+}
+
+/** Everyone can see who is away. Approved leave only, and only the facts
+    people need to plan around — never the reason or the attachment. */
+async function loadRoster() {
+  const from = iso(addDays(new Date(), -45));
+  const { data, error } = await DB().from('leave_requests')
+    .select('id,employee_id,employee_name,leave_type_id,leave_type_name,start_date,end_date,days_count,status')
+    .eq('status', 'approved').gte('end_date', from)
+    .order('start_date', { ascending: true }).limit(500);
+  if (error) { console.warn('[leave] roster:', error.message); S.roster = []; return; }
+  S.roster = data || [];
 }
 
 async function loadRequests() {
@@ -464,6 +482,7 @@ async function refresh(showSpinner) {
   await Promise.all([loadTypes(), loadUsers(), loadApprovers()]);
   await resolveScope();
   await loadRequests();
+  await loadRoster();
   await loadNotifs();
   sweepUpcoming().catch(e => console.warn('[leave] sweep:', e.message));
   render();
@@ -498,6 +517,24 @@ function renderRep() {
       ? `<div class="alert ai"><span>📅</span><div>Next approved leave: <strong>${esc(upcoming[upcoming.length-1].leave_type_name)}</strong>, ${fmtDate(upcoming[upcoming.length-1].start_date)} – ${fmtDate(upcoming[upcoming.length-1].end_date)}.</div></div>`
       : '';
 
+  const away = rosterGroups().now.length;
+
+  if (S.repTab === 'roster') {
+    return `
+    <div class="lv-bar">
+      <div>
+        <div style="font-size:15px;font-weight:700;letter-spacing:-.02em;">Who's away</div>
+        <div style="font-size:11.5px;color:var(--txt2);margin-top:2px;">Approved leave across the team, so you can plan around it.</div>
+      </div>
+      <button class="btn btn-royal" onclick="Leave.openRequestForm()">＋ Request leave</button>
+    </div>
+    <div class="tabs" style="margin-bottom:14px;">
+      <div class="tab" onclick="Leave.setRepTab('mine')">My leave</div>
+      <div class="tab active" onclick="Leave.setRepTab('roster')">Who's away${away ? `<span class="lv-tabcount">${away}</span>` : ''}</div>
+    </div>
+    ${renderRoster()}`;
+  }
+
   return `
   <div class="lv-bar">
     <div>
@@ -505,6 +542,10 @@ function renderRep() {
       <div style="font-size:11.5px;color:var(--txt2);margin-top:2px;">Request time off and track where each request stands.</div>
     </div>
     <button class="btn btn-royal" onclick="Leave.openRequestForm()">＋ Request leave</button>
+  </div>
+  <div class="tabs" style="margin-bottom:14px;">
+    <div class="tab active" onclick="Leave.setRepTab('mine')">My leave</div>
+    <div class="tab" onclick="Leave.setRepTab('roster')">Who's away${away ? `<span class="lv-tabcount">${away}</span>` : ''}</div>
   </div>
   ${banner}
   <div class="lv-stats">
@@ -561,6 +602,7 @@ function renderManager() {
     { id:'overview',  label:'Overview' },
     { id:'approvals', label:'Pending approvals', count: pending.length },
     { id:'calendar',  label:'Calendar' },
+    { id:'roster',    label:"Who's away" },
     { id:'requests',  label:'All requests' },
   ];
   if (roleAdmin()) tabs.push({ id:'settings', label:'Settings' });
@@ -568,6 +610,7 @@ function renderManager() {
   const body =
     S.tab === 'approvals' ? renderApprovals() :
     S.tab === 'calendar'  ? renderCalendarShell() :
+    S.tab === 'roster'    ? renderRoster() :
     S.tab === 'requests'  ? renderList() :
     S.tab === 'settings'  ? renderSettings() :
                             renderOverview();
@@ -704,6 +747,91 @@ function canDecide(r) {
   return assigned.some(a => String(a.manager_id) === String(u.id));
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  WHO'S AWAY — the team roster, visible to every role
+// ═══════════════════════════════════════════════════════════════════════════
+function rosterGroups() {
+  const t = todayISO();
+  const all = calendarItems().filter(r => r.status === 'approved');
+  const seen = new Set();
+  const uniq = all.filter(r => (seen.has(r.id) ? false : seen.add(r.id)));
+  return {
+    now:      uniq.filter(r => covers(r, t)).sort((a, b) => a.end_date.localeCompare(b.end_date)),
+    upcoming: uniq.filter(r => r.start_date > t).sort((a, b) => a.start_date.localeCompare(b.start_date)),
+    past:     uniq.filter(r => r.end_date < t).sort((a, b) => b.end_date.localeCompare(a.end_date)).slice(0, 15),
+  };
+}
+
+function rosterRow(r, mode) {
+  const name = r.employee_name || userName(r.employee_id);
+  const ls   = liveStatus(r);
+  const t    = todayISO();
+  let note;
+  if (mode === 'now') {
+    const left = countDays(t, r.end_date);
+    note = `Back on ${fmtDate(iso(addDays(parseD(r.end_date), 1)))} · ${left} day${left === 1 ? '' : 's'} left`;
+  } else if (mode === 'upcoming') {
+    const until = countDays(t, r.start_date) - 1;
+    note = until <= 0 ? 'Starts tomorrow' : `Starts in ${until} day${until === 1 ? '' : 's'}`;
+  } else {
+    note = `Returned ${fmtDate(iso(addDays(parseD(r.end_date), 1)))}`;
+  }
+  return `<tr>
+    <td><strong>${esc(name)}</strong></td>
+    <td><span style="display:inline-flex;align-items:center;gap:6px;">
+      <span style="width:8px;height:8px;border-radius:2px;background:${typeColor(r)};"></span>${esc(r.leave_type_name || '—')}</span></td>
+    <td>${fmtDate(r.start_date)}</td>
+    <td>${fmtDate(r.end_date)}</td>
+    <td><strong>${r.days_count || 0}</strong></td>
+    <td>${badge(ls)}</td>
+    <td style="font-size:11.5px;color:var(--txt2);">${note}</td>
+  </tr>`;
+}
+
+function rosterTable(rows, mode, emptyText) {
+  if (!rows.length) return `<div class="empty-state" style="padding:26px 20px;">${esc(emptyText)}</div>`;
+  return `<div class="lv-scroll"><table><thead><tr>
+      <th>Employee</th><th>Leave type</th><th>Start date</th><th>End date</th><th>Days</th><th>Status</th><th></th>
+    </tr></thead><tbody>${rows.map(r => rosterRow(r, mode)).join('')}</tbody></table></div>`;
+}
+
+function renderRoster() {
+  const g = rosterGroups();
+  const me_ = me();
+  const mineAway = g.now.some(r => String(r.employee_id) === String(me_?.id));
+
+  return `
+  <div class="lv-stats" style="margin-bottom:14px;">
+    ${stat(g.now.length, 'Away today', g.now.length ? g.now.map(r => (r.employee_name || userName(r.employee_id)).split(' ')[0]).slice(0, 3).join(', ') : 'Everyone is in', '#1D9E75')}
+    ${stat(g.upcoming.filter(r => r.start_date <= iso(addDays(new Date(), 7))).length, 'Away next week', 'Approved leave', 'var(--royal)')}
+    ${stat(g.upcoming.length, 'Booked ahead', 'All upcoming leave', 'var(--gold)')}
+  </div>
+
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-hdr"><span class="card-title">On leave now</span>
+      <span class="badge ${g.now.length ? 'bg' : 'bb'}">${g.now.length}</span></div>
+    ${rosterTable(g.now, 'now', 'Nobody is on leave today.')}
+  </div>
+
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-hdr"><span class="card-title">Coming up</span>
+      <span style="font-size:11px;color:var(--txt3);">Approved and scheduled</span></div>
+    ${rosterTable(g.upcoming, 'upcoming', 'No leave booked yet.')}
+  </div>
+
+  <div class="card" style="margin-bottom:0;">
+    <div class="card-hdr"><span class="card-title">Recently back</span>
+      <span style="font-size:11px;color:var(--txt3);">Last 45 days</span></div>
+    ${rosterTable(g.past, 'past', 'No completed leave in this period.')}
+  </div>
+
+  <div style="font-size:11px;color:var(--txt3);margin-top:12px;line-height:1.6;">
+    Approved leave only. Reasons and attachments stay private to the person and their approvers.
+    ${mineAway ? '' : ''}
+  </div>`;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 //  CALENDAR — month / week / day
 // ═══════════════════════════════════════════════════════════════════════════
@@ -744,7 +872,10 @@ function renderCalendarShell() {
 function startOfWeek(d) { const x = new Date(d); x.setDate(x.getDate() - x.getDay()); x.setHours(0,0,0,0); return x; }
 
 function calendarItems() {
-  return S.requests.filter(r => ['pending','approved'].includes(r.status));
+  const out = new Map();
+  S.requests.filter(r => ['pending','approved'].includes(r.status)).forEach(r => out.set(r.id, r));
+  S.roster.forEach(r => { if (!out.has(r.id)) out.set(r.id, r); });   // everyone's approved leave
+  return [...out.values()];
 }
 function itemsOn(dISO) {
   return calendarItems().filter(r => covers(r, dISO))
@@ -1165,6 +1296,10 @@ async function openDetail(id) {
   const name = r.employee_name || userName(r.employee_id);
   const ls   = liveStatus(r);
   const mine = String(r.employee_id) === String(me()?.id);
+  // Colleagues can see that someone is away and for how long. The reason,
+  // the attachment and the decision trail belong to the person and their
+  // approvers only.
+  const full = mine || roleMgr();
 
   modal(`
     <div class="lv-modal-hd">
@@ -1183,13 +1318,13 @@ async function openDetail(id) {
         <div class="lv-k">End date</div><div>${fmtDate(r.end_date)}</div>
         <div class="lv-k">Days</div><div>${r.days_count} calendar${r.working_days != null ? ` · ${r.working_days} working` : ''}</div>
         <div class="lv-k">Returns to work</div><div>${fmtDate(iso(addDays(parseD(r.end_date), 1)))}</div>
-        <div class="lv-k">Reason</div><div style="line-height:1.6;">${esc(r.reason || '—')}</div>
+        ${full ? `<div class="lv-k">Reason</div><div style="line-height:1.6;">${esc(r.reason || '—')}</div>
         <div class="lv-k">Attachment</div><div>${r.attachment_path
           ? `<button class="btn btn-sm" onclick="Leave.openAttachment('${r.id}')">📎 ${esc(r.attachment_name || 'Open file')}</button>`
           : '<span style="color:var(--txt3);">None</span>'}</div>
-        <div class="lv-k">Requested</div><div>${fmtStamp(r.requested_at)}</div>
-        ${r.status === 'approved' ? `<div class="lv-k">Approved by</div><div>${esc(r.decided_by_name || userName(r.decided_by))} · ${fmtStamp(r.decided_at)}</div>` : ''}
-        ${r.status === 'rejected' ? `<div class="lv-k">Rejected by</div><div>${esc(r.decided_by_name || userName(r.decided_by))} · ${fmtStamp(r.decided_at)}</div>
+        <div class="lv-k">Requested</div><div>${fmtStamp(r.requested_at)}</div>` : ''}
+        ${full && r.status === 'approved' ? `<div class="lv-k">Approved by</div><div>${esc(r.decided_by_name || userName(r.decided_by))} · ${fmtStamp(r.decided_at)}</div>` : ''}
+        ${full && r.status === 'rejected' ? `<div class="lv-k">Rejected by</div><div>${esc(r.decided_by_name || userName(r.decided_by))} · ${fmtStamp(r.decided_at)}</div>
           <div class="lv-k">Reason given</div><div style="color:#A32D2D;line-height:1.6;">${esc(r.rejection_reason || '—')}</div>` : ''}
         ${r.status === 'cancelled' ? `<div class="lv-k">Cancelled</div><div>${fmtStamp(r.cancelled_at)}</div>` : ''}
       </div>
@@ -1203,6 +1338,7 @@ async function openDetail(id) {
         <button class="btn btn-green" onclick="Leave.approve('${r.id}')">✓ Approve</button>` : ''}
     </div>`, 600);
 
+  if (!full) return;                      // no history for colleagues
   const { data: trail } = await DB().from('leave_audit_log')
     .select('*').eq('request_id', r.id).order('created_at');
   const host = document.getElementById('lv-trail');
@@ -1442,6 +1578,7 @@ async function unassign(rowId) {
 
 // ─── UI STATE ACTIONS ──────────────────────────────────────────────────────
 function setTab(tab)          { S.tab = tab; render(); }
+function setRepTab(tab)       { S.repTab = tab; render(); }
 function setFilter(key, val)  { S.filters[key] = val; render(); }
 function clearFilters()       { S.filters = { rep:'', manager:'', type:'', status:'', from:'', to:'' }; render(); }
 function calMode(m)           { S.calMode = m; render(); }
@@ -1714,7 +1851,7 @@ document.addEventListener('DOMContentLoaded', () => { patchHost(); waitForApp();
 // ─── PUBLIC API (used by inline onclick handlers) ──────────────────────────
 window.Leave = {
   // navigation / state
-  setTab, setFilter, clearFilters, calMode, calToday, calStep, calDay,
+  setTab, setRepTab, setFilter, clearFilters, calMode, calToday, calStep, calDay,
   refresh, render, goTo: goToLeave,
   // requests
   openRequestForm, onTypeChange, recalc, submit, openDetail, openAttachment,
