@@ -605,7 +605,7 @@ function renderManager() {
     { id:'roster',    label:"Who's away" },
     { id:'requests',  label:'All requests' },
   ];
-  if (roleAdmin()) tabs.push({ id:'settings', label:'Settings' });
+  if (roleMgr()) tabs.push({ id:'settings', label:'Settings' });
 
   const body =
     S.tab === 'approvals' ? renderApprovals() :
@@ -1064,7 +1064,8 @@ function listRow(r) {
 //  SETTINGS (Super Admin) — leave types + approver assignments
 // ═══════════════════════════════════════════════════════════════════════════
 function renderSettings() {
-  const reps = S.users.filter(u => u.is_active !== false && u.role === 'sales_rep');
+  // Everyone active — sales reps, managers and admins — can have an approver assigned.
+  const employees = S.users.filter(u => u.is_active !== false);
   const mgrs = S.users.filter(u => u.is_active !== false && ['admin','manager'].includes(u.role));
 
   return `
@@ -1092,12 +1093,12 @@ function renderSettings() {
     <div class="card-hdr"><span class="card-title">Who approves whose leave</span>
       <span style="font-size:11px;color:var(--txt3);">Employees with no approver fall back to all admins</span></div>
     <div class="lv-scroll"><table><thead><tr>
-      <th>Sales rep</th><th>Approvers</th><th></th>
+      <th>Employee</th><th>Approvers</th><th></th>
     </tr></thead><tbody>
-      ${reps.length ? reps.map(r => {
+      ${employees.length ? employees.map(r => {
         const assigned = S.approvers.filter(a => String(a.employee_id) === String(r.id));
         return `<tr>
-          <td><strong>${esc(r.full_name)}</strong><div style="font-size:11px;color:var(--txt3);">${esc(r.email || '')}</div></td>
+          <td><strong>${esc(r.full_name)}</strong>${r.role !== 'sales_rep' ? ` <span class="badge bb" style="font-size:9.5px;">${esc(r.role)}</span>` : ''}<div style="font-size:11px;color:var(--txt3);">${esc(r.email || '')}</div></td>
           <td>${assigned.length
             ? assigned.map(a => `<span class="badge bb" style="margin:2px 4px 2px 0;">${esc(userName(a.manager_id))}
                 <span onclick="Leave.unassign('${a.id}')" style="cursor:pointer;margin-left:5px;font-weight:700;">×</span></span>`).join('')
@@ -1109,7 +1110,7 @@ function renderSettings() {
                     .map(m => `<option value="${m.id}">${esc(m.full_name)}</option>`).join('')}
             </select>
           </td></tr>`;
-      }).join('') : `<tr><td colspan="3" class="empty-state">No active sales reps found.</td></tr>`}
+      }).join('') : `<tr><td colspan="3" class="empty-state">No active employees found.</td></tr>`}
     </tbody></table></div>
   </div>`;
 }
