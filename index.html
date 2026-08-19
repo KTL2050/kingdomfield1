@@ -8137,10 +8137,14 @@ document.getElementById('wallet-redeem-modal').addEventListener('click', functio
 
 const ATT_OFFICE = [0.3136, 32.5811]; // adjust to your office GPS
 const ATT_RANGE_KM = 1.0;
-const ATT_MODELS_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+// Local copy first (instant), jsDelivr as fallback — both far faster than
+// github.io, which has no edge server anywhere near Uganda.
+const ATT_MODELS_URL     = './models';
+const ATT_MODELS_FALLBACK = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights';
 const ATT_MATCH_THRESHOLD = 0.45;
 
 let _attModelsReady = false;
+let _attModelsLoading = null;
 let _attStream = null;
 let _attMode = 'in'; // 'in' or 'out'
 let _attCapturedPhoto = null;
@@ -8155,19 +8159,108 @@ let _attOpenRecord = null; // today's open clock-in record
 // ── Load face-api models once ──────────────────────────────
 async function _attLoadModels() {
   if (_attModelsReady) return;
-  const bar = document.getElementById('att-models-bar');
-  const steps = [
-    () => faceapi.nets.tinyFaceDetector.loadFromUri(ATT_MODELS_URL),
-    () => faceapi.nets.faceLandmark68Net.loadFromUri(ATT_MODELS_URL),
-    () => faceapi.nets.faceRecognitionNet.loadFromUri(ATT_MODELS_URL),
-  ];
-  for (let i = 0; i < steps.length; i++) {
-    await steps[i]();
-    if (bar) bar.style.width = ((i + 1) / steps.length * 100) + '%';
-  }
-  _attModelsReady = true;
+  if (_attModelsLoading) return _attModelsLoading;      // never load twice at once
+
+  _attModelsLoading = (async () => {
+    const bar = document.getElementById('att-models-bar');
+
+    // Force the GPU backend. Without this, tfjs can silently fall back to CPU,
+    // which is 10-30x slower for these models.
+    try {
+      await faceapi.tf.setBackend('webgl');
+      await faceapi.tf.ready();
+    } catch (e) { console.warn('[face] WebGL unavailable, using CPU:', e.message); }
+
+    const load = async (base) => {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(base);
+      if (bar) bar.style.width = '33%';
+      await faceapi.nets.faceLandmark68Net.loadFromUri(base);
+      if (bar) bar.style.width = '66%';
+      await faceapi.nets.faceRecognitionNet.loadFromUri(base);
+      if (bar) bar.style.width = '100%';
+    };
+
+    try { await load(ATT_MODELS_URL); }
+    catch (e) {
+      console.warn('[face] local models unavailable, falling back to CDN');
+      await load(ATT_MODELS_FALLBACK);
+    }
+
+    // Warm-up: the first inference compiles GPU shaders and can take seconds.
+    // Spend that cost now, in the background, not while someone is waiting.
+    try {
+      const warm = document.createElement('canvas');
+      warm.width = 160; warm.height = 160;
+      await faceapi.detectSingleFace(warm, new faceapi.TinyFaceDetectorOptions({ inputSize: 160 }));
+    } catch (e) { /* warm-up failures are harmless */ }
+
+    _attModelsReady = true;
+  })();
+
+  return _attModelsLoading;
 }
 _attLoadModels().catch(console.warn);
+
+// ── Reference face signature ───────────────────────────────────────────────
+// A face descriptor is 128 numbers. Computing it takes seconds; comparing two
+// takes microseconds. So we compute it once, store it, and never look at the
+// reference photo again.
+async function _attGetRefSignature(empId) {
+  // 1. This session
+  if (_attRefDescriptor) return _attRefDescriptor;
+
+  // 2. This phone
+  try {
+    const cached = JSON.parse(localStorage.getItem('ktl_face_sig_' + empId) || 'null');
+    if (Array.isArray(cached) && cached.length === 128) {
+      _attRefDescriptor = new Float32Array(cached);
+      return _attRefDescriptor;
+    }
+  } catch (e) {}
+
+  // 3. The database
+  const { data } = await sb.from('employee_faces')
+    .select('photo_path,descriptor').eq('employee_id', empId).maybeSingle();
+  if (!data) return null;
+
+  if (Array.isArray(data.descriptor) && data.descriptor.length === 128) {
+    _attRefDescriptor = new Float32Array(data.descriptor);
+    localStorage.setItem('ktl_face_sig_' + empId, JSON.stringify(data.descriptor));
+    return _attRefDescriptor;
+  }
+
+  // 4. Not computed yet (face registered before this update) — do it once here
+  //    and save it, so this is the last time anyone pays this cost.
+  const { data: urlData } = await sb.storage
+    .from('attendance-photos').createSignedUrl(data.photo_path, 60);
+  if (!urlData) return null;
+
+  const img = await faceapi.fetchImage(urlData.signedUrl);
+  const det = await faceapi.detectSingleFace(img,
+    new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.2 })
+  ).withFaceLandmarks().withFaceDescriptor();
+  if (!det) return null;
+
+  const arr = Array.from(det.descriptor);
+  _attRefDescriptor = det.descriptor;
+  localStorage.setItem('ktl_face_sig_' + empId, JSON.stringify(arr));
+  sb.from('employee_faces').update({ descriptor: arr, descriptor_at: new Date().toISOString() })
+    .eq('employee_id', empId).then(() => {});
+  return _attRefDescriptor;
+}
+
+// Shrink before analysing — a 3000px phone photo carries no more facial
+// information than a 640px one, but costs many times more to process.
+function _attDownscale(img, max) {
+  const w = img.width || img.videoWidth, h = img.height || img.videoHeight;
+  if (!w || !h) return img;
+  const scale = Math.min(1, (max || 640) / Math.max(w, h));
+  if (scale === 1) return img;
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
 
 // ── Load reference face descriptor ────────────────────────
 async function _attLoadRefDescriptor() {
@@ -9021,58 +9114,6 @@ document.getElementById('att-capture-btn').addEventListener('click', async () =>
 
     hintEl.textContent = 'Comparing with your registered face…';
 
-    const { data: urlData } = await sb.storage
-      .from('attendance-photos')
-      .createSignedUrl(faceData.photo_path, 60);
-
-    if (!urlData) throw new Error('Could not load registered face image.');
-
-    // Load both images into canvases for comparison
-    const loadImg = (src) => new Promise((res, rej) => {
-      const i = new Image(); i.crossOrigin = 'anonymous';
-      i.onload = () => res(i); i.onerror = rej; i.src = src;
-    });
-
-    const [capturedImg, refImg] = await Promise.all([
-      loadImg(_attCapturedPhoto),
-      loadImg(urlData.signedUrl)
-    ]);
-
-    // Use face-api.js to get descriptors — but with relaxed thresholds
-    // so it works even without perfect detection conditions
-    if (!_attModelsReady) {
-      hintEl.textContent = 'Loading face models…';
-      await _attLoadModels();
-    }
-
-    const opts = [
-      new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.1 }),
-      new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.1 }),
-      new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.08 }),
-      new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.05 }),
-    ];
-
-    // Detect in captured photo
-    let capturedDet = null;
-    for (const o of opts) {
-      capturedDet = await faceapi.detectSingleFace(capturedImg, o).withFaceLandmarks().withFaceDescriptor();
-      if (capturedDet) break;
-    }
-    // Fallback: try on canvas directly
-    if (!capturedDet) {
-      for (const o of opts) {
-        capturedDet = await faceapi.detectSingleFace(canvas, o).withFaceLandmarks().withFaceDescriptor();
-        if (capturedDet) break;
-      }
-    }
-
-    // Detect in reference photo
-    let refDet = null;
-    for (const o of opts) {
-      refDet = await faceapi.detectSingleFace(refImg, o).withFaceLandmarks().withFaceDescriptor();
-      if (refDet) break;
-    }
-
     if (!capturedDet && !refDet) {
       // Neither detected — fall back to basic pixel similarity
       hintEl.textContent = 'Using basic image comparison (ensure good lighting)…';
@@ -9240,6 +9281,8 @@ document.getElementById('att-reg-btn')?.addEventListener('click', async () => {
         photo_path:      filePath,
         registered_name: empName,
         registered_at:   new Date().toISOString(),
+        descriptor:      Array.from(det.descriptor),   // the 128-number signature
+        descriptor_at:   new Date().toISOString(),
       }, { onConflict: 'employee_id' });
 
       if (dbError) {
@@ -11335,6 +11378,7 @@ function saveCRMSettings(){alert('✅ CRM settings saved!');}
   </div>
 </div>
 <script src="ktl-leave.js"></script>
+<script src="ktl-leave-admin.js"></script>
 <script src="ktl-reports.js"></script>
 </body>
 </html>
