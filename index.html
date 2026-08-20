@@ -8152,6 +8152,7 @@ let _attCurrentLocation = null;
 let _attLocationIsReal = false;  // true only when a real device GPS reading was obtained
 let _attLocationError  = '';     // human-readable reason if GPS failed
 let _attRefDescriptor = null;
+let _attLocationAccuracy = null;   // metres, from the last successful fix
 let _attAdminMap = null;
 let _attRepMap = null;
 let _attOpenRecord = null; // today's open clock-in record
@@ -9011,6 +9012,10 @@ function openAttFaceModal(mode) {
 
     hintEl.textContent = 'Position your face in the circle, then click Take Photo.';
     capBtn.style.display = 'block';
+
+    // Fetch the signature while the user is still positioning, so that by the
+    // time they press Verify there is nothing left to download.
+    _attGetRefSignature(currentUser?.id).catch(() => {});
   })();
 }
 
@@ -9114,10 +9119,66 @@ document.getElementById('att-capture-btn').addEventListener('click', async () =>
 
     hintEl.textContent = 'Comparing with your registered face…';
 
+    // ── Signature first, reference image only if we actually need it ─────
+    let refDet = null, refImg = null;
+
+    const _loadRefImg = async () => {
+      if (refImg) return refImg;
+      const { data: u } = await sb.storage
+        .from('attendance-photos')
+        .createSignedUrl(faceData.photo_path, 60);
+      if (!u?.signedUrl) return null;
+      refImg = await faceapi.fetchImage(u.signedUrl);
+      return refImg;
+    };
+
+    const _detOpts = [
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.20 }),
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.12 }),
+    ];
+    const _detectFace = async (src) => {
+      const small = _attDownscale(src, 480);   // downscale once, reuse for both passes
+      for (const o of _detOpts) {
+        try {
+          const d = await faceapi.detectSingleFace(small, o).withFaceLandmarks().withFaceDescriptor();
+          if (d) return d;
+        } catch (e) { /* try the next size */ }
+      }
+      return null;
+    };
+
+    const capturedImg = await new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload  = () => resolve(im);
+      im.onerror = () => reject(new Error('Could not read the photo you just took.'));
+      im.src = _attCapturedPhoto;
+    });
+
+    const capturedDet = await _detectFace(capturedImg);
+
+    // Cached signature — localStorage, then DB. No image download in the
+    // common case, which is what keeps verification quick.
+    try {
+      const cachedSig = await _attGetRefSignature(empId);
+      if (cachedSig) refDet = { descriptor: cachedSig };
+    } catch (e) { /* fall through to detecting on the image */ }
+    if (!refDet) {
+      const im = await _loadRefImg();
+      if (im) refDet = await _detectFace(im);
+    }
+
     if (!capturedDet && !refDet) {
       // Neither detected — fall back to basic pixel similarity
       hintEl.textContent = 'Using basic image comparison (ensure good lighting)…';
-      const sim = _attPixelSimilarity(capturedImg, refImg);
+      const _ri = await _loadRefImg();
+      if (!_ri) {
+        hintEl.textContent = 'Could not open your registered photo. Try again in a moment.';
+        hintEl.style.color = '#A32D2D';
+        capBtn.disabled = false;
+        capBtn.textContent = 'Verify Identity';
+        return;
+      }
+      const sim = _attPixelSimilarity(capturedImg, _ri);
       _attShowVerificationResult(sim >= 0.72, Math.round(sim * 100), hintEl, scoreWrap, capBtn);
       return;
     }
@@ -9132,7 +9193,15 @@ document.getElementById('att-capture-btn').addEventListener('click', async () =>
 
     if (!refDet) {
       // Reference face couldn't be detected — use pixel comparison as fallback
-      const sim = _attPixelSimilarity(capturedImg, refImg);
+      const _ri = await _loadRefImg();
+      if (!_ri) {
+        hintEl.textContent = 'Could not open your registered photo. Try again in a moment.';
+        hintEl.style.color = '#A32D2D';
+        capBtn.disabled = false;
+        capBtn.textContent = 'Verify Identity';
+        return;
+      }
+      const sim = _attPixelSimilarity(capturedImg, _ri);
       _attShowVerificationResult(sim >= 0.72, Math.round(sim * 100), hintEl, scoreWrap, capBtn);
       return;
     }
@@ -9304,8 +9373,24 @@ document.getElementById('att-reg-btn')?.addEventListener('click', async () => {
 // ── Clock In / Out ────────────────────────────────────────────
 async function _attRecordClock(mode) {
   const now = new Date();
-  const loc  = _attCurrentLocation;
-  const addr = loc ? await _attReverseGeocode(loc[0], loc[1]) : '';
+
+  // Always take a fresh reading. The fix captured when the screen loaded may be
+  // minutes old and kilometres away if the person travelled after opening the app.
+  const loc = await _attGetLocation();
+  if (!loc) {
+    alert('❌ ' + (_attLocationError || 'Could not get your location.') +
+          '\n\nYour attendance was not recorded, because the location would be wrong.');
+    return;
+  }
+  if (_attLocationAccuracy > 500) {
+    const ok = confirm(
+      '⚠️ Your device only pinned your position to about ' + Math.round(_attLocationAccuracy) + ' m.\n\n' +
+      'This usually means GPS is off, or you are on a laptop using Wi-Fi positioning, ' +
+      'which can be wrong by many kilometres.\n\nRecord attendance anyway?');
+    if (!ok) return;
+  }
+  _attCurrentLocation = loc;
+  const addr = await _attReverseGeocode(loc[0], loc[1]);
 
   // Get the user from Supabase directly to ensure the ID matches
   const storedUser = JSON.parse(localStorage.getItem('ktl_user') || '{}');
@@ -9546,30 +9631,55 @@ function _attGreenDot() { return L.divIcon({ className: '', html: '<div style="w
 // ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
-function _attGetLocation() {
+function _attGetLocation(opts) {
+  const sampleMs   = (opts && opts.sampleMs) || 7000;  // keep sampling this long
+  const goodEnough = (opts && opts.target)   || 25;    // stop early at this accuracy (m)
+
   return new Promise(resolve => {
-    _attLocationIsReal = false;
-    _attLocationError  = '';
+    _attLocationIsReal   = false;
+    _attLocationError    = '';
+    _attLocationAccuracy = null;
 
     if (!navigator.geolocation) {
       _attLocationError = 'Geolocation is not supported by this browser.';
-      resolve(ATT_OFFICE);
+      resolve(null);
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
+    let best = null, watchId = null, timer = null, done = false;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      clearTimeout(timer);
+      if (best) {
+        _attLocationIsReal   = true;
+        _attLocationAccuracy = best.coords.accuracy;
+        resolve([best.coords.latitude, best.coords.longitude]);
+      } else {
+        if (!_attLocationError) _attLocationError = 'Could not determine your position. Turn on location services and try again.';
+        resolve(null);   // never silently fall back to the office coordinates
+      }
+    };
+
+    timer = setTimeout(finish, sampleMs);
+
+    // watchPosition keeps improving: the first fix is often a coarse network
+    // estimate, and a real GPS fix arrives a few seconds later.
+    watchId = navigator.geolocation.watchPosition(
       pos => {
-        _attLocationIsReal = true;
-        resolve([pos.coords.latitude, pos.coords.longitude]);
+        if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
+        if (best.coords.accuracy <= goodEnough) finish();
       },
       err => {
-        if (err.code === 1) _attLocationError = 'Location permission denied. Allow location access for this site in your browser settings.';
-        else if (err.code === 2) _attLocationError = 'Could not determine your position. Make sure GPS/location services are turned on.';
-        else if (err.code === 3) _attLocationError = 'Location request timed out. Try again.';
-        else _attLocationError = 'Could not get your location.';
-        resolve(ATT_OFFICE);
+        if      (err.code === 1) _attLocationError = 'Location permission denied. Allow location access for this site in your browser settings.';
+        else if (err.code === 2) _attLocationError = 'Position unavailable. Make sure GPS/location services are turned on.';
+        else if (err.code === 3) _attLocationError = 'Location request timed out.';
+        else                     _attLocationError = 'Could not get your location.';
+        if (!best) finish();
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: sampleMs, maximumAge: 0 }
     );
   });
 }
