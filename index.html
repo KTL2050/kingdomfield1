@@ -8151,6 +8151,7 @@ let _attCapturedPhoto = null;
 let _attCurrentLocation = null;
 let _attLocationIsReal = false;  // true only when a real device GPS reading was obtained
 let _attLocationError  = '';     // human-readable reason if GPS failed
+let _attLocationAccuracy = null; // meters of accuracy for the last reading obtained
 let _attRefDescriptor = null;
 let _attAdminMap = null;
 let _attRepMap = null;
@@ -9575,6 +9576,7 @@ function _attGetLocation() {
   return new Promise(resolve => {
     _attLocationIsReal = false;
     _attLocationError  = '';
+    _attLocationAccuracy = null;
 
     if (!navigator.geolocation) {
       _attLocationError = 'Geolocation is not supported by this browser.';
@@ -9582,20 +9584,47 @@ function _attGetLocation() {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      pos => {
+    // iOS Safari often hands back a fast, low-accuracy fix (Wi-Fi/cell based)
+    // on the very first read — sometimes hundreds of meters off — before the
+    // GPS chip locks on. So instead of trusting one reading, we watch for a
+    // few seconds and keep whichever fix has the best (lowest) accuracy.
+    let best = null;
+    let settled = false;
+    const GOOD_ENOUGH_M = 30;   // stop early if we get a fix this precise
+    const MAX_WAIT_MS   = 9000; // otherwise wait this long, then use best-so-far
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      navigator.geolocation.clearWatch(watchId);
+      clearTimeout(timer);
+      if (best) {
         _attLocationIsReal = true;
-        resolve([pos.coords.latitude, pos.coords.longitude]);
+        _attLocationAccuracy = best.coords.accuracy;
+        resolve([best.coords.latitude, best.coords.longitude]);
+      } else {
+        resolve(ATT_OFFICE);
+      }
+    };
+
+    const watchId = navigator.geolocation.watchPosition(
+      pos => {
+        if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
+        if (pos.coords.accuracy <= GOOD_ENOUGH_M) finish();
       },
       err => {
-        if (err.code === 1) _attLocationError = 'Location permission denied. Allow location access for this site in your browser settings.';
-        else if (err.code === 2) _attLocationError = 'Could not determine your position. Make sure GPS/location services are turned on.';
-        else if (err.code === 3) _attLocationError = 'Location request timed out. Try again.';
-        else _attLocationError = 'Could not get your location.';
-        resolve(ATT_OFFICE);
+        if (!best) {
+          if (err.code === 1) _attLocationError = 'Location permission denied. Allow location access for this site in your browser settings.';
+          else if (err.code === 2) _attLocationError = 'Could not determine your position. Make sure GPS/location services are turned on.';
+          else if (err.code === 3) _attLocationError = 'Location request timed out. Try again.';
+          else _attLocationError = 'Could not get your location.';
+        }
+        finish();
       },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: MAX_WAIT_MS, maximumAge: 0 }
     );
+
+    const timer = setTimeout(finish, MAX_WAIT_MS);
   });
 }
 
