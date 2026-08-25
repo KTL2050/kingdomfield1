@@ -11,7 +11,7 @@
    needs to change.
 
    Requires leave-management-schema.sql to have been run once in Supabase.
-   ═══════════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════════ */ 
 (function () {
 'use strict';
 
@@ -57,6 +57,7 @@ const S = {
   calMode:     'month',         // month | week | day
   calCursor:   new Date(),
   filters:     { rep:'', manager:'', type:'', status:'', from:'', to:'' },
+  editingId:   null,            // id of the request being edited, if any
 };
 
 // ─── SAFE ACCESS TO HOST APP GLOBALS ───────────────────────────────────────
@@ -1128,17 +1129,33 @@ function modal(html, width) {
   ov.addEventListener('click', e => { if (e.target === ov) closeModal(); });
   return ov;
 }
-function closeModal() { document.getElementById('lv-ov')?.remove(); }
+function closeModal() { S.editingId = null; document.getElementById('lv-ov')?.remove(); }
 
 // ─── NEW REQUEST FORM ──────────────────────────────────────────────────────
-function openRequestForm() {
-  const types = S.types.filter(t => t.is_active);
+function openRequestForm(editId) {
+  const editing = editId ? getReq(editId) : null;
+  if (editId && !editing) { toast('That request could not be found.', 'error'); return; }
+  if (editing && (editing.status !== 'pending' || String(editing.employee_id) !== String(me()?.id))) {
+    toast('Only your own pending requests can be edited.', 'error');
+    return;
+  }
+  S.editingId = editing ? editing.id : null;
+
+  let types = S.types.filter(t => t.is_active);
+  if (editing && !types.some(x => x.id === editing.leave_type_id)) {
+    const et = S.types.find(x => x.id === editing.leave_type_id);
+    if (et) types = [et, ...types];
+  }
   if (!types.length) { toast('No leave types are set up yet. Ask an admin to add one.', 'warn'); return; }
-  const t = todayISO();
+
+  const t     = todayISO();
+  const start = editing ? editing.start_date : t;
+  const end   = editing ? editing.end_date   : t;
+
   modal(`
     <div class="lv-modal-hd">
-      <div><div style="font-size:15px;font-weight:700;">Request leave</div>
-      <div style="font-size:11.5px;color:var(--txt2);margin-top:2px;">Your approvers are notified as soon as you submit.</div></div>
+      <div><div style="font-size:15px;font-weight:700;">${editing ? 'Edit leave request' : 'Request leave'}</div>
+      <div style="font-size:11.5px;color:var(--txt2);margin-top:2px;">${editing ? 'Your approvers will see the updated details.' : 'Your approvers are notified as soon as you submit.'}</div></div>
       <button class="lv-x" onclick="Leave.closeModal()">×</button>
     </div>
     <div class="lv-modal-bd">
@@ -1146,25 +1163,26 @@ function openRequestForm() {
       <div class="fg">
         <label class="flbl">Leave type</label>
         <select class="fin" id="lv-f-type" onchange="Leave.onTypeChange()">
-          ${types.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('')}
+          ${types.map(x => `<option value="${x.id}"${editing && editing.leave_type_id === x.id ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}
         </select>
         <div id="lv-type-hint" style="font-size:11px;color:var(--txt3);margin-top:3px;"></div>
       </div>
       <div class="fgrid">
         <div class="fg"><label class="flbl">Start date</label>
-          <input type="date" class="fin" id="lv-f-start" min="${t}" value="${t}" onchange="Leave.recalc()"/></div>
+          <input type="date" class="fin" id="lv-f-start" ${editing ? '' : `min="${t}"`} value="${start}" onchange="Leave.recalc()"/></div>
         <div class="fg"><label class="flbl">End date</label>
-          <input type="date" class="fin" id="lv-f-end" min="${t}" value="${t}" onchange="Leave.recalc()"/></div>
+          <input type="date" class="fin" id="lv-f-end" ${editing ? '' : `min="${t}"`} value="${end}" onchange="Leave.recalc()"/></div>
       </div>
       <div class="alert ai" id="lv-days-box"><span>🗓️</span><div id="lv-days-txt">1 day of leave.</div></div>
       <div class="fg"><label class="flbl">Reason</label>
-        <textarea class="fin" id="lv-f-reason" rows="3" placeholder="Briefly explain why you need this leave"></textarea></div>
+        <textarea class="fin" id="lv-f-reason" rows="3" placeholder="Briefly explain why you need this leave">${editing ? esc(editing.reason || '') : ''}</textarea></div>
       <div class="fg"><label class="flbl">Attachment <span style="color:var(--txt3);font-weight:400;">(optional — max ${CFG.maxAttachmentMB}MB)</span></label>
+        ${editing && editing.attachment_path ? `<div style="font-size:11.5px;color:var(--txt2);margin-bottom:5px;">Current: 📎 ${esc(editing.attachment_name || 'attached file')} — choose a new file below to replace it.</div>` : ''}
         <input type="file" class="fin" id="lv-f-file" accept="image/*,.pdf,.doc,.docx"/></div>
     </div>
     <div class="lv-modal-ft">
       <button class="btn" onclick="Leave.closeModal()">Cancel</button>
-      <button class="btn btn-royal" id="lv-submit-btn" onclick="Leave.submit()">Submit request</button>
+      <button class="btn btn-royal" id="lv-submit-btn" onclick="Leave.submit()">${editing ? 'Save changes' : 'Submit request'}</button>
     </div>`);
   onTypeChange();
   recalc();
