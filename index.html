@@ -7,7 +7,7 @@
 <link rel="manifest" href="/manifest.json"/>
 <meta name="theme-color" content="#1a3a6b"/>   
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/> 
-<meta name="apple-mobile-web-app-capable" content="yes"/> 
+<meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="KTLSALES"/> 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -2675,13 +2675,6 @@ async function bootApp() {
     document.getElementById('change-password-screen').classList.add('hidden');
     buildNav('sidebar-nav'); buildNav('drawer-nav', true);
     updateUserUI(); applyRoleUI();
-
-    // Warm up face verification in the background: load the models and fetch
-    // this user's 128-number face signature now, so that when they open the
-    // clock-in modal later there is nothing left to download or compute.
-    _attLoadModels()
-      .then(() => _attGetRefSignature(currentUser?.id))
-      .catch(err => console.warn('[face] warm-up skipped:', err && err.message));
 
     if (!isSalesRep()) {
       setLoading('Loading team data...');
@@ -5884,13 +5877,13 @@ async function _startLocationBroadcast() {
 
 async function _pushLiveLocation() {
   if (!currentUser?.id) return;
-  // Don't drain the battery while the tab is in the background, and never
-  // start a second GPS request while a clock-in or punch-in is already asking
-  // — on iOS that competition is what makes one of them fail.
-  if (document.visibilityState === 'hidden') return;
-  if (_attLocInFlight) return;
+  // Skip if page is hidden (tab is in background) to save battery,
+  // but still push when visible on ANY tab
   try {
-    const loc = await _attGetLocation({ sampleMs: 6000, target: 60 });
+    const loc = await Promise.race([
+      _attGetLocation(),
+      new Promise(resolve => setTimeout(() => resolve(null), 8000))
+    ]);
     if (!loc) return;
     _attCurrentLocation = loc;
     await sb.from('live_locations').upsert({
@@ -8159,7 +8152,6 @@ let _attCurrentLocation = null;
 let _attLocationIsReal = false;  // true only when a real device GPS reading was obtained
 let _attLocationError  = '';     // human-readable reason if GPS failed
 let _attRefDescriptor = null;
-let _attLocationAccuracy = null;   // metres, from the last successful fix
 let _attAdminMap = null;
 let _attRepMap = null;
 let _attOpenRecord = null; // today's open clock-in record
@@ -8172,30 +8164,20 @@ async function _attLoadModels() {
   _attModelsLoading = (async () => {
     const bar = document.getElementById('att-models-bar');
 
-    // Prefer the GPU backend, but verify it actually works. iOS Safari often
-    // reports WebGL support and then throws on the first real operation, which
-    // is what leaves "Verifying…" spinning forever.
+    // Force the GPU backend. Without this, tfjs can silently fall back to CPU,
+    // which is 10-30x slower for these models.
     try {
       await faceapi.tf.setBackend('webgl');
       await faceapi.tf.ready();
-      const _probe = faceapi.tf.tensor1d([1, 2, 3]);
-      _probe.square().dataSync();
-      _probe.dispose();
-    } catch (e) {
-      console.warn('[face] WebGL unusable, switching to CPU:', e.message);
-      try { await faceapi.tf.setBackend('cpu'); await faceapi.tf.ready(); } catch (e2) {}
-    }
+    } catch (e) { console.warn('[face] WebGL unavailable, using CPU:', e.message); }
 
-    // Load the three nets in parallel. On a high-latency mobile link this is
-    // roughly three times faster than fetching them one after another.
     const load = async (base) => {
-      let doneCount = 0;
-      const tick = () => { doneCount++; if (bar) bar.style.width = Math.round(doneCount / 3 * 100) + '%'; };
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(base).then(tick),
-        faceapi.nets.faceLandmark68Net.loadFromUri(base).then(tick),
-        faceapi.nets.faceRecognitionNet.loadFromUri(base).then(tick),
-      ]);
+      await faceapi.nets.tinyFaceDetector.loadFromUri(base);
+      if (bar) bar.style.width = '33%';
+      await faceapi.nets.faceLandmark68Net.loadFromUri(base);
+      if (bar) bar.style.width = '66%';
+      await faceapi.nets.faceRecognitionNet.loadFromUri(base);
+      if (bar) bar.style.width = '100%';
     };
 
     try { await load(ATT_MODELS_URL); }
@@ -9004,27 +8986,9 @@ function openAttFaceModal(mode) {
 
     // Start camera
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera not available. The app must be opened over https.');
-      }
-      _attStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 720 } },
-        audio: false,
-      });
-      const _v = document.getElementById('att-video');
-      _v.setAttribute('playsinline', '');
-      _v.setAttribute('muted', '');
-      _v.srcObject = _attStream;
+      _attStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+      document.getElementById('att-video').srcObject = _attStream;
       cameraEl.style.display = 'block';
-      // iOS reports videoWidth = 0 for a moment after the stream attaches.
-      // Capturing during that window produces a black frame, which then fails
-      // face detection and looks like verification hanging.
-      await new Promise(res => {
-        if (_v.readyState >= 2 && _v.videoWidth) return res();
-        const t = setTimeout(res, 4000);
-        _v.onloadedmetadata = () => { clearTimeout(t); res(); };
-      });
-      try { await _v.play(); } catch (e) {}
     } catch (err) {
       hintEl.textContent = 'Camera error: ' + (err.message || 'Permission denied');
       hintEl.style.color = '#A32D2D';
@@ -9047,10 +9011,6 @@ function openAttFaceModal(mode) {
 
     hintEl.textContent = 'Position your face in the circle, then click Take Photo.';
     capBtn.style.display = 'block';
-
-    // Fetch the signature while the user is still positioning, so that by the
-    // time they press Verify there is nothing left to download.
-    _attGetRefSignature(currentUser?.id).catch(() => {});
   })();
 }
 
@@ -9072,11 +9032,6 @@ document.getElementById('att-capture-btn').addEventListener('click', async () =>
 
   // ── STEP 1: Take Photo ──
   if (!_attCapturedPhoto) {
-    if (!video.videoWidth || !video.videoHeight) {
-      hintEl.textContent = 'Camera is still starting. Wait a moment and tap Take Photo again.';
-      hintEl.style.color = '#A32D2D';
-      return;
-    }
     canvas.width  = video.videoWidth  || 640;
     canvas.height = video.videoHeight || 480;
     canvas.getContext('2d').drawImage(video, 0, 0);
@@ -9117,91 +9072,110 @@ document.getElementById('att-capture-btn').addEventListener('click', async () =>
     return;
   }
 
-  // ── STEP 2: Verify against the stored face signature ──
+  // ── STEP 2: Verify by pixel comparison with stored reference ──
   capBtn.disabled = true;
-  capBtn.textContent = 'Verifying\u2026';
-  hintEl.textContent = 'Checking your face\u2026';
+  capBtn.textContent = 'Verifying…';
+  hintEl.textContent = 'Loading your registered face…';
   hintEl.style.color = 'var(--royal)';
   scoreWrap.style.display = 'none';
 
-  const _failVerify = (msg) => {
-    hintEl.textContent = msg;
+  try {
+    // Load reference face from Supabase Storage
+    const empId = currentUser?.id 
+      || JSON.parse(localStorage.getItem('ktl_user') || '{}')?.id;
+
+    if (!empId) {
+      hintEl.textContent = 'Session error. Please sign out and sign back in.';
+      hintEl.style.color = '#A32D2D';
+      capBtn.disabled = false;
+      capBtn.textContent = 'Verify Identity';
+      return;
+    }
+
+    const { data: faceData, error: faceErr } = await sb
+      .from('employee_faces')
+      .select('photo_path')
+      .eq('employee_id', empId)
+      .maybeSingle();
+
+    if (faceErr || !faceData) {
+      hintEl.textContent = 'No registered face found. Register your face first.';
+      hintEl.style.color = '#A32D2D';
+      document.getElementById('att-reg-banner').style.display = 'flex';
+      capBtn.disabled = false;
+      capBtn.textContent = 'Take Photo';
+      _attCapturedPhoto = null;
+      previewWrap.innerHTML = '';
+      video.style.display = 'block';
+      document.getElementById('att-face-frame').style.display = 'block';
+      document.getElementById('att-retake-btn')?.remove();
+      return;
+    }
+
+    hintEl.textContent = 'Comparing with your registered face…';
+
+    // Load the just-captured photo into an <img>
+    const capturedImg = await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = rej;
+      im.src = _attCapturedPhoto;
+    });
+
+    // Detect the face in the captured photo (try a few settings)
+    const detOpts = [
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.2 }),
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.15 }),
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.1 }),
+    ];
+    let capturedDet = null;
+    for (const o of detOpts) {
+      capturedDet = await faceapi.detectSingleFace(capturedImg, o).withFaceLandmarks().withFaceDescriptor();
+      if (capturedDet) break;
+    }
+
+    // Load the registered reference descriptor (cached after first computation)
+    const refDescriptor = await _attGetRefSignature(empId);
+
+    if (!capturedDet && !refDescriptor) {
+      hintEl.textContent = 'Using basic image comparison (ensure good lighting)…';
+      const { data: urlData } = await sb.storage.from('attendance-photos').createSignedUrl(faceData.photo_path, 60);
+      const refImg = await faceapi.fetchImage(urlData.signedUrl);
+      const sim = _attPixelSimilarity(capturedImg, refImg);
+      _attShowVerificationResult(sim >= 0.72, Math.round(sim * 100), hintEl, scoreWrap, capBtn);
+      return;
+    }
+
+    if (!capturedDet) {
+      hintEl.textContent = 'Face not detected in your photo. Ensure good lighting and face the camera directly.';
+      hintEl.style.color = '#A32D2D';
+      capBtn.disabled = false;
+      capBtn.textContent = 'Verify Identity';
+      return;
+    }
+
+    if (!refDescriptor) {
+      const { data: urlData } = await sb.storage.from('attendance-photos').createSignedUrl(faceData.photo_path, 60);
+      const refImg = await faceapi.fetchImage(urlData.signedUrl);
+      const sim = _attPixelSimilarity(capturedImg, refImg);
+      _attShowVerificationResult(sim >= 0.72, Math.round(sim * 100), hintEl, scoreWrap, capBtn);
+      return;
+    }
+
+    // Compare descriptors
+    const distance   = faceapi.euclideanDistance(capturedDet.descriptor, refDescriptor);
+    const similarity = Math.max(0, Math.min(100, Math.round((1 - distance) * 100)));
+    const verified   = distance <= 0.50; // slightly relaxed threshold
+
+    _attShowVerificationResult(verified, similarity, hintEl, scoreWrap, capBtn);
+
+  } catch (err) {
+    console.error('Verification error:', err);
+    hintEl.textContent = 'Error: ' + err.message;
     hintEl.style.color = '#A32D2D';
     capBtn.disabled = false;
     capBtn.textContent = 'Verify Identity';
-  };
-
-  // Hard ceiling. Whatever goes wrong underneath, the button never sits on
-  // "Verifying…" indefinitely — the person always gets a way forward.
-  let _verifyTimedOut = false;
-  const _verifyTimer = setTimeout(() => {
-    _verifyTimedOut = true;
-    _failVerify('Verification is taking too long. Check your connection, then tap Verify Identity again.');
-  }, 25000);
-
-  try {
-    const empId = currentUser?.id || JSON.parse(localStorage.getItem('ktl_user') || '{}')?.id;
-    if (!empId) {
-      clearTimeout(_verifyTimer);
-      _failVerify('Session error. Please sign out and sign back in.');
-      return;
-    }
-
-    await _attLoadModels();
-    if (_verifyTimedOut) return;
-
-    // Normally already cached (session → this phone → database), so nothing is
-    // downloaded here and the comparison is instant.
-    hintEl.textContent = 'Loading your registered face\u2026';
-    const refSig = await _attGetRefSignature(empId);
-    if (_verifyTimedOut) return;
-
-    if (!refSig) {
-      clearTimeout(_verifyTimer);
-      document.getElementById('att-reg-banner').style.display = 'flex';
-      _failVerify('No registered face found. Tap Register Now to set one up.');
-      return;
-    }
-
-    hintEl.textContent = 'Comparing with your registered face\u2026';
-    const capturedImg = await new Promise((resolve, reject) => {
-      const im = new Image();
-      im.onload  = () => resolve(im);
-      im.onerror = () => reject(new Error('Could not read the photo you just took.'));
-      im.src = _attCapturedPhoto;
-    });
-    if (_verifyTimedOut) return;
-
-    const small = _attDownscale(capturedImg, 416);
-    let capturedDet = null;
-    for (const o of [
-      new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.20 }),
-      new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.12 }),
-    ]) {
-      try {
-        capturedDet = await faceapi.detectSingleFace(small, o).withFaceLandmarks().withFaceDescriptor();
-      } catch (e) { capturedDet = null; }
-      if (capturedDet || _verifyTimedOut) break;
-    }
-    if (_verifyTimedOut) return;
-
-    clearTimeout(_verifyTimer);
-
-    if (!capturedDet) {
-      _failVerify('Face not detected. Move into brighter light, hold the phone at eye level, then retake the photo.');
-      return;
-    }
-
-    const distance   = faceapi.euclideanDistance(capturedDet.descriptor, refSig);
-    const similarity = Math.max(0, Math.min(100, Math.round((1 - distance) * 100)));
-    _attShowVerificationResult(distance <= 0.52, similarity, hintEl, scoreWrap, capBtn);
-
-  } catch (err) {
-    clearTimeout(_verifyTimer);
-    console.error('Verification error:', err);
-    _failVerify('Verification failed: ' + (err.message || 'unknown error') + '. Tap Verify Identity to try again.');
   }
-
 });
 
 // ── Pixel similarity fallback (used when face-api can't detect) ──
@@ -9355,33 +9329,8 @@ document.getElementById('att-reg-btn')?.addEventListener('click', async () => {
 // ── Clock In / Out ────────────────────────────────────────────
 async function _attRecordClock(mode) {
   const now = new Date();
-
-  // Always take a fresh reading. The fix captured when the screen loaded may be
-  // minutes old and kilometres away if the person travelled after opening the app.
-  const loc = await _attGetLocation();
-
-  if (!loc) {
-    // A missing fix must not cost someone their attendance record. Offer to
-    // record without one; the manager sees "Location unavailable" on the row.
-    const proceed = confirm('⚠️ ' + (_attLocationError || 'Could not get your location.') +
-      '\n\nRecord your attendance WITHOUT a location? Your manager will see "Location unavailable" for this entry.');
-    if (!proceed) return;
-  } else if (_attLocationAccuracy > 1000) {
-    const ok = confirm(
-      '⚠️ Your device only pinned your position to about ' + Math.round(_attLocationAccuracy) + ' m.\n\n' +
-      'This usually means GPS is off, or you are on a laptop using Wi-Fi positioning.\n\nRecord attendance anyway?');
-    if (!ok) return;
-  }
-
-  if (loc) _attCurrentLocation = loc;
-  // Address lookup is a nicety, not a blocker: cap it so a slow geocoder
-  // cannot stall the clock-in.
-  const addr = loc
-    ? await Promise.race([
-        _attReverseGeocode(loc[0], loc[1]),
-        new Promise(r => setTimeout(() => r(`${loc[0].toFixed(5)}, ${loc[1].toFixed(5)}`), 7000)),
-      ])
-    : 'Location unavailable';
+  const loc  = _attCurrentLocation;
+  const addr = loc ? await _attReverseGeocode(loc[0], loc[1]) : '';
 
   // Get the user from Supabase directly to ensure the ID matches
   const storedUser = JSON.parse(localStorage.getItem('ktl_user') || '{}');
@@ -9622,129 +9571,39 @@ function _attGreenDot() { return L.divIcon({ className: '', html: '<div style="w
 // ─────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────
-let _attLocInFlight  = null;   // only ever one geolocation request at a time
-let _attLastGoodFix  = null;   // {lat,lng,acc,ts} — last real fix this session
+function _attGetLocation() {
+  return new Promise(resolve => {
+    _attLocationIsReal = false;
+    _attLocationError  = '';
 
-function _attIsIOS() {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent)
-      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
-
-function _attGetLocation(opts) {
-  opts = opts || {};
-  // iOS Safari is markedly slower to produce a first fix than Android Chrome.
-  const sampleMs   = opts.sampleMs   || (_attIsIOS() ? 15000 : 9000);
-  const goodEnough = opts.target     || 35;     // stop early at this accuracy (m)
-  const allowCache = opts.allowCache !== false; // fall back to the last known fix
-
-  // Overlapping requests are the main cause of "location unavailable" on
-  // iPhone: the background broadcaster and a clock-in ask at the same moment
-  // and Safari fails one of them. Share a single in-flight promise instead.
-  if (_attLocInFlight) return _attLocInFlight;
-
-  _attLocInFlight = new Promise(resolve => {
-    _attLocationIsReal   = false;
-    _attLocationError    = '';
-    _attLocationAccuracy = null;
-
-    const settle = (val) => { _attLocInFlight = null; resolve(val); };
-
-    const secure = window.isSecureContext
-      || location.protocol === 'https:'
-      || location.hostname === 'localhost'
-      || location.hostname === '127.0.0.1';
-    if (!secure) {
-      _attLocationError = 'Location needs a secure connection. Open the app using https, not http.';
-      return settle(null);
-    }
     if (!navigator.geolocation) {
-      _attLocationError = 'This browser does not support location.';
-      return settle(null);
+      _attLocationError = 'Geolocation is not supported by this browser.';
+      resolve(ATT_OFFICE);
+      return;
     }
 
-    let best = null, watchId = null, timer = null, finished = false;
-
-    const finish = () => {
-      if (finished) return;
-      finished = true;
-      if (watchId !== null) { try { navigator.geolocation.clearWatch(watchId); } catch (e) {} }
-      clearTimeout(timer);
-
-      if (best) {
-        _attLocationIsReal   = true;
-        _attLocationAccuracy = best.coords.accuracy;
-        _attLastGoodFix = {
-          lat: best.coords.latitude, lng: best.coords.longitude,
-          acc: best.coords.accuracy, ts: Date.now(),
-        };
-        return settle([best.coords.latitude, best.coords.longitude]);
-      }
-
-      // Last resort: a real fix taken earlier in this session. Far better than
-      // failing outright when someone is standing at a client's shop.
-      if (allowCache && _attLastGoodFix && (Date.now() - _attLastGoodFix.ts) < 10 * 60 * 1000) {
-        _attLocationIsReal   = true;
-        _attLocationAccuracy = _attLastGoodFix.acc;
-        _attLocationError    = 'Using your last known position — GPS was slow to respond.';
-        return settle([_attLastGoodFix.lat, _attLastGoodFix.lng]);
-      }
-
-      if (!_attLocationError) {
-        _attLocationError = 'Could not get a location fix. Turn on Location Services and try again.';
-      }
-      settle(null);
-    };
-
-    timer = setTimeout(finish, sampleMs);
-
-    const onOk = pos => {
-      if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
-      if (best.coords.accuracy <= goodEnough) finish();
-    };
-
-    const onErr = err => {
-      if (err.code === 1) {
-        _attLocationError = _attIsIOS()
-          ? 'Location permission denied. On iPhone open Settings → Privacy & Security → Location Services → Safari Websites → While Using the App, then reload this page and tap Allow.'
-          : 'Location permission denied. Allow location access for this site in your browser settings.';
-        finish();  // no point waiting out the timer on a denial
-      } else if (err.code === 2) {
-        _attLocationError = 'Position unavailable. Make sure Location Services / GPS is switched on.';
-      } else if (err.code === 3) {
-        _attLocationError = 'Location request timed out.';
-      } else {
-        _attLocationError = 'Could not get your location.';
-      }
-    };
-
-    // Pass 1 — high accuracy watch. Keeps improving: the first reading is often
-    // a coarse network estimate and a true GPS fix arrives seconds later.
-    try {
-      watchId = navigator.geolocation.watchPosition(onOk, onErr,
-        { enableHighAccuracy: true, timeout: sampleMs, maximumAge: 0 });
-    } catch (e) { /* handled by the coarse pass below */ }
-
-    // Pass 2 — a parallel coarse request. On iPhones indoors this frequently
-    // returns in a second or two when the high-accuracy watch never fires,
-    // so the person gets an approximate position rather than nothing.
-    try {
-      navigator.geolocation.getCurrentPosition(
-        pos => { if (!best) best = pos; },
-        () => {},
-        { enableHighAccuracy: false, timeout: sampleMs, maximumAge: 60000 });
-    } catch (e) {}
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        _attLocationIsReal = true;
+        resolve([pos.coords.latitude, pos.coords.longitude]);
+      },
+      err => {
+        if (err.code === 1) _attLocationError = 'Location permission denied. Allow location access for this site in your browser settings.';
+        else if (err.code === 2) _attLocationError = 'Could not determine your position. Make sure GPS/location services are turned on.';
+        else if (err.code === 3) _attLocationError = 'Location request timed out. Try again.';
+        else _attLocationError = 'Could not get your location.';
+        resolve(ATT_OFFICE);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
   });
-
-  return _attLocInFlight;
 }
 
 async function _attRetryLocation() {
   _attCurrentLocation = await _attGetLocation();
   if (!_attLocationIsReal) {
-    const ios = _attIsIOS();
-    alert('⚠️ ' + (_attLocationError || 'Could not access your location.') + '\n\n' + (ios
-      ? 'On iPhone:\n1. Settings → Privacy & Security → Location Services → make sure it is ON.\n2. Scroll to Safari Websites (or Chrome) → set to "While Using the App".\n3. Turn on "Precise Location".\n4. Reload this page and tap Allow when asked.'
-      : 'On Android / desktop:\n1. Tap the lock or info icon next to the address bar.\n2. Set "Location" to Allow.\n3. Reload the page and tap Enable Location again.'));
+    alert('⚠️ ' + (_attLocationError || 'Could not access your location.') +
+      '\n\nTo fix this:\n1. Click the lock/info icon next to the address bar.\n2. Find "Location" and set it to Allow.\n3. Reload the page and click Enable Location again.');
   }
   if (isSalesRep()) { _loadRepAttendanceView(); } else { _renderAdminMyCard(); }
 }
@@ -10575,17 +10434,8 @@ async function punchInActivity() {
   btn.disabled = true; btn.textContent = 'Punching in…';
   statusEl.style.display = 'block';
 
-  const loc = await _attGetLocation();
-  if (!loc) {
-    const proceed = confirm('⚠️ ' + (_attLocationError || 'Could not get your location.') +
-      '\n\nPunch in WITHOUT a location?');
-    if (!proceed) {
-      btn.disabled = false; btn.textContent = '📍 Punch In';
-      statusEl.style.display = 'none';
-      return;
-    }
-  }
-  const addr = loc ? await _attReverseGeocode(loc[0], loc[1]) : 'Location unavailable';
+  const loc  = await _attGetLocation();
+  const addr = await _attReverseGeocode(loc[0], loc[1]);
 
   const act = {
     id: 'act_' + Date.now(),
@@ -10596,7 +10446,7 @@ async function punchInActivity() {
     feedback: '',
     status: 'Punched In',
     punch_in_time: new Date().toISOString(),
-    punch_in_lat: loc ? loc[0] : null, punch_in_lng: loc ? loc[1] : null,
+    punch_in_lat: loc[0], punch_in_lng: loc[1],
     punch_in_location: addr,
     punch_out_time: null, punch_out_lat: null, punch_out_lng: null, punch_out_location: null,
     created_by: currentUser?.id,
@@ -10621,22 +10471,13 @@ async function confirmPunchOut(actId) {
   statusEl.style.display = 'block';
 
   const feedback = document.getElementById('act-notes').value.trim();
-  const loc = await _attGetLocation();
-  if (!loc) {
-    const proceed = confirm('⚠️ ' + (_attLocationError || 'Could not get your location.') +
-      '\n\nPunch out WITHOUT a location?');
-    if (!proceed) {
-      btn.disabled = false; btn.textContent = '🏁 Punch Out';
-      statusEl.style.display = 'none';
-      return;
-    }
-  }
-  const addr = loc ? await _attReverseGeocode(loc[0], loc[1]) : 'Location unavailable';
+  const loc  = await _attGetLocation();
+  const addr = await _attReverseGeocode(loc[0], loc[1]);
 
   act.status = 'Completed';
   act.feedback = feedback;
   act.punch_out_time = new Date().toISOString();
-  act.punch_out_lat = loc ? loc[0] : null; act.punch_out_lng = loc ? loc[1] : null;
+  act.punch_out_lat = loc[0]; act.punch_out_lng = loc[1];
   act.punch_out_location = addr;
 
   saveCRM('activities', crmActivities);
@@ -10652,11 +10493,11 @@ async function punchOutActivity(actId) {
   if (!confirm(`Punch out of "${act.subject}" at ${act.contact_name}?`)) return;
 
   const loc  = await _attGetLocation();
-  const addr = loc ? await _attReverseGeocode(loc[0], loc[1]) : 'Location unavailable';
+  const addr = await _attReverseGeocode(loc[0], loc[1]);
 
   act.status = 'Completed';
   act.punch_out_time = new Date().toISOString();
-  act.punch_out_lat = loc ? loc[0] : null; act.punch_out_lng = loc ? loc[1] : null;
+  act.punch_out_lat = loc[0]; act.punch_out_lng = loc[1];
   act.punch_out_location = addr;
 
   saveCRM('activities', crmActivities);
