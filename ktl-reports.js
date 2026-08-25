@@ -8,7 +8,7 @@
    It takes over the existing Reports screen, reusing the app's Supabase
    client (sb), session (currentUser), role helpers, and CSS. The old Reports
    markup is hidden rather than deleted, so nothing else breaks.
-
+ 
    Reports included
      Listings   — by store, by sales rep, by rep & store, listing detail,
                   products listed detail, daily summary
@@ -41,7 +41,7 @@ const S = {
   preset:    'this_month',
   from:      '',
   to:        '',
-  filters:   { rep:'', store:'', status:'', q:'' },
+  filters:   { rep:'', store:'', status:'', q:'', leaveType:'' },
   conds:     [],                // More Filters: {field, op, value, value2}
   sort:      { key:null, dir:'desc' },
   rows:      [],
@@ -52,6 +52,7 @@ const S = {
   cache:     {},
   users:     [],
   clients:   [],
+  leaveTypes:[],
 };
 
 // ─── HOST APP ACCESS ───────────────────────────────────────────────────────
@@ -350,13 +351,15 @@ table.rp-tbl tfoot td:last-child{padding-right:30px;}
 //  filtering never re-query the database.
 // ═══════════════════════════════════════════════════════════════════════════
 async function loadRefData() {
-  if (S.users.length && S.clients.length) return;
-  const [u, c] = await Promise.all([
+  if (S.users.length && S.clients.length && S.leaveTypes.length) return;
+  const [u, c, lt] = await Promise.all([
     DB().from('users').select('id,full_name,email,role,is_active').order('full_name'),
     DB().from('clients').select('id,name').order('name'),
+    DB().from('leave_types').select('id,name').order('sort_order'),
   ]);
-  S.users   = u.data || [];
-  S.clients = c.data || [];
+  S.users      = u.data || [];
+  S.clients    = c.data || [];
+  S.leaveTypes = lt.data || [];
 }
 
 function cacheKey(kind) { return `${kind}|${S.from}|${S.to}`; }
@@ -409,6 +412,19 @@ async function fetchPayouts() {
   });
   S.cache[key] = inRange;
   return inRange;
+}
+
+/** Leave requests overlapping the selected period — a leave spanning the
+    range boundary still counts, same convention as orders/attendance. */
+async function fetchLeave() {
+  const key = cacheKey('leave');
+  if (S.cache[key]) return S.cache[key];
+  const { data, error } = await DB().from('leave_requests').select('*')
+    .lte('start_date', S.to).gte('end_date', S.from)
+    .order('start_date', { ascending: false }).limit(CFG.rowLimit);
+  if (error) { console.warn('[reports] leave:', error.message); S.cache[key] = []; return []; }
+  S.cache[key] = data || [];
+  return S.cache[key];
 }
 
 /** Listings that count toward performance — drafts and cancellations excluded. */
@@ -888,9 +904,176 @@ const REPORTS = [
       .sort((a, b) => b.amount - a.amount);
   },
 },
+
+// ── LEAVE ─────────────────────────────────────────────────────────────────
+{
+  id:'leave-detail', cat:'Leave', name:'Leave Request Detail',
+  desc:'Every leave request overlapping the period, with dates, status and who decided it.',
+  filters:['employee','leavetype','leavestatus'],
+  cols:[
+    { key:'employee',   label:'Employee',    type:'text' },
+    { key:'type',       label:'Leave Type',  type:'text' },
+    { key:'start',      label:'Start',       type:'date' },
+    { key:'end',        label:'End',         type:'date' },
+    { key:'days',       label:'Days',        type:'num', total:true, r:true },
+    { key:'status',     label:'Status',      type:'badge' },
+    { key:'reason',     label:'Reason',      type:'text' },
+    { key:'requested',  label:'Requested',   type:'datetime' },
+    { key:'decidedBy',  label:'Decided By',  type:'text' },
+    { key:'decidedOn',  label:'Decided On',  type:'datetime' },
+  ],
+  async run() {
+    const rows = await fetchLeave();
+    const f = S.filters;
+    return rows
+      .filter(r => !f.rep       || String(r.employee_id) === f.rep)
+      .filter(r => !f.leaveType || r.leave_type_id === f.leaveType)
+      .filter(r => !f.status    || r.status === f.status)
+      .map(r => ({
+        employee: r.employee_name || userName(r.employee_id),
+        type: r.leave_type_name || '—',
+        start: r.start_date, end: r.end_date, days: Number(r.days_count || 0),
+        status: r.status, reason: r.reason || '—',
+        requested: r.requested_at,
+        decidedBy: r.decided_by_name || (r.decided_by ? userName(r.decided_by) : '—'),
+        decidedOn: r.decided_at,
+      })).sort((a, b) => String(b.start).localeCompare(String(a.start)));
+  },
+},
+
+{
+  id:'leave-by-employee', ranked:true, cat:'Leave', name:'Leave Summary by Employee',
+  desc:'Requests, approved days taken and outcomes for each employee in the period.',
+  filters:['employee','leavetype'],
+  cols:[
+    { key:'employee',     label:'Employee',       type:'text' },
+    { key:'requests',     label:'Requests',       type:'num', total:true, r:true },
+    { key:'approvedDays', label:'Approved Days',  type:'num', total:true, r:true },
+    { key:'pending',      label:'Pending',        type:'num', total:true, r:true },
+    { key:'approved',     label:'Approved',       type:'num', total:true, r:true },
+    { key:'rejected',     label:'Rejected',       type:'num', total:true, r:true },
+    { key:'cancelled',    label:'Cancelled',      type:'num', total:true, r:true },
+    { key:'last',         label:'Last Request',   type:'date' },
+  ],
+  async run() {
+    const rows = await fetchLeave();
+    const f = S.filters;
+    const scoped = rows
+      .filter(r => !f.rep       || String(r.employee_id) === f.rep)
+      .filter(r => !f.leaveType || r.leave_type_id === f.leaveType);
+    const g = {};
+    scoped.forEach(r => {
+      const k = String(r.employee_id);
+      if (!g[k]) g[k] = { employee: r.employee_name || userName(r.employee_id), requests:0, approvedDays:0, pending:0, approved:0, rejected:0, cancelled:0, last:null };
+      g[k].requests += 1;
+      if (r.status === 'approved')       { g[k].approved += 1; g[k].approvedDays += Number(r.days_count || 0); }
+      else if (r.status === 'pending')   g[k].pending += 1;
+      else if (r.status === 'rejected')  g[k].rejected += 1;
+      else if (r.status === 'cancelled') g[k].cancelled += 1;
+      if (!g[k].last || r.start_date > g[k].last) g[k].last = r.start_date;
+    });
+    return Object.values(g).sort((a, b) => b.approvedDays - a.approvedDays);
+  },
+},
+
+{
+  id:'leave-by-type', cat:'Leave', name:'Leave by Type',
+  desc:'Requests and approved days broken down by leave type.',
+  filters:['employee','leavestatus'],
+  cols:[
+    { key:'type',         label:'Leave Type',      type:'text' },
+    { key:'requests',     label:'Requests',        type:'num', total:true, r:true },
+    { key:'approvedDays', label:'Approved Days',   type:'num', total:true, r:true },
+    { key:'employees',    label:'Employees',       type:'num', r:true },
+    { key:'avg',          label:'Avg Days/Request',type:'num', r:true },
+    { key:'rejected',     label:'Rejected',        type:'num', total:true, r:true },
+  ],
+  async run() {
+    const rows = await fetchLeave();
+    const f = S.filters;
+    const scoped = rows
+      .filter(r => !f.rep    || String(r.employee_id) === f.rep)
+      .filter(r => !f.status || r.status === f.status);
+    const g = {};
+    scoped.forEach(r => {
+      const k = r.leave_type_id || 'none';
+      if (!g[k]) g[k] = { type: r.leave_type_name || 'Unknown', requests:0, approvedDays:0, employees:new Set(), rejected:0 };
+      g[k].requests += 1;
+      if (r.status === 'approved') g[k].approvedDays += Number(r.days_count || 0);
+      if (r.status === 'rejected') g[k].rejected += 1;
+      if (r.employee_id) g[k].employees.add(String(r.employee_id));
+    });
+    return Object.values(g).map(r => ({
+      type: r.type, requests: r.requests, approvedDays: r.approvedDays,
+      employees: r.employees.size, avg: r.requests ? +(r.approvedDays / r.requests).toFixed(1) : 0,
+      rejected: r.rejected,
+    })).sort((a, b) => b.approvedDays - a.approvedDays);
+  },
+},
+
+{
+  id:'leave-status-summary', cat:'Leave', name:'Leave Summary by Status',
+  desc:'Totals of pending, approved, rejected and cancelled leave in the period.',
+  filters:['employee','leavetype'],
+  cols:[
+    { key:'status',    label:'Status',       type:'badge' },
+    { key:'count',     label:'Requests',     type:'num', total:true, r:true },
+    { key:'days',      label:'Days',         type:'num', total:true, r:true },
+    { key:'employees', label:'Employees',    type:'num', r:true },
+    { key:'last',      label:'Most Recent',  type:'datetime' },
+  ],
+  async run() {
+    const rows = await fetchLeave();
+    const f = S.filters;
+    const scoped = rows
+      .filter(r => !f.rep       || String(r.employee_id) === f.rep)
+      .filter(r => !f.leaveType || r.leave_type_id === f.leaveType);
+    const g = {};
+    scoped.forEach(r => {
+      const k = r.status || 'pending';
+      if (!g[k]) g[k] = { status:k, count:0, days:0, employees:new Set(), last:null };
+      g[k].count += 1;
+      g[k].days  += Number(r.days_count || 0);
+      if (r.employee_id) g[k].employees.add(String(r.employee_id));
+      const when = r.decided_at || r.requested_at;
+      if (when && (!g[k].last || when > g[k].last)) g[k].last = when;
+    });
+    return Object.values(g).map(r => ({ ...r, employees:r.employees.size }))
+      .sort((a, b) => b.count - a.count);
+  },
+},
+
+{
+  id:'leave-roster', cat:'Leave', name:'Currently & Upcoming Leave',
+  desc:'Approved leave in the period, marked as upcoming, active or completed.',
+  filters:['employee','leavetype'],
+  cols:[
+    { key:'employee', label:'Employee',   type:'text' },
+    { key:'type',     label:'Leave Type', type:'text' },
+    { key:'start',    label:'Start',      type:'date' },
+    { key:'end',      label:'End',        type:'date' },
+    { key:'days',     label:'Days',       type:'num', total:true, r:true },
+    { key:'live',     label:'Status',     type:'badge' },
+  ],
+  async run() {
+    const rows = await fetchLeave();
+    const f = S.filters;
+    const t = todayISO();
+    return rows
+      .filter(r => r.status === 'approved')
+      .filter(r => !f.rep       || String(r.employee_id) === f.rep)
+      .filter(r => !f.leaveType || r.leave_type_id === f.leaveType)
+      .map(r => ({
+        employee: r.employee_name || userName(r.employee_id),
+        type: r.leave_type_name || '—',
+        start: r.start_date, end: r.end_date, days: Number(r.days_count || 0),
+        live: r.start_date > t ? 'upcoming' : (r.end_date < t ? 'completed' : 'active'),
+      })).sort((a, b) => String(a.start).localeCompare(String(b.start)));
+  },
+},
 ];
 
-const CATEGORIES = ['Listings', 'Attendance', 'Wallet'];
+const CATEGORIES = ['Listings', 'Attendance', 'Leave', 'Wallet'];
 function reportById(id) { return REPORTS.find(r => r.id === id); }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -906,11 +1089,13 @@ function visitLabel(id) {
 const CAT_STYLE = {
   Listings:   { accent:'#1A3A6B', tint:'#EAF0F8', source:'Listings & items' },
   Attendance: { accent:'#0F766E', tint:'#E3F1EF', source:'Clock in / out'  },
+  Leave:      { accent:'#6B3FA0', tint:'#F1EAFA', source:'Leave requests'  },
   Wallet:     { accent:'#A97406', tint:'#FAF2DE', source:'Points & payouts'},
 };
 const CAT_ICON = {
   Listings:   '<path d="M3 4h14M3 9h14M3 14h9"/>',
   Attendance: '<circle cx="10" cy="10" r="7.2"/><path d="M10 6v4.3l2.8 1.7"/>',
+  Leave:      '<rect x="3" y="4.5" width="14" height="12.5" rx="1.6"/><path d="M3 8.5h14M6.5 2.5v4M13.5 2.5v4"/>',
   Wallet:     '<path d="M3 6.5h11a2 2 0 012 2v5a2 2 0 01-2 2H4a1 1 0 01-1-1V6.5zM3 6.5A1.5 1.5 0 014.5 5H13"/><circle cx="13.4" cy="11" r="1"/>',
 };
 function catIcon(cat, size) {
@@ -1043,6 +1228,20 @@ function filterControls(def) {
       </select>`));
   }
 
+  if (wants.includes('leavetype')) {
+    bits.push(chip('Leave type', `<select onchange="Reports.setFilter('leaveType',this.value)">
+        <option value="">All leave types</option>
+        ${S.leaveTypes.map(t => `<option value="${t.id}"${f.leaveType === String(t.id) ? ' selected' : ''}>${esc(t.name)}</option>`).join('')}
+      </select>`));
+  }
+
+  if (wants.includes('leavestatus')) {
+    bits.push(chip('Leave status', `<select onchange="Reports.setFilter('status',this.value)">
+        ${['','pending','approved','rejected','cancelled']
+          .map(x => `<option value="${x}"${f.status === x ? ' selected' : ''}>${x ? x[0].toUpperCase()+x.slice(1) : 'Any status'}</option>`).join('')}
+      </select>`));
+  }
+
   return bits.join('');
 }
 
@@ -1143,6 +1342,7 @@ function sortRows(rows, def) {
 const CHIP_MAP = {
   submitted:'neut', fulfilled:'ok', partial:'warn', draft:'grey', cancelled:'bad',
   completed:'ok', in:'neut', pending:'warn', approved:'ok', paid:'ok', rejected:'bad',
+  upcoming:'neut', active:'ok',
 };
 
 /** The metric a ranked report is ordered by — gets the share rule under it. */
@@ -1343,7 +1543,7 @@ async function open(id) {
   const def = reportById(id); if (!def) return;
   S.reportId = id;
   S.view = 'report';
-  S.filters = { rep:'', store:'', status:'', q:'' };
+  S.filters = { rep:'', store:'', status:'', q:'', leaveType:'' };
   S.conds = [];
   S.hidden = {};
   S.sort = { key:null, dir:'desc' };
@@ -1416,7 +1616,7 @@ function setCond(i, field, value) {
 }
 function removeCond(i) { S.conds.splice(i, 1); renderReport(); }
 function reset() {
-  S.filters = { rep:'', store:'', status:'', q:'' };
+  S.filters = { rep:'', store:'', status:'', q:'', leaveType:'' };
   S.conds = []; S.hidden = {}; S.sort = { key:null, dir:'desc' };
   S.preset = 'this_month';
   const r = resolveRange(S.preset); S.from = r.from; S.to = r.to;
