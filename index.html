@@ -7279,7 +7279,14 @@ async function _wBuildPurchaseHistory(clientIds, sinceDate) {
   const zohoIds = [], byZoho = new Map();
   wanted.forEach(id => {
     const z = clientById.get(id)?.zoho_customer_id;
-    if (z) { zohoIds.push(String(z)); byZoho.set(String(z), id); }
+    if (!z) return;
+    const key = String(z);
+    zohoIds.push(key);
+    // Several client records can share one Zoho customer — typically the same
+    // store entered separately by different reps. Keep every one of them,
+    // otherwise all but the last silently score zero.
+    if (!byZoho.has(key)) byZoho.set(key, []);
+    byZoho.get(key).push(id);
   });
 
   const grouped = new Map();   // clientId -> rows
@@ -7288,8 +7295,8 @@ async function _wBuildPurchaseHistory(clientIds, sinceDate) {
   if (zohoIds.length) {
     const rows = await _wFetchLines('customer_id', zohoIds, sinceDate);
     rows.forEach(r => {
-      const cid = byZoho.get(String(r.customer_id));
-      if (cid) grouped.get(cid).push(r);
+      const ids = byZoho.get(String(r.customer_id));
+      if (ids) ids.forEach(cid => grouped.get(cid).push(r));
     });
   }
 
@@ -7410,28 +7417,43 @@ function _wConfirmedForOrder(order, listedItems, histRows, M) {
 async function _wLoadFor(repIds) {
   const M = _wBuildProductMaps();
 
-  const { data: ordersRaw } = await sb
-    .from('orders')
-    .select('id, item_count, order_date, client_name, created_at, client_id, order_ref, created_by')
-    .in('created_by', repIds)
-    .in('status', ['submitted', 'fulfilled', 'partial'])
-    .order('created_at', { ascending: false });
-
-  const orders = ordersRaw || [];
+  // Supabase caps a single response at 1,000 rows. Merging every rep into one
+  // query means that cap now truncates whole reps out of the result, so this
+  // must page through until it runs out.
+  const orders = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await sb
+      .from('orders')
+      .select('id, item_count, order_date, client_name, created_at, client_id, order_ref, created_by')
+      .in('created_by', repIds)
+      .in('status', ['submitted', 'fulfilled', 'partial'])
+      .order('created_at', { ascending: false })
+      .range(from, from + 999);
+    if (error || !data || data.length === 0) break;
+    orders.push(...data);
+    if (data.length < 1000) break;
+  }
+  console.log(`[wallet] ${orders.length} orders across ${repIds.length} reps`);
   if (!orders.length) {
     return { orders: [], ordersByRep: new Map(), confirmedByOrder: {}, storesByRep: new Map(), redeemedByRep: new Map() };
   }
 
   // All order_items in a few chunked queries instead of one per rep.
   const itemsByOrder = {};
-  const orderIdChunks = _wChunk(orders.map(o => o.id), 200);
+  const orderIdChunks = _wChunk(orders.map(o => o.id), 100);
   const itemTasks = orderIdChunks.map(chunk => async () => {
-    const { data } = await sb.from('order_items')
-      .select('order_id, sku, product_id, product_name')
-      .in('order_id', chunk);
-    (data || []).forEach(it => {
-      (itemsByOrder[it.order_id] || (itemsByOrder[it.order_id] = [])).push(it);
-    });
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from('order_items')
+        .select('order_id, sku, product_id, product_name')
+        .in('order_id', chunk)
+        .order('order_id', { ascending: true })
+        .range(from, from + 999);
+      if (error || !data || data.length === 0) break;
+      data.forEach(it => {
+        (itemsByOrder[it.order_id] || (itemsByOrder[it.order_id] = [])).push(it);
+      });
+      if (data.length < 1000) break;
+    }
   });
 
   // Payout requests for every rep in a single query.
