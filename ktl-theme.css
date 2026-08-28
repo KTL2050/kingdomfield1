@@ -12,7 +12,7 @@
 
    Applied so far:  every screen — Attendance · Dashboard · Clients ·
                     Place Listing · Targets · Wallet · Sales Team ·
-                    User Management · Leave Management
+                    User Management · Leave Management · Stock Position
                     (Reports carries its own copy of this language.)
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -51,6 +51,8 @@
 #screen-dashboard .mc-val,
 #screen-dashboard td,
 #screen-dashboard th,
+#screen-stock td,#screen-stock th,#screen-stock .mc-val,
+#screen-stock .sp-calc-hero-v,#screen-stock .sp-bs-v,#screen-stock .sp-sku-onhand-v,
 .lg-scope .mc-val,
 .lg-scope td,
 .lg-scope th,
@@ -1033,7 +1035,248 @@
 #screen-leave .lv-modal-hd,#screen-leave .lv-modal-ft{border-color:var(--lg-rule)!important;}
 
 
-/* ─── 12. MOTION AND SMALL SCREENS (sections 7–11) ─────────────────────── */
+/* ─── 12. STOCK POSITION ───────────────────────────────────────────────────
+   The module ships its own styles (ktl-stock.js); these refinements bring it
+   in line without touching that file. A stock count is a physical inventory
+   taken store by store, so the screen reads as a ruled progression —
+   Store → SKU → Count — ending in a submitted record rather than a
+   coloured dashboard card. All of it is scoped with an sp- prefix in the
+   module's own CSS, so nothing here needs !important to win.               */
+
+#screen-stock{color:var(--lg-txt);}
+
+/* 12a. The three-step rail — a metrics-grid of status, not a floating card */
+#screen-stock .sp-step-rail{
+  gap:1px;background:var(--lg-rule);border:1px solid var(--lg-rule);border-radius:3px;
+  overflow:hidden;box-shadow:0 1px 3px rgba(18,35,63,.05);
+}
+#screen-stock .sp-step-node{background:var(--lg-paper);padding:15px 18px;}
+#screen-stock .sp-step-node:not(:last-child)::after{background:var(--lg-rule);}
+#screen-stock .sp-step-node:hover{background:var(--lg-canvas);}
+#screen-stock .sp-step-dot{
+  border-radius:2px;font-family:var(--lg-serif);font-weight:600;
+  background:var(--lg-canvas);color:var(--lg-txt3);border:1px solid var(--lg-rule-mid);
+}
+#screen-stock .sp-step-node.active .sp-step-dot{
+  background:var(--lg-ink);color:#fff;border-color:var(--lg-ink);box-shadow:none;
+}
+#screen-stock .sp-step-node.done .sp-step-dot{background:var(--lg-teal);color:#fff;border-color:var(--lg-teal);}
+#screen-stock .sp-step-k{
+  font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--lg-txt3);
+}
+#screen-stock .sp-step-v{font-size:12.5px;color:var(--lg-txt2);}
+#screen-stock .sp-step-node.active .sp-step-v{color:var(--lg-ink);font-weight:600;}
+
+/* 12b. The scope note — a rule, not a tinted box, matching Place Listing -- */
+#screen-stock .rep-scope-banner{
+  background:transparent!important;border:none!important;border-radius:0!important;
+  border-left:2px solid var(--lg-gold)!important;padding:2px 0 2px 14px!important;
+  color:var(--lg-txt2)!important;font-size:12.5px!important;
+}
+
+/* 12c. Panels --------------------------------------------------------------*/
+#screen-stock .card{
+  background:var(--lg-paper);border:1px solid var(--lg-rule);border-radius:3px;
+  box-shadow:0 1px 3px rgba(18,35,63,.05);padding:0;overflow:hidden;margin-bottom:16px;
+}
+#screen-stock .card-hdr{
+  padding:17px 22px 14px;margin-bottom:0;border-bottom:1px solid var(--lg-rule);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+}
+#screen-stock .card-title{
+  font-family:var(--lg-serif);font-size:18px!important;font-weight:600!important;
+  letter-spacing:-.01em;color:var(--lg-ink)!important;line-height:1.2;
+}
+#screen-stock .card-sub{font-size:11.5px;color:var(--lg-txt2);}
+#screen-stock .card > *:not(.card-hdr){padding-left:22px;padding-right:22px;}
+#screen-stock .card > *:last-child{padding-bottom:18px;}
+
+/* 12d. Tabs — the same filing index as every other module ----------------- */
+#screen-stock .tabs{border-bottom:1px solid var(--lg-rule-mid);padding:0 22px;gap:0;margin-bottom:14px;}
+#screen-stock .tab{
+  padding:12px 16px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--lg-txt3);border-bottom:2px solid transparent;margin-bottom:-1px;
+}
+#screen-stock .tab:hover{color:var(--lg-ink);background:transparent;}
+#screen-stock .tab.active{color:var(--lg-ink);border-bottom-color:var(--lg-gold);background:transparent;}
+#screen-stock .tc{padding:0;}
+
+/* 12e. Store picker — squared tiles, initials in the serif ---------------- */
+#screen-stock .sp-store-card{border-radius:3px;box-shadow:none;}
+#screen-stock .sp-store-card:hover{transform:none;background:var(--lg-canvas);border-color:var(--lg-rule-mid);box-shadow:none;}
+#screen-stock .sp-store-card.sel{background:var(--lg-royal-soft);border-color:var(--lg-royal);box-shadow:none;}
+#screen-stock .sp-store-av{
+  border-radius:2px;font-family:var(--lg-serif);font-weight:600;
+  background:var(--lg-royal-soft);color:var(--lg-royal);border-color:var(--lg-rule-mid);
+}
+#screen-stock .sp-store-card.sel .sp-store-av{background:var(--lg-royal);color:#fff;border-color:var(--lg-royal);}
+#screen-stock .sp-store-nm{color:var(--lg-ink);}
+#screen-stock .sp-store-meta{color:var(--lg-txt3);}
+
+/* 12f. SKU list — a ruled register, not a stack of chips ------------------ */
+#screen-stock .sp-cat-block{border-radius:3px;box-shadow:none;}
+#screen-stock .sp-cat-hdr{background:var(--lg-canvas);}
+#screen-stock .sp-cat-nm{
+  font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--lg-txt3);
+}
+#screen-stock .sp-cat-count{font-size:10px;color:var(--lg-txt3);}
+#screen-stock .sp-sku-row:hover{background:var(--lg-canvas);}
+#screen-stock .sp-sku-row.active{background:var(--lg-royal-soft);box-shadow:inset 2px 0 0 var(--lg-royal);}
+#screen-stock .sp-sku-row.counted{background:transparent;border-left:2px solid var(--lg-teal);padding-left:12px;}
+#screen-stock .sp-sku-row.pending{background:transparent;border-left:2px solid var(--lg-gold);padding-left:12px;}
+#screen-stock .sp-sku-row.pending .sp-sku-size{background:var(--lg-gold-soft);border-color:var(--lg-gold);color:var(--lg-gold);}
+#screen-stock .sp-sku-size{
+  border-radius:2px;font-family:var(--lg-serif);font-weight:600;
+  background:var(--lg-canvas);border-color:var(--lg-rule-mid);color:var(--lg-txt2);
+}
+#screen-stock .sp-sku-row.counted .sp-sku-size{background:var(--lg-teal-soft);border-color:var(--lg-teal);color:var(--lg-teal);}
+#screen-stock .sp-sku-nm{color:var(--lg-ink);font-weight:600;}
+#screen-stock .sp-sku-sub{color:var(--lg-txt3);}
+#screen-stock .sp-sku-onhand-v{font-family:var(--lg-serif);font-weight:600;}
+#screen-stock .sp-sku-onhand-l{color:var(--lg-txt3);}
+/* Row action buttons — weight is earned, not uniform. Most rows get a quiet
+   outline; only "awaiting close" is filled, because that's the one state
+   that actually needs the rep's attention before leaving the store. */
+#screen-stock .sp-count-btn{border-radius:2px;letter-spacing:.03em;}
+#screen-stock .sp-count-btn.quiet{border-color:var(--lg-rule-mid);color:var(--lg-txt2);background:var(--lg-paper);}
+#screen-stock .sp-count-btn.quiet:hover{background:var(--lg-royal-soft);border-color:var(--lg-royal);color:var(--lg-royal);}
+#screen-stock .sp-count-btn.urgent{background:var(--lg-gold);border-color:var(--lg-gold);}
+
+/* 12g–h. The stock card — a ledger line, not a stepper box. The number
+   sits on a ruled baseline like an amount written into a paper stock card;
+   the header carries a small folio reference and a quiet close, not a
+   second boxed button; the body has a faint ruled-paper texture. */
+#screen-stock .sp-count-panel{border-radius:3px;border-color:var(--lg-rule);box-shadow:0 1px 3px rgba(18,35,63,.05);}
+#screen-stock .sp-count-hd{background:var(--lg-ink);border-bottom:2px solid var(--lg-gold);}
+#screen-stock .sp-ch-eyebrow{color:var(--lg-gold);opacity:.85;}
+#screen-stock .sp-count-hd-sku{font-family:var(--lg-serif);font-size:16px;font-weight:600;letter-spacing:-.01em;}
+#screen-stock .sp-count-body{background-image:repeating-linear-gradient(to bottom,transparent,transparent 27px,rgba(20,30,50,.045) 27px,rgba(20,30,50,.045) 28px);}
+#screen-stock .sp-count-sec{
+  font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--lg-txt3);
+}
+#screen-stock .sp-count-sec::after{background:var(--lg-rule);}
+#screen-stock .sp-ll-lbl-text{color:var(--lg-txt3);letter-spacing:.12em;}
+#screen-stock .sp-ll-hint{color:var(--lg-txt3);}
+#screen-stock .sp-ll-nudge{border-radius:2px;border-color:var(--lg-rule-mid);color:var(--lg-txt3);}
+#screen-stock .sp-ll-nudge:hover{border-color:var(--lg-royal);color:var(--lg-royal);}
+#screen-stock .sp-ll-figure{border-bottom-color:var(--lg-ink);}
+#screen-stock .sp-ll-inp{font-family:var(--lg-serif);color:var(--lg-ink);}
+#screen-stock .sp-ledger-line.tinted .sp-ll-figure{border-bottom-color:var(--lg-royal);}
+#screen-stock .sp-ledger-line.danger .sp-ll-figure{border-bottom-color:var(--lg-neg);}
+#screen-stock .sp-ref-line{border-bottom-color:var(--lg-rule-mid);}
+#screen-stock .sp-ref-lbl{color:var(--lg-txt3);}
+#screen-stock .sp-ref-v{font-family:var(--lg-serif);color:var(--lg-ink);}
+#screen-stock .sp-cta-primary{border-radius:3px!important;}
+#screen-stock .sp-ghost-link{color:var(--lg-royal);}
+#screen-stock .sp-ghost-link.danger{color:var(--lg-neg);}
+#screen-stock .sp-cta-sep{color:var(--lg-txt3);}
+#screen-stock .sp-chip{border-radius:2px;font-size:10px;letter-spacing:.02em;border-color:var(--lg-rule-mid);color:var(--lg-txt2);}
+#screen-stock .sp-chip.on-dmg{background:#FBEBEB;border-color:var(--lg-neg);color:var(--lg-neg);}
+
+/* 12i. The result strip — solid ink and a gold rule, like the wallet hero - */
+#screen-stock .sp-calc-strip{
+  background:var(--lg-ink)!important;border-radius:3px!important;
+  border-bottom:2px solid var(--lg-gold)!important;
+}
+#screen-stock .sp-calc-hero-l{letter-spacing:.14em;}
+#screen-stock .sp-calc-hero-v{font-family:var(--lg-serif);font-weight:600;letter-spacing:-.03em;}
+#screen-stock .sp-pos-pill{border-radius:2px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;}
+#screen-stock .sp-calc-l{letter-spacing:.1em;}
+
+/* 12j. Basket bar — a ruled total, not a floating card --------------------- */
+#screen-stock .sp-basket-bar{
+  border-radius:3px;box-shadow:none;border:1px solid var(--lg-rule);border-top:2px solid var(--lg-ink);
+}
+#screen-stock .sp-bs-l{
+  font-size:8.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--lg-txt3);
+}
+#screen-stock .sp-bs-v{font-family:var(--lg-serif);font-weight:600;color:var(--lg-ink);}
+
+/* 12k. Progress meter — a share rule, like every pbar ---------------------- */
+#screen-stock .sp-pmeter{height:2px;background:var(--lg-rule);border-radius:0;}
+#screen-stock .sp-pmeter i{background:var(--lg-ink);border-radius:0;}
+
+/* 12l. Submitted confirmation — the same iconed cards as the Dashboard ---- */
+#screen-stock .metrics-grid{
+  gap:1px;background:var(--lg-rule);border:1px solid var(--lg-rule);border-radius:3px;
+  overflow:hidden;box-shadow:0 1px 3px rgba(18,35,63,.05);
+}
+#screen-stock .mc{background:var(--lg-paper)!important;border:none!important;border-radius:0!important;box-shadow:none!important;padding:18px 20px!important;}
+#screen-stock .mc::after{content:none!important;}
+#screen-stock .mc-dots{display:none;}
+#screen-stock .mc-top{gap:12px;}
+#screen-stock .mc-ico{width:32px;height:32px;border-radius:2px;}
+#screen-stock .mc-ico svg{width:16px;height:16px;}
+#screen-stock .mc-lbl{
+  font-size:8.5px!important;font-weight:700!important;letter-spacing:.14em!important;
+  text-transform:uppercase!important;color:var(--lg-txt3)!important;margin-bottom:7px!important;
+}
+#screen-stock .mc-val{
+  font-family:var(--lg-serif);font-size:24px!important;font-weight:600!important;
+  letter-spacing:-.02em!important;line-height:1!important;color:var(--lg-ink)!important;
+}
+#screen-stock .mc-sub{font-size:11px!important;color:var(--lg-txt2)!important;margin-top:6px!important;}
+
+/* 12m. Who can count stock -------------------------------------------------*/
+#screen-stock .sp-acc-row{border-color:var(--lg-rule);}
+#screen-stock .sp-acc-av{border-radius:2px;font-family:var(--lg-serif);background:var(--lg-royal-soft);color:var(--lg-royal);}
+#screen-stock .sp-sw input:checked+span{background:var(--lg-teal);border-color:var(--lg-teal);}
+
+/* 12n. Badges, controls, tables, empty states — the same tokens as every
+   screen in the app, so a status pill or a search box never looks like it
+   wandered in from a different tool.                                       */
+#screen-stock .badge{
+  border-radius:2px!important;font-size:10px!important;font-weight:700!important;
+  letter-spacing:.07em!important;text-transform:uppercase!important;padding:3px 8px!important;
+}
+#screen-stock .badge.bg{background:var(--lg-teal-soft)!important;color:var(--lg-teal)!important;}
+#screen-stock .badge.bb{background:var(--lg-royal-soft)!important;color:var(--lg-royal)!important;}
+#screen-stock .badge.ba,#screen-stock .badge.bgold{background:var(--lg-gold-soft)!important;color:var(--lg-gold)!important;}
+#screen-stock .badge.br{background:#FBEBEB!important;color:var(--lg-neg)!important;}
+#screen-stock .si,#screen-stock .fin{
+  border-radius:3px!important;border:1px solid var(--lg-rule-mid)!important;
+  background:var(--lg-paper)!important;font-size:12.5px!important;color:var(--lg-ink)!important;
+}
+#screen-stock .si:focus,#screen-stock .fin:focus{outline:none;border-color:var(--lg-royal)!important;}
+#screen-stock .btn{border-radius:3px!important;font-size:11.5px!important;box-shadow:none!important;letter-spacing:.01em;}
+#screen-stock .btn-royal{background:var(--lg-ink)!important;font-weight:600!important;}
+#screen-stock .btn-green{background:var(--lg-teal)!important;border-color:var(--lg-teal)!important;}
+#screen-stock .btn-gold{background:var(--lg-gold)!important;border-color:var(--lg-gold)!important;}
+#screen-stock table{border-collapse:collapse;width:100%;}
+#screen-stock thead th{
+  background:var(--lg-paper)!important;padding:12px 14px 8px!important;
+  font-size:9px!important;font-weight:700!important;letter-spacing:.13em!important;
+  text-transform:uppercase!important;color:var(--lg-txt3)!important;
+  border-bottom:1px solid var(--lg-rule-mid)!important;text-align:left;white-space:nowrap;
+}
+#screen-stock tbody td{
+  padding:11px 14px!important;font-size:12.5px!important;
+  border-bottom:1px solid var(--lg-rule)!important;color:var(--lg-txt);
+}
+#screen-stock tbody tr:hover{background:var(--lg-canvas)!important;}
+#screen-stock tbody td:first-child{font-weight:600;color:var(--lg-ink);}
+#screen-stock .empty-state{padding:40px 22px!important;color:var(--lg-txt2)!important;font-size:12.5px!important;}
+#screen-stock .empty-state::before{
+  content:'—';display:block;font-family:var(--lg-serif);font-size:28px;
+  color:var(--lg-rule-mid);line-height:1;margin-bottom:11px;
+}
+#screen-stock :focus-visible{outline:2px solid var(--lg-royal);outline-offset:2px;}
+
+/* 12o. Motion and small screens -------------------------------------------- */
+@media(prefers-reduced-motion:reduce){
+  #screen-stock *{animation:none!important;transition:none!important;}
+}
+@media(max-width:768px){
+  #screen-stock .card-hdr{padding:15px 16px 12px;}
+  #screen-stock .card > *:not(.card-hdr){padding-left:16px;padding-right:16px;}
+  #screen-stock .tabs{padding-left:16px;padding-right:16px;}
+  #screen-stock thead th:first-child,#screen-stock tbody td:first-child{padding-left:16px!important;}
+  #screen-stock .mc{padding:15px 16px!important;}
+  #screen-stock .mc-val{font-size:21px!important;}
+}
+
+
+/* ─── 13. MOTION AND SMALL SCREENS (sections 7–11) ─────────────────────── */
 @media(prefers-reduced-motion:reduce){
   #screen-targets *,#screen-wallet *,#screen-team *,#screen-admin *,#screen-leave *{
     animation:none!important;transition:none!important;
@@ -1058,90 +1301,4 @@
   #screen-admin thead th:first-child,#screen-admin tbody td:first-child,
   #screen-leave thead th:first-child,#screen-leave tbody td:first-child{padding-left:16px!important;}
   #screen-team .cli-item{padding-left:16px!important;padding-right:16px!important;}
-}
-
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   13. MOBILE CHROME — the topbar
-   The dark bar above already carries the brand and the screen name, so on a
-   phone the white bar stops being a header and becomes a single utility row:
-   greeting on the left, then time, alerts and sync on the right. One line,
-   46px, nothing repeated.
-   ═══════════════════════════════════════════════════════════════════════════ */
-@media(max-width:768px){
-
-  .topbar{
-    flex-direction:row!important;
-    align-items:center!important;
-    justify-content:space-between!important;
-    gap:10px!important;
-    height:46px!important;
-    min-height:46px!important;
-    padding:0 13px!important;
-    border-bottom:1px solid var(--lg-rule);
-    background:var(--lg-paper);
-  }
-
-  /* The old "Row 1" wrapper dissolves, so the greeting and the clock become
-     direct children of the bar and can sit on one line with the actions. */
-  .topbar > div[style*="width:100%"]{display:contents!important;}
-
-  /* Left — greeting only, truncated rather than wrapped */
-  .topbar-greeting{
-    flex:1 1 auto;min-width:0;order:1;
-    flex-direction:row!important;align-items:center!important;gap:0!important;
-  }
-  .topbar-greeting-name{
-    font-size:12.5px!important;font-weight:600!important;
-    color:var(--lg-ink)!important;letter-spacing:-.01em;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:100%;
-  }
-  .topbar-greeting-sub{display:none!important;}   /* screen name is in the dark bar */
-
-  /* Middle — the clock, as quiet text instead of a pill */
-  #topbar-datetime{
-    order:2;flex-shrink:0;
-    background:transparent!important;border:none!important;
-    padding:0!important;gap:5px!important;height:auto!important;
-  }
-  #topbar-datetime svg{display:none!important;}
-  #topbar-date-label{
-    font-size:10.5px!important;font-weight:600!important;
-    color:var(--lg-txt3)!important;letter-spacing:.02em;
-  }
-  #topbar-time-label{
-    font-size:12px!important;font-weight:700!important;
-    color:var(--lg-ink)!important;margin-left:1px!important;
-    font-variant-numeric:tabular-nums;
-  }
-
-  /* Right — actions, icon only */
-  .topbar-right{
-    order:3;width:auto!important;flex-shrink:0;
-    gap:7px!important;padding-bottom:0!important;justify-content:flex-end!important;
-  }
-  #sync-status{display:none!important;}
-  .topbar-right > *{height:32px!important;}
-
-  .sync-btn{
-    width:32px!important;padding:0!important;
-    font-size:0!important;                 /* hides the "Sync Zoho" label */
-    justify-content:center!important;border-radius:3px!important;
-    background:var(--lg-gold)!important;box-shadow:none!important;
-  }
-  .sync-btn svg{width:15px!important;height:15px!important;flex-shrink:0;}
-
-  #lv-bell{
-    width:32px!important;margin:0!important;border-radius:3px!important;
-    border:1px solid var(--lg-rule-mid)!important;
-  }
-  #lv-bell-dot{min-width:15px;height:15px;font-size:9px;border-radius:8px;}
-
-  .tb-user{display:none!important;}        /* account lives in the drawer */
-}
-
-/* Narrow phones — the date goes, the time stays. */
-@media(max-width:379px){
-  #topbar-date-label{display:none!important;}
-  .topbar{padding:0 11px!important;gap:8px!important;}
 }
