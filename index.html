@@ -2941,19 +2941,34 @@ async function loadTopListers(period) {
   if (_topListPeriod === 'month')   from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
   else if (_topListPeriod === '30') from = new Date(Date.now() - 30*86400000).toISOString().split('T')[0];
 
-  let q = sb.from('orders').select('created_by,item_count,order_date').neq('status','draft').limit(5000);
-  if (from) q = q.gte('order_date', from);
+  // Find which reps have non-draft, non-cancelled listings in this period
+  let repQ = sb.from('orders').select('created_by').in('status', ['submitted', 'fulfilled', 'partial']).limit(5000);
+  if (from) repQ = repQ.gte('order_date', from);
+  const { data: repRows, error: repErr } = await repQ;
+  if (repErr) { host.innerHTML = `<div class="empty-state" style="padding:24px;color:#A32D2D;">Could not load listings: ${repErr.message}</div>`; return; }
 
-  const { data, error } = await q;
-  if (error) { host.innerHTML = `<div class="empty-state" style="padding:24px;color:#A32D2D;">Could not load listings: ${error.message}</div>`; return; }
+  const repIds = Array.from(new Set((repRows || []).map(r => String(r.created_by)).filter(Boolean)));
+  if (!repIds.length) {
+    host.innerHTML = `<div class="empty-state" style="padding:26px;">
+      <div style="font-size:24px;margin-bottom:8px;">📋</div>
+      <div style="font-weight:600;font-size:12.5px;margin-bottom:3px;">No listings in this period</div>
+      <div>Submitted listings appear here as reps place them.</div></div>`;
+    return;
+  }
+
+  // Reuse the same confirmed-purchase matching engine that powers Wallet/points
+  const res = await _wLoadFor(repIds);
 
   const tally = {};
-  (data || []).forEach(o => {
-    if (!o.created_by) return;
-    const k = String(o.created_by);
-    if (!tally[k]) tally[k] = { items: 0, listings: 0 };
-    tally[k].items    += Number(o.item_count || 0);
-    tally[k].listings += 1;
+  repIds.forEach(rep => {
+    const orders = (res.ordersByRep.get(rep) || []).filter(o => !from || (o.order_date || '') >= from);
+    let items = 0, listings = 0;
+    orders.forEach(o => {
+      const confirmed = res.confirmedByOrder[o.id] || 0;
+      items += confirmed;
+      if (confirmed > 0) listings += 1; // only count listings where something was actually bought
+    });
+    if (items > 0 || listings > 0) tally[rep] = { items, listings };
   });
 
   await _ensureRepCache();
