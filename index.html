@@ -2440,6 +2440,7 @@ const SUPABASE_URL  = 'https://bccqhwsbhgssoapiqljy.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjY3Fod3NiaGdzc29hcGlxbGp5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDI0MzczNCwiZXhwIjoyMDg5ODE5NzM0fQ.jQS-HoxiIRhBeahU5FKXPoyys80tOZ-lHudlSXLncbA';
 const EDGE_FN_URL   = 'https://bccqhwsbhgssoapiqljy.supabase.co/functions/v1/sync-customer-sales';
 const ZOHO_WEBHOOK_URL = 'https://bccqhwsbhgssoapiqljy.supabase.co/functions/v1/zoho-webhook';
+const ACTIVE_CLIENTS_URL = 'https://bccqhwsbhgssoapiqljy.supabase.co/functions/v1/sync-active-clients';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 function normalizeSku(s) {
@@ -2994,9 +2995,10 @@ async function loadAdminDashboard() {
   const metricsEl = document.getElementById('screen-dashboard');
 
   // Inject admin-specific metrics HTML
-  document.getElementById('m-clients').textContent = allClients.length.toLocaleString();
+  const activeClients90d = allClients.filter(c => c.active_90d).length;
+  document.getElementById('m-clients').textContent = activeClients90d.toLocaleString();
   const mcSub = document.getElementById('m-clients-sub');
-  if (mcSub) mcSub.textContent = 'Total in system';
+  if (mcSub) mcSub.textContent = 'Active Clients';
   document.getElementById('m-skus').textContent = allProducts.filter(p=>p.status==='active').length.toLocaleString();
   const alertCount = allProducts.filter(p=>p.stock_on_hand<=0||(p.stock_on_hand>0&&p.stock_on_hand<50)).length;
   document.getElementById('m-alerts').textContent = alertCount;
@@ -5168,6 +5170,24 @@ async function clearSyncResume(){try{await sb.from('sync_state').delete().eq('ke
 async function saveSyncPage(page,date_from,date_to){try{await sb.from('sync_state').upsert({key:'last_sync_page',value:JSON.stringify({page,date_from,date_to}),updated_at:new Date().toISOString()},{onConflict:'key'});}catch(e){}}
 function setSyncPreset(preset,event){const today=new Date();const fmt=d=>d.toISOString().split('T')[0];const fromEl=document.getElementById('sync-from');const toEl=document.getElementById('sync-to');if(!fromEl||!toEl)return;if(preset==='thisYear'){fromEl.value=fmt(new Date(today.getFullYear(),0,1));toEl.value=fmt(today);}else if(preset==='lastYear'){fromEl.value=fmt(new Date(today.getFullYear()-1,0,1));toEl.value=fmt(new Date(today.getFullYear()-1,11,31));}else if(preset==='last3'){const d=new Date(today);d.setMonth(d.getMonth()-3);fromEl.value=fmt(d);toEl.value=fmt(today);}else if(preset==='last6'){const d=new Date(today);d.setMonth(d.getMonth()-6);fromEl.value=fmt(d);toEl.value=fmt(today);}else if(preset==='allTime'){fromEl.value='2020-01-01';toEl.value=fmt(today);}document.querySelectorAll('#sync-modal-el .date-preset-btn').forEach(b=>b.classList.remove('active'));if(event&&event.target)event.target.classList.add('active');}
 function syncLog(msg,type='info'){const log=document.getElementById('sync-log');if(!log)return;const line=document.createElement('span');line.className='sync-log-line '+type;line.textContent='['+new Date().toLocaleTimeString()+'] '+msg;log.appendChild(line);log.scrollTop=log.scrollHeight;}
+
+async function refreshActiveClients() {
+  syncLog(`🔎 Checking which clients ordered in the last 90 days...`, 'info');
+  try {
+    const res = await fetch(ACTIVE_CLIENTS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON}` }
+    });
+    const data = await res.json();
+    if (data.ok) {
+      syncLog(`✅ ${data.active_clients} clients active in the last 90 days`, 'ok');
+    } else {
+      syncLog(`⚠️ Active-clients check failed: ${data.error}`, 'err');
+    }
+  } catch (e) {
+    syncLog(`⚠️ Active-clients check failed: ${e.message}`, 'err');
+  }
+}
 // Replace ONLY the startFullSync function with this:
 
 async function startFullSync() {
@@ -5323,6 +5343,7 @@ try {
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Sync failed');
     syncLog(`✅ Done! ${data.message || JSON.stringify({customers: data.customers_synced, products: data.products_synced})}`, 'ok');
+    if (_currentSyncType === 'customers') await refreshActiveClients();
     document.getElementById('sync-progress-fill').style.width = '100%';
     document.getElementById('sync-progress-pct').textContent = '100%';
     document.getElementById('sync-progress-label').textContent = '✅ Complete!';
@@ -5491,6 +5512,7 @@ syncLog(`✅ Page ${page}: ${invoicesProcessed} invoices → ${lineItemsSaved} l
   closeBtn.disabled    = false;
   closeBtn.textContent = 'Close';
 
+  await refreshActiveClients();
   await loadClients();
   await loadProducts();
   const isMob = window.innerWidth <= 768;
@@ -11327,7 +11349,6 @@ function saveCRMSettings(){alert('✅ CRM settings saved!');}
 <div id="pwa-install-banner">
   <div id="pwa-install-text"> 
     <div id="pwa-install-title">Add KTLSALES to your home screen</div>
-    <div id="pwa-install-sub">Listing Generates Revenue - 10B - BOOM </div>
   </div>
   <div id="pwa-install-actions">
     <button class="pwa-btn pwa-btn-dismiss" onclick="dismissPwaInstall()">Not now</button>
