@@ -14,7 +14,11 @@
                   products listed detail, daily summary
      Attendance — detail (clock in/out), summary by employee, late arrivals,
                   missing clock-outs, daily attendance
+     Leave      — request detail, summary by employee, by type, by status,
+                  current & upcoming leave
      Wallet     — points by rep, payout requests, payout summary
+     Stock      — position by store, position by rep, count detail, item
+                  detail, daily summary, reorder suggestions, damage detail
    ═══════════════════════════════════════════════════════════════════════════ */
 (function () {
 'use strict';
@@ -390,6 +394,41 @@ async function fetchOrderItems(orders) {
   return out;
 }
 
+/** Confirmed-purchase count per order — an item only counts once it's been
+ *  matched against a real Zoho invoice for that client, on or after the
+ *  listing date. Reuses the exact same matching engine as the rep Wallet
+ *  and each client's "Successful Listing" tab (_w* helpers, defined in the
+ *  main clockin.html script), so these reports agree with what reps see. */
+async function fetchConfirmedByOrder() {
+  const key = cacheKey('confirmed');
+  if (S.cache[key]) return S.cache[key];
+
+  const orders = await fetchOrders();   // full period set, unfiltered by rep/store/status
+  const items  = await fetchOrderItems(orders);
+
+  const itemsByOrder = {};
+  items.forEach(it => (itemsByOrder[it.order_id] || (itemsByOrder[it.order_id] = [])).push(it));
+
+  const M = _wBuildProductMaps();
+  const clientIds = Array.from(new Set(orders.map(o => o.client_id).filter(Boolean)));
+  const sinceDate = orders.reduce((min, o) => {
+    const d = o.order_date || '';
+    return d && (!min || d < min) ? d : min;
+  }, '');
+  const history = await _wBuildPurchaseHistory(clientIds, sinceDate);
+
+  const byOrder = {};
+  orders.forEach(o => {
+    const cid = String(o.client_id || '');
+    byOrder[o.id] = cid
+      ? _wConfirmedForOrder(o, itemsByOrder[o.id] || [], history.get(cid) || [], M)
+      : 0;
+  });
+
+  S.cache[key] = byOrder;
+  return byOrder;
+}
+
 async function fetchAttendance() {
   const key = cacheKey('att');
   if (S.cache[key]) return S.cache[key];
@@ -425,6 +464,43 @@ async function fetchLeave() {
   if (error) { console.warn('[reports] leave:', error.message); S.cache[key] = []; return []; }
   S.cache[key] = data || [];
   return S.cache[key];
+}
+
+/** Stock position headers — one row per store visit submitted through the
+    Stock Position module. Tolerates a missing table (feature not set up
+    yet) the same way payouts/leave do, rather than failing the whole run. */
+async function fetchStockCounts() {
+  const key = cacheKey('stockcounts');
+  if (S.cache[key]) return S.cache[key];
+  const { data, error } = await DB().from('stock_counts').select('*')
+    .gte('counted_at', S.from + 'T00:00:00').lte('counted_at', S.to + 'T23:59:59')
+    .order('counted_at', { ascending: false }).limit(CFG.rowLimit);
+  if (error) { console.warn('[reports] stock_counts:', error.message); S.cache[key] = []; return []; }
+  S.cache[key] = data || [];
+  return S.cache[key];
+}
+/** stock_count_items carries no date of its own, so it is fetched by parent
+    count header — same chunked-by-200 pattern as order items. */
+async function fetchStockCountItems(counts) {
+  const key = cacheKey('stockitems');
+  if (S.cache[key]) return S.cache[key];
+  const ids = counts.map(c => c.id);
+  const out = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await DB().from('stock_count_items').select('*').in('count_id', ids.slice(i, i + 200));
+    if (error) { console.warn('[reports] stock_count_items:', error.message); continue; }
+    out.push(...(data || []));
+  }
+  S.cache[key] = out;
+  return out;
+}
+function applyStockCountFilters(counts) {
+  const f = S.filters;
+  return counts.filter(c => {
+    if (f.rep   && String(c.user_id)   !== f.rep)   return false;
+    if (f.store && String(c.client_id) !== f.store) return false;
+    return true;
+  });
 }
 
 /** Listings that count toward performance — drafts and cancellations excluded. */
@@ -465,15 +541,15 @@ const REPORTS = [
   ],
   async run() {
     const orders = countedOrders(applyOrderFilters(await fetchOrders()));
-    const items  = await fetchOrderItems(orders);
-    const byOrder = {};
-    items.forEach(it => { byOrder[it.order_id] = (byOrder[it.order_id] || 0) + 1; });
+    const byOrder = await fetchConfirmedByOrder();
 
     const g = {};
     orders.forEach(o => {
+      const confirmed = byOrder[o.id] || 0;
+      if (confirmed === 0) return;   // only count listings the store actually bought from
       const k = String(o.client_id || 'none');
       if (!g[k]) g[k] = { store:o.client_name || 'Unknown store', products:0, listings:0, reps:new Set(), last:null };
-      g[k].products += byOrder[o.id] ?? Number(o.item_count || 0);
+      g[k].products += confirmed;
       g[k].listings += 1;
       if (o.created_by) g[k].reps.add(String(o.created_by));
       if (!g[k].last || o.order_date > g[k].last) g[k].last = o.order_date;
@@ -500,15 +576,15 @@ const REPORTS = [
   ],
   async run() {
     const orders = countedOrders(applyOrderFilters(await fetchOrders()));
-    const items  = await fetchOrderItems(orders);
-    const byOrder = {};
-    items.forEach(it => { byOrder[it.order_id] = (byOrder[it.order_id] || 0) + 1; });
+    const byOrder = await fetchConfirmedByOrder();
 
     const g = {};
     orders.forEach(o => {
+      const confirmed = byOrder[o.id] || 0;
+      if (confirmed === 0) return;   // only count listings the store actually bought from
       const k = String(o.created_by || 'none');
       if (!g[k]) g[k] = { rep:userName(o.created_by), products:0, listings:0, stores:new Set(), last:null };
-      g[k].products += byOrder[o.id] ?? Number(o.item_count || 0);
+      g[k].products += confirmed;
       g[k].listings += 1;
       if (o.client_id) g[k].stores.add(String(o.client_id));
       if (!g[k].last || o.order_date > g[k].last) g[k].last = o.order_date;
@@ -537,15 +613,15 @@ const REPORTS = [
   ],
   async run() {
     const orders = countedOrders(applyOrderFilters(await fetchOrders()));
-    const items  = await fetchOrderItems(orders);
-    const byOrder = {};
-    items.forEach(it => { byOrder[it.order_id] = (byOrder[it.order_id] || 0) + 1; });
+    const byOrder = await fetchConfirmedByOrder();
 
     const g = {};
     orders.forEach(o => {
+      const confirmed = byOrder[o.id] || 0;
+      if (confirmed === 0) return;   // only count listings the store actually bought from
       const k = `${o.created_by}|${o.client_id}`;
       if (!g[k]) g[k] = { rep:userName(o.created_by), store:o.client_name || 'Unknown store', products:0, listings:0, first:o.order_date, last:o.order_date };
-      g[k].products += byOrder[o.id] ?? Number(o.item_count || 0);
+      g[k].products += confirmed;
       g[k].listings += 1;
       if (o.order_date < g[k].first) g[k].first = o.order_date;
       if (o.order_date > g[k].last)  g[k].last  = o.order_date;
@@ -563,18 +639,16 @@ const REPORTS = [
     { key:'date',     label:'Date',       type:'date' },
     { key:'store',    label:'Store',      type:'text' },
     { key:'rep',      label:'Sales Rep',  type:'text' },
-    { key:'products', label:'Products',   type:'num', total:true, r:true },
+    { key:'products', label:'Confirmed Purchases', type:'num', total:true, r:true },
     { key:'status',   label:'Status',     type:'badge' },
     { key:'created',  label:'Submitted',  type:'datetime' },
   ],
   async run() {
-    const orders = applyOrderFilters(await fetchOrders());
-    const items  = await fetchOrderItems(orders);
-    const byOrder = {};
-    items.forEach(it => { byOrder[it.order_id] = (byOrder[it.order_id] || 0) + 1; });
+    const orders  = applyOrderFilters(await fetchOrders());
+    const byOrder = await fetchConfirmedByOrder();
     return orders.map(o => ({
       ref: o.order_ref, date: o.order_date, store: o.client_name || '—',
-      rep: userName(o.created_by), products: byOrder[o.id] ?? Number(o.item_count || 0),
+      rep: userName(o.created_by), products: byOrder[o.id] || 0,
       status: o.status, created: o.created_at,
     }));
   },
@@ -621,15 +695,15 @@ const REPORTS = [
     { key:'reps',     label:'Reps Active',     type:'num', r:true },
   ],
   async run() {
-    const orders = countedOrders(applyOrderFilters(await fetchOrders()));
-    const items  = await fetchOrderItems(orders);
-    const byOrder = {};
-    items.forEach(it => { byOrder[it.order_id] = (byOrder[it.order_id] || 0) + 1; });
+    const orders  = countedOrders(applyOrderFilters(await fetchOrders()));
+    const byOrder = await fetchConfirmedByOrder();
     const g = {};
     orders.forEach(o => {
+      const confirmed = byOrder[o.id] || 0;
+      if (confirmed === 0) return;   // only count listings the store actually bought from
       const k = o.order_date;
       if (!g[k]) g[k] = { date:k, products:0, listings:0, stores:new Set(), reps:new Set() };
-      g[k].products += byOrder[o.id] ?? Number(o.item_count || 0);
+      g[k].products += confirmed;
       g[k].listings += 1;
       if (o.client_id)  g[k].stores.add(String(o.client_id));
       if (o.created_by) g[k].reps.add(String(o.created_by));
@@ -821,16 +895,16 @@ const REPORTS = [
   ],
   async run() {
     const orders  = countedOrders(applyOrderFilters(await fetchOrders()));
-    const items   = await fetchOrderItems(orders);
     const payouts = await fetchPayouts();
-    const byOrder = {};
-    items.forEach(it => { byOrder[it.order_id] = (byOrder[it.order_id] || 0) + 1; });
+    const byOrder = await fetchConfirmedByOrder();
 
     const g = {};
     orders.forEach(o => {
+      const confirmed = byOrder[o.id] || 0;
+      if (confirmed === 0) return;   // points are only earned on confirmed purchases
       const k = String(o.created_by || 'none');
       if (!g[k]) g[k] = { rep:userName(o.created_by), earned:0, redeemed:0, listings:0 };
-      g[k].earned  += (byOrder[o.id] ?? Number(o.item_count || 0)) * CFG.pointsPerItem;
+      g[k].earned  += confirmed * CFG.pointsPerItem;
       g[k].listings += 1;
     });
     payouts.filter(p => ['approved','paid'].includes(p.status)).forEach(p => {
@@ -1071,9 +1145,265 @@ const REPORTS = [
       })).sort((a, b) => String(a.start).localeCompare(String(b.start)));
   },
 },
+
+// ── STOCK POSITION ────────────────────────────────────────────────────────
+// Reps don't decide to run these — an admin switches Stock Position on for
+// whoever should be counting (Stock Position → Who can count stock), so
+// every row below is built from what that chosen set of people submitted.
+{
+  id:'stock-by-store', ranked:true, cat:'Stock', name:'Stock Position by Store',
+  desc:'Every store counted in the period, ranked by sellable units on the shelf.',
+  filters:['rep','stockstatus'],
+  cols:[
+    { key:'store',    label:'Store',          type:'text' },
+    { key:'sellable', label:'Sellable Units', type:'num', total:true, r:true },
+    { key:'skus',     label:'SKUs Closed',    type:'num', total:true, r:true },
+    { key:'damaged',  label:'Damaged',        type:'num', total:true, r:true },
+    { key:'oos',      label:'Out of Stock',   type:'num', total:true, r:true },
+    { key:'lowCrit',  label:'Low / Critical', type:'num', total:true, r:true },
+    { key:'reps',     label:'Reps Counting',  type:'num', r:true },
+    { key:'visits',   label:'Visits',         type:'num', total:true, r:true },
+    { key:'last',     label:'Last Counted',   type:'date' },
+  ],
+  async run() {
+    const counts = applyStockCountFilters(await fetchStockCounts());
+    const items  = await fetchStockCountItems(counts);
+    const cMap = {}; counts.forEach(c => { cMap[c.id] = c; });
+    const f = S.filters;
+
+    const g = {};
+    items.forEach(it => {
+      const c = cMap[it.count_id]; if (!c) return;
+      if (f.status && it.status !== f.status) return;
+      const k = String(c.client_id || 'none');
+      if (!g[k]) g[k] = { store:c.client_name || 'Unknown store', sellable:0, skus:0, damaged:0, oos:0, lowCrit:0, reps:new Set(), visits:new Set(), last:null };
+      g[k].sellable += Number(it.sellable || 0);
+      g[k].skus     += 1;
+      g[k].damaged  += Number(it.damaged || 0);
+      if (it.status === 'Out of stock') g[k].oos += 1;
+      if (it.status === 'Low' || it.status === 'Critical') g[k].lowCrit += 1;
+      if (c.user_id) g[k].reps.add(String(c.user_id));
+      g[k].visits.add(String(c.id));
+      const day = (c.counted_at || '').split('T')[0];
+      if (!g[k].last || day > g[k].last) g[k].last = day;
+    });
+    return Object.values(g).map(r => ({
+      store: r.store, sellable: r.sellable, skus: r.skus, damaged: r.damaged,
+      oos: r.oos, lowCrit: r.lowCrit, reps: r.reps.size, visits: r.visits.size, last: r.last,
+    })).sort((a, b) => b.sellable - a.sellable);
+  },
+},
+
+{
+  id:'stock-by-rep', ranked:true, cat:'Stock', name:'Stock Position by Rep',
+  desc:'Who is actually doing the counting — SKUs closed, stores covered, and what they found.',
+  filters:['store','stockstatus'],
+  cols:[
+    { key:'rep',      label:'Counted By',     type:'text' },
+    { key:'skus',     label:'SKUs Closed',    type:'num', total:true, r:true },
+    { key:'sellable', label:'Sellable Units', type:'num', total:true, r:true },
+    { key:'damaged',  label:'Damaged',        type:'num', total:true, r:true },
+    { key:'oos',      label:'Out of Stock',   type:'num', total:true, r:true },
+    { key:'stores',   label:'Stores Covered', type:'num', r:true },
+    { key:'visits',   label:'Visits',         type:'num', total:true, r:true },
+    { key:'last',     label:'Last Active',    type:'date' },
+  ],
+  async run() {
+    const counts = applyStockCountFilters(await fetchStockCounts());
+    const items  = await fetchStockCountItems(counts);
+    const cMap = {}; counts.forEach(c => { cMap[c.id] = c; });
+    const f = S.filters;
+
+    const g = {};
+    items.forEach(it => {
+      const c = cMap[it.count_id]; if (!c) return;
+      if (f.status && it.status !== f.status) return;
+      const k = String(c.user_id || 'none');
+      if (!g[k]) g[k] = { rep:c.user_name || userName(c.user_id), skus:0, sellable:0, damaged:0, oos:0, stores:new Set(), visits:new Set(), last:null };
+      g[k].skus     += 1;
+      g[k].sellable += Number(it.sellable || 0);
+      g[k].damaged  += Number(it.damaged || 0);
+      if (it.status === 'Out of stock') g[k].oos += 1;
+      if (c.client_id) g[k].stores.add(String(c.client_id));
+      g[k].visits.add(String(c.id));
+      const day = (c.counted_at || '').split('T')[0];
+      if (!g[k].last || day > g[k].last) g[k].last = day;
+    });
+    return Object.values(g).map(r => ({
+      rep: r.rep, skus: r.skus, sellable: r.sellable, damaged: r.damaged,
+      oos: r.oos, stores: r.stores.size, visits: r.visits.size, last: r.last,
+    })).sort((a, b) => b.skus - a.skus);
+  },
+},
+
+{
+  id:'stock-count-detail', cat:'Stock', name:'Stock Count Detail',
+  desc:'Every stock position submitted in the period, one row per store visit.',
+  filters:['rep','store'],
+  cols:[
+    { key:'ref',       label:'Reference',    type:'text' },
+    { key:'date',      label:'Date',         type:'date' },
+    { key:'store',     label:'Store',        type:'text' },
+    { key:'rep',       label:'Counted By',   type:'text' },
+    { key:'skus',      label:'SKUs Closed',  type:'num', total:true, r:true },
+    { key:'sellable',  label:'Sellable',     type:'num', total:true, r:true },
+    { key:'damaged',   label:'Damaged',      type:'num', total:true, r:true },
+    { key:'oos',       label:'Out of Stock', type:'num', total:true, r:true },
+    { key:'submitted', label:'Submitted',    type:'datetime' },
+  ],
+  async run() {
+    const counts = applyStockCountFilters(await fetchStockCounts());
+    return counts.map(c => ({
+      ref: c.ref, date: (c.counted_at || '').split('T')[0], store: c.client_name || '—',
+      rep: c.user_name || userName(c.user_id), skus: Number(c.total_skus || 0),
+      sellable: Number(c.total_sellable || 0), damaged: Number(c.total_damaged || 0),
+      oos: Number(c.oos_count || 0), submitted: c.counted_at,
+    })).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  },
+},
+
+{
+  id:'stock-item-detail', cat:'Stock', name:'Stock Item Detail',
+  desc:'One row per SKU counted — the line-by-line record behind every stock position.',
+  filters:['rep','store','stockstatus'],
+  cols:[
+    { key:'date',     label:'Date',       type:'date' },
+    { key:'store',    label:'Store',      type:'text' },
+    { key:'rep',      label:'Counted By', type:'text' },
+    { key:'sku',      label:'SKU',        type:'text' },
+    { key:'product',  label:'Product',    type:'text' },
+    { key:'opening',  label:'Opening',    type:'num', r:true },
+    { key:'closing',  label:'Closing',    type:'num', r:true },
+    { key:'damaged',  label:'Damaged',    type:'num', total:true, r:true },
+    { key:'sellable', label:'Sellable',   type:'num', total:true, r:true },
+    { key:'sold',     label:'Sold',       type:'num', total:true, r:true },
+    { key:'status',   label:'Position',   type:'badge' },
+    { key:'ref',      label:'Reference',  type:'text' },
+  ],
+  async run() {
+    const counts = applyStockCountFilters(await fetchStockCounts());
+    const items  = await fetchStockCountItems(counts);
+    const cMap = {}; counts.forEach(c => { cMap[c.id] = c; });
+    const f = S.filters;
+    return items
+      .filter(it => cMap[it.count_id] && (!f.status || it.status === f.status))
+      .map(it => {
+        const c = cMap[it.count_id];
+        return {
+          date: (c.counted_at || '').split('T')[0], store: c.client_name || '—',
+          rep: c.user_name || userName(c.user_id), sku: it.sku || '—', product: it.item_name || '—',
+          opening: Number(it.opening || 0), closing: Number(it.physical ?? it.shelf ?? 0),
+          damaged: Number(it.damaged || 0), sellable: Number(it.sellable || 0),
+          sold: it.sold == null ? null : Number(it.sold), status: it.status || '—', ref: c.ref,
+        };
+      }).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  },
+},
+
+{
+  id:'stock-daily', cat:'Stock', name:'Daily Stock Summary',
+  desc:'Stock-count activity per day — visits, stores covered and reps active.',
+  filters:['rep','store'],
+  cols:[
+    { key:'date',     label:'Date',        type:'date' },
+    { key:'visits',   label:'Visits',      type:'num', total:true, r:true },
+    { key:'skus',     label:'SKUs Closed', type:'num', total:true, r:true },
+    { key:'stores',   label:'Stores',      type:'num', r:true },
+    { key:'reps',     label:'Reps Active', type:'num', r:true },
+    { key:'sellable', label:'Sellable',    type:'num', total:true, r:true },
+    { key:'damaged',  label:'Damaged',     type:'num', total:true, r:true },
+  ],
+  async run() {
+    const counts = applyStockCountFilters(await fetchStockCounts());
+    const g = {};
+    counts.forEach(c => {
+      const k = (c.counted_at || '').split('T')[0];
+      if (!g[k]) g[k] = { date:k, visits:0, skus:0, stores:new Set(), reps:new Set(), sellable:0, damaged:0 };
+      g[k].visits   += 1;
+      g[k].skus     += Number(c.total_skus || 0);
+      g[k].sellable += Number(c.total_sellable || 0);
+      g[k].damaged  += Number(c.total_damaged || 0);
+      if (c.client_id) g[k].stores.add(String(c.client_id));
+      if (c.user_id)   g[k].reps.add(String(c.user_id));
+    });
+    return Object.values(g).map(r => ({ ...r, stores:r.stores.size, reps:r.reps.size }))
+      .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  },
+},
+
+{
+  id:'stock-reorder', ranked:true, cat:'Stock', name:'Reorder Suggestions',
+  desc:'SKUs that need restocking, based on the most recent count of each in the period.',
+  filters:['rep','store'],
+  cols:[
+    { key:'store',     label:'Store',         type:'text' },
+    { key:'sku',       label:'SKU',           type:'text' },
+    { key:'product',   label:'Product',       type:'text' },
+    { key:'sellable',  label:'Sellable Now',  type:'num', r:true },
+    { key:'suggested', label:'Suggest Order', type:'num', total:true, r:true },
+    { key:'daysCover', label:'Days Cover',    type:'num', r:true },
+    { key:'status',    label:'Position',      type:'badge' },
+    { key:'last',      label:'Last Counted',  type:'date' },
+  ],
+  async run() {
+    const counts = applyStockCountFilters(await fetchStockCounts());
+    const items  = await fetchStockCountItems(counts);
+    const cMap = {}; counts.forEach(c => { cMap[c.id] = c; });
+
+    // One row per store+SKU — only the most recently counted line survives,
+    // so a SKU counted twice in the period doesn't get double-ordered.
+    const latest = {};
+    items.forEach(it => {
+      const c = cMap[it.count_id]; if (!c) return;
+      const k = `${c.client_id}|${it.sku}`;
+      if (!latest[k] || c.counted_at > latest[k].at) latest[k] = { it, c, at: c.counted_at };
+    });
+    return Object.values(latest)
+      .filter(({ it }) => Number(it.suggested_order || 0) > 0)
+      .map(({ it, c }) => ({
+        store: c.client_name || '—', sku: it.sku || '—', product: it.item_name || '—',
+        sellable: Number(it.sellable || 0), suggested: Number(it.suggested_order || 0),
+        daysCover: it.days_cover == null ? null : Number(it.days_cover),
+        status: it.status || '—', last: (c.counted_at || '').split('T')[0],
+      })).sort((a, b) => b.suggested - a.suggested);
+  },
+},
+
+{
+  id:'stock-damage', cat:'Stock', name:'Damaged Stock Detail',
+  desc:'Every SKU with damaged units in the period, and the reason recorded for it.',
+  filters:['rep','store'],
+  cols:[
+    { key:'date',    label:'Date',       type:'date' },
+    { key:'store',   label:'Store',      type:'text' },
+    { key:'rep',     label:'Counted By', type:'text' },
+    { key:'sku',     label:'SKU',        type:'text' },
+    { key:'product', label:'Product',    type:'text' },
+    { key:'damaged', label:'Damaged',    type:'num', total:true, r:true },
+    { key:'reason',  label:'Reason',     type:'text' },
+    { key:'notes',   label:'Notes',      type:'text' },
+    { key:'ref',     label:'Reference',  type:'text' },
+  ],
+  async run() {
+    const counts = applyStockCountFilters(await fetchStockCounts());
+    const items  = await fetchStockCountItems(counts);
+    const cMap = {}; counts.forEach(c => { cMap[c.id] = c; });
+    return items
+      .filter(it => cMap[it.count_id] && Number(it.damaged || 0) > 0)
+      .map(it => {
+        const c = cMap[it.count_id];
+        return {
+          date: (c.counted_at || '').split('T')[0], store: c.client_name || '—',
+          rep: c.user_name || userName(c.user_id), sku: it.sku || '—', product: it.item_name || '—',
+          damaged: Number(it.damaged || 0), reason: it.damage_reason || '—',
+          notes: it.notes || '—', ref: c.ref,
+        };
+      }).sort((a, b) => b.damaged - a.damaged);
+  },
+},
 ];
 
-const CATEGORIES = ['Listings', 'Attendance', 'Leave', 'Wallet'];
+const CATEGORIES = ['Listings', 'Attendance', 'Leave', 'Wallet', 'Stock'];
 function reportById(id) { return REPORTS.find(r => r.id === id); }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1091,12 +1421,14 @@ const CAT_STYLE = {
   Attendance: { accent:'#0F766E', tint:'#E3F1EF', source:'Clock in / out'  },
   Leave:      { accent:'#6B3FA0', tint:'#F1EAFA', source:'Leave requests'  },
   Wallet:     { accent:'#A97406', tint:'#FAF2DE', source:'Points & payouts'},
+  Stock:      { accent:'#9A3412', tint:'#FCEEE6', source:'Stock counts'    },
 };
 const CAT_ICON = {
   Listings:   '<path d="M3 4h14M3 9h14M3 14h9"/>',
   Attendance: '<circle cx="10" cy="10" r="7.2"/><path d="M10 6v4.3l2.8 1.7"/>',
   Leave:      '<rect x="3" y="4.5" width="14" height="12.5" rx="1.6"/><path d="M3 8.5h14M6.5 2.5v4M13.5 2.5v4"/>',
   Wallet:     '<path d="M3 6.5h11a2 2 0 012 2v5a2 2 0 01-2 2H4a1 1 0 01-1-1V6.5zM3 6.5A1.5 1.5 0 014.5 5H13"/><circle cx="13.4" cy="11" r="1"/>',
+  Stock:      '<path d="M10 2.5l7 3.5v7l-7 3.5-7-3.5v-7l7-3.5z"/><path d="M3 6l7 3.5 7-3.5M10 9.5V17.5"/>',
 };
 function catIcon(cat, size) {
   return `<svg width="${size||18}" height="${size||18}" viewBox="0 0 20 20" fill="none" stroke="currentColor"
@@ -1124,7 +1456,7 @@ function renderHome() {
     <div>
       <div class="rp-kicker">Kingdom Trading Limited</div>
       <div class="rp-h1">Reports</div>
-      <div class="rp-lede">Listings, attendance and wallet figures for the whole operation — filter any report by date, rep or store, then export or print it.</div>
+      <div class="rp-lede">Listings, attendance, leave, wallet and stock-count figures for the whole operation — filter any report by date, rep or store, then export or print it.</div>
     </div>
     <div class="rp-find">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
@@ -1242,6 +1574,13 @@ function filterControls(def) {
       </select>`));
   }
 
+  if (wants.includes('stockstatus')) {
+    bits.push(chip('Stock status', `<select onchange="Reports.setFilter('status',this.value)">
+        ${['','Healthy','Low','Critical','Out of stock','Overstocked']
+          .map(x => `<option value="${x}"${f.status === x ? ' selected' : ''}>${x || 'Any status'}</option>`).join('')}
+      </select>`));
+  }
+
   return bits.join('');
 }
 
@@ -1343,6 +1682,7 @@ const CHIP_MAP = {
   submitted:'neut', fulfilled:'ok', partial:'warn', draft:'grey', cancelled:'bad',
   completed:'ok', in:'neut', pending:'warn', approved:'ok', paid:'ok', rejected:'bad',
   upcoming:'neut', active:'ok',
+  Healthy:'ok', Low:'warn', Critical:'bad', 'Out of stock':'bad', Overstocked:'neut',
 };
 
 /** The metric a ranked report is ordered by — gets the share rule under it. */
