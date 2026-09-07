@@ -10348,7 +10348,7 @@ function openActivityModal(existingId = null) {
   d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(3px);';
   const clientNames = (isSalesRep() ? visibleClients : allClients).map(c=>c.name);
   const clientOptions = clientNames.map(n=>`<option value="${n}">`).join('');
-  const typeOpts = ['Call','Meeting','Visit','Order Generation','Collections'];
+  const typeOpts = ['Call','Meeting','Visit','Order Generation','Collections','Prospecting'];
   const roField = isPunchOut ? 'readonly style="background:var(--bg2);color:var(--txt2);"' : '';
   d.innerHTML=`<div style="background:#fff;border-radius:16px;width:90%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 16px 60px rgba(0,0,0,0.25);">
     <div style="padding:18px 22px;border-bottom:0.5px solid var(--brd);display:flex;justify-content:space-between;align-items:center;">
@@ -10364,11 +10364,14 @@ function openActivityModal(existingId = null) {
           </select>
         </div>
         <div class="fg"><label class="flbl">Contact Name</label>
-          <input class="fin" id="act-contact" list="act-contact-datalist" placeholder="Type or search client name..." value="${existing?.contact_name||''}" ${roField} autocomplete="off"/>
-          <datalist id="act-contact-datalist">${clientOptions}</datalist>
+          <select class="fin" id="act-contact" onchange="toggleActContactOther()" ${isPunchOut?'disabled':''}>
+            <option value="">— Select client —</option>
+            <option value="__new__">+ Add New Client</option>
+            ${clientNames.map(n=>`<option value="${n}" ${existing?.contact_name===n?'selected':''}>${n}</option>`).join('')}
+          </select>
         </div>
+        <div class="fg ${existing && existing.contact_name && !clientNames.includes(existing.contact_name)?'':'hidden'}" id="act-contact-other-wrap" style="grid-column:1/-1;"><label class="flbl">New Client Name</label><input class="fin" id="act-contact-other" placeholder="e.g. China Town Store - Lugogo" value="${existing && !clientNames.includes(existing.contact_name)?existing.contact_name||'':''}" ${isPunchOut?'readonly style="background:var(--bg2);"':''}/></div>
         <div class="fg ${existing && !typeOpts.includes(existing.type)?'':'hidden'}" id="act-type-other-wrap" style="grid-column:1/-1;"><label class="flbl">Custom Activity Type</label><input class="fin" id="act-type-other" placeholder="e.g. Product training" value="${existing && !typeOpts.includes(existing.type)?existing.type:''}" ${isPunchOut?'readonly style="background:var(--bg2);"':''}/></div>
-        <div class="fg"><label class="flbl">Contact Number</label><input class="fin" type="tel" id="act-phone" placeholder="e.g. 0712 345 678" value="${existing?.phone||''}" ${roField}/></div>
         <div class="fg"><label class="flbl">Calendar</label><input class="fin" type="date" id="act-date" value="${existing?.date || new Date().toISOString().split('T')[0]}" ${roField}/></div>
         <div class="fg" style="grid-column:1/-1;"><label class="flbl">${isPunchOut ? 'Feedback' : 'Notes'}</label><textarea class="fin" id="act-notes" rows="3" style="resize:vertical;" placeholder="${isPunchOut ? _actFeedbackPlaceholder(existing?.type) : ''}">${isPunchOut ? '' : (existing?.notes||'')}</textarea></div>
       </div>
@@ -10392,6 +10395,11 @@ function toggleActTypeOther() {
   document.getElementById('act-type-other-wrap').classList.toggle('hidden', !isOther);
 }
 
+function toggleActContactOther() {
+  const isNew = document.getElementById('act-contact').value === '__new__';
+  document.getElementById('act-contact-other-wrap').classList.toggle('hidden', !isNew);
+}
+
 function _actFeedbackPlaceholder(type) {
   const prompts = {
     'Call': 'What was discussed on the call? Any follow-up needed?',
@@ -10408,8 +10416,9 @@ async function punchInActivity() {
   const type = typeSel === '__other__' ? document.getElementById('act-type-other').value.trim() : typeSel;
   if (!type) { alert('Please specify the activity type.'); return; }
 
-  const contact_name = document.getElementById('act-contact').value.trim();
-  if (!contact_name) { alert('Please select or enter a customer name.'); return; }
+  const contactSel = document.getElementById('act-contact').value;
+  const contact_name = contactSel === '__new__' ? document.getElementById('act-contact-other').value.trim() : contactSel;
+  if (!contact_name) { alert('Please select an existing client or add a new one.'); return; }
 
   const btn = document.getElementById('act-punchin-btn');
   const statusEl = document.getElementById('act-punchin-status');
