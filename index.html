@@ -5915,20 +5915,19 @@ async function _startLocationBroadcast() {
 
 async function _pushLiveLocation() {
   if (!currentUser?.id) return;
-  // Skip if page is hidden (tab is in background) to save battery,
-  // but still push when visible on ANY tab
   try {
-    const loc = await Promise.race([
-      _attGetLocation(),
-      new Promise(resolve => setTimeout(() => resolve(null), 8000))
-    ]);
-    if (!loc) return;
-    _attCurrentLocation = loc;
+    // Don't start a second, competing GPS fetch here. _attGetLocation()
+    // relies on shared status flags, and running it at the same time as
+    // the foreground screen's own fetch causes them to overwrite each
+    // other — which is exactly what was flipping a good address back
+    // to the office fallback a few seconds after it first showed correctly.
+    // Just re-broadcast whatever the foreground already confirmed as real.
+    if (!_attCurrentLocation || !_attLocationIsReal) return;
     await sb.from('live_locations').upsert({
       employee_id:   currentUser.id,
       employee_name: currentUser.full_name || 'Unknown',
-      lat:           loc[0],
-      lng:           loc[1],
+      lat:           _attCurrentLocation[0],
+      lng:           _attCurrentLocation[1],
       updated_at:    new Date().toISOString(),
     }, { onConflict: 'employee_id' });
   } catch(e) {
@@ -9271,8 +9270,9 @@ document.getElementById('att-reg-btn')?.addEventListener('click', async () => {
 // ── Clock In / Out ────────────────────────────────────────────
 async function _attRecordClock(mode) {
   const now = new Date();
-  const loc  = _attCurrentLocation;
-  const addr = loc ? await _attReverseGeocode(loc[0], loc[1]) : '';
+  const loc = await _attGetVerifiedLocation();
+  if (!loc) return;
+  const addr = await _attReverseGeocode(loc[0], loc[1]);
 
   // Get the user from Supabase directly to ensure the ID matches
   const storedUser = JSON.parse(localStorage.getItem('ktl_user') || '{}');
@@ -9567,6 +9567,20 @@ function _attGetLocation() {
 
     const timer = setTimeout(finish, MAX_WAIT_MS);
   });
+}
+
+// Wraps _attGetLocation() with a real-fix check. Returns [lat,lng] only when
+// a genuine device GPS reading was obtained — returns null and alerts the
+// user if GPS failed, so the office fallback point never gets silently
+// saved as someone's real location.
+async function _attGetVerifiedLocation() {
+  const loc = await _attGetLocation();
+  if (!_attLocationIsReal) {
+    alert('⚠️ ' + (_attLocationError || 'Could not get your location.') +
+      '\n\nPlease move somewhere with a clearer GPS signal (near a window or outdoors) and try again. Nothing was recorded.');
+    return null;
+  }
+  return loc;
 }
 
 async function _attRetryLocation() {
@@ -10425,7 +10439,8 @@ async function punchInActivity() {
   btn.disabled = true; btn.textContent = 'Punching in…';
   statusEl.style.display = 'block';
 
-  const loc  = await _attGetLocation();
+  const loc = await _attGetVerifiedLocation();
+  if (!loc) { btn.disabled = false; btn.textContent = '📍 Punch In'; statusEl.style.display = 'none'; return; }
   const addr = await _attReverseGeocode(loc[0], loc[1]);
 
   const act = {
@@ -10462,7 +10477,8 @@ async function confirmPunchOut(actId) {
   statusEl.style.display = 'block';
 
   const feedback = document.getElementById('act-notes').value.trim();
-  const loc  = await _attGetLocation();
+  const loc = await _attGetVerifiedLocation();
+  if (!loc) { btn.disabled = false; btn.textContent = '🏁 Punch Out'; statusEl.style.display = 'none'; return; }
   const addr = await _attReverseGeocode(loc[0], loc[1]);
 
   act.status = 'Completed';
@@ -10483,7 +10499,8 @@ async function punchOutActivity(actId) {
   if (!act) return;
   if (!confirm(`Punch out of "${act.subject}" at ${act.contact_name}?`)) return;
 
-  const loc  = await _attGetLocation();
+  const loc = await _attGetVerifiedLocation();
+  if (!loc) return;
   const addr = await _attReverseGeocode(loc[0], loc[1]);
 
   act.status = 'Completed';
