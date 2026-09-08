@@ -9674,12 +9674,12 @@ async function _geoBigDataCloud(lat, lng) {
 
 // Google Reverse Geocoding — primary provider. Falls back to free providers
 // automatically if this returns null (e.g. quota hit, key issue, no result).
-const GOOGLE_GEOCODE_KEY = 'PASTE_YOUR_RESTRICTED_API_KEY_HERE';
+const GOOGLE_GEOCODE_KEY = 'AIzaSyB7wh9D-EtqxsI7sWYrbu0oGW0hyd-xqbo';
 
 async function _geoGoogle(lat, lng) {
   if (!GOOGLE_GEOCODE_KEY) return null;
   const d = await _geoFetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_GEOCODE_KEY}`);
-  if (!d || d.status !== 'OK' || !d.results?.length) return null;
+  if (!d || d.status !== 'OK' || !d.results?.length) { console.warn('[geocode] Google failed:', d?.status, d?.error_message); return null; }
   return d.results[0].formatted_address || null;
 }
 
