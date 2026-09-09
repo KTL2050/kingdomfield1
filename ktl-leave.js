@@ -21,6 +21,7 @@ const CFG = {
   excludeWeekends: false,   // set true to count Mon–Fri only as leave days
   notifPollMs:     60000,   // how often the bell refreshes
   maxAttachmentMB: 5,
+  annualLeaveDays: 21,      // days granted to each person per calendar year
 };
 
 const STATUS_LABEL = {
@@ -348,11 +349,12 @@ async function audit(requestId, action, fromStatus, toStatus, note) {
 //  NOTIFICATIONS — topbar bell
 // ═══════════════════════════════════════════════════════════════════════════
 const NOTIF_META = {
-  new_request: { icon:'📥', color:'#854F0B' },
-  approved:    { icon:'✅', color:'#3B6D11' },
-  rejected:    { icon:'❌', color:'#A32D2D' },
-  cancelled:   { icon:'🚫', color:'#6b6b67' },
-  upcoming:    { icon:'📅', color:'#2451a0' },
+  new_request:     { icon:'📥', color:'#854F0B' },
+  approved:        { icon:'✅', color:'#3B6D11' },
+  rejected:        { icon:'❌', color:'#A32D2D' },
+  cancelled:       { icon:'🚫', color:'#6b6b67' },
+  upcoming:        { icon:'📅', color:'#2451a0' },
+  stock_submitted: { icon:'📦', color:'#1D9E75' },
 };
 
 function mountBell() {
@@ -501,6 +503,22 @@ function myRequests() {
   return S.requests.filter(r => String(r.employee_id) === String(u?.id));
 }
 
+/** Days left out of the annual grant for a given employee, based on this year's approved leave. */
+function balanceFor(employeeId) {
+  const year = new Date().getFullYear();
+  const used = S.requests
+    .filter(r => String(r.employee_id) === String(employeeId) && r.status === 'approved'
+              && parseD(r.start_date).getFullYear() === year)
+    .reduce((s, r) => s + (r.days_count || 0), 0);
+  return Math.max(0, CFG.annualLeaveDays - used);
+}
+
+/** Same thing, for whoever is signed in right now. */
+function remainingLeaveDays() {
+  const u = me();
+  return balanceFor(u?.id);
+}
+
 // ─── SALES REP VIEW ────────────────────────────────────────────────────────
 function renderRep() {
   const mine    = myRequests();
@@ -509,6 +527,7 @@ function renderRep() {
   const approved= mine.filter(r => r.status === 'approved');
   const taken   = approved.filter(r => r.end_date < todayISO() && parseD(r.start_date).getFullYear() === year)
                           .reduce((s, r) => s + (r.days_count || 0), 0);
+  const remaining = remainingLeaveDays();
   const upcoming= approved.filter(r => r.start_date > todayISO());
   const onLeave = approved.find(r => covers(r, todayISO()));
 
@@ -550,6 +569,7 @@ function renderRep() {
   </div>
   ${banner}
   <div class="lv-stats">
+    ${stat(remaining, 'Days remaining', `Of ${CFG.annualLeaveDays} for ${year}`, remaining <= 3 ? '#A32D2D' : '#1D9E75')}
     ${stat(pending.length, 'Pending', pending.length ? 'Waiting for approval' : 'Nothing waiting', '#854F0B')}
     ${stat(approved.length, 'Approved', 'All time', '#3B6D11')}
     ${stat(taken, 'Days taken', `Completed in ${year}`, 'var(--royal)')}
@@ -650,6 +670,11 @@ function renderOverview() {
   const oldest = pending.length ? Math.floor((Date.now() - new Date(
     pending.map(r => r.requested_at).sort()[0]).getTime()) / 86400000) : 0;
 
+  const balances = S.users
+    .filter(u => u.is_active !== false && (S.teamIds === null || S.teamIds.includes(String(u.id))))
+    .map(u => ({ ...u, remaining: balanceFor(u.id) }))
+    .sort((a, b) => a.remaining - b.remaining);
+
   return `
   <div class="lv-stats">
     ${stat(pending.length, 'Awaiting you', pending.length ? `Oldest waiting ${oldest} day${oldest === 1 ? '' : 's'}` : 'Queue is clear', '#854F0B')}
@@ -679,7 +704,14 @@ function renderOverview() {
     <div class="card-hdr"><span class="card-title">Waiting for your decision</span>
       <button class="btn btn-sm" onclick="Leave.setTab('approvals')">Open all →</button></div>
     ${pending.slice(0, 3).map(approvalCard).join('')}
-  </div>` : ''}`;
+  </div>` : ''}
+
+  <div class="card" style="margin-top:14px;margin-bottom:0;">
+    <div class="card-hdr"><span class="card-title">Leave balances</span>
+      <span style="font-size:11px;color:var(--txt3);">${new Date().getFullYear()} · ${CFG.annualLeaveDays} days each</span></div>
+    ${balances.length ? balances.map(balanceRow).join('')
+      : `<div class="empty-state" style="padding:24px;">No one in scope yet.</div>`}
+  </div>`;
 }
 
 function personRow(r, note) {
@@ -687,13 +719,33 @@ function personRow(r, note) {
   return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--brd);cursor:pointer;" onclick="Leave.openDetail('${r.id}')">
     <div class="lv-av">${initials(name)}</div>
     <div style="flex:1;min-width:0;">
-      <div style="font-size:12.5px;font-weight:600;">${esc(name)}</div>
-      <div style="font-size:11px;color:var(--txt2);margin-top:1px;">
-        <span style="width:7px;height:7px;border-radius:2px;background:${typeColor(r)};display:inline-block;margin-right:5px;"></span>
+      <div style="font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(name)}</div>
+      <div style="font-size:11px;color:var(--txt2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        <span style="width:7px;height:7px;border-radius:2px;background:${typeColor(r)};display:inline-block;margin-right:5px;flex-shrink:0;"></span>
         ${esc(r.leave_type_name || '')} · ${note}
       </div>
     </div>
-    <span style="font-size:11px;font-weight:600;color:var(--txt3);">${r.days_count}d</span>
+    <span style="flex-shrink:0;white-space:nowrap;font-size:11px;font-weight:600;color:var(--txt3);background:var(--bg2);padding:4px 9px;border-radius:20px;">${r.days_count}d</span>
+  </div>`;
+}
+
+function balanceRow(u) {
+  const used = CFG.annualLeaveDays - u.remaining;
+  const pct  = Math.min(100, Math.round((used / CFG.annualLeaveDays) * 100));
+  const tone = u.remaining <= 3 ? '#A32D2D' : u.remaining <= 7 ? '#854F0B' : '#3B6D11';
+  const tint = u.remaining <= 3 ? 'rgba(163,45,45,.1)' : u.remaining <= 7 ? 'rgba(133,79,11,.1)' : 'rgba(59,109,17,.1)';
+  return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
+    <div class="lv-av">${initials(u.full_name)}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(u.full_name)}</div>
+      <div style="height:5px;border-radius:3px;background:var(--bg2);margin-top:6px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;border-radius:3px;background:${tone};"></div>
+      </div>
+    </div>
+    <div style="flex-shrink:0;white-space:nowrap;padding:4px 10px;border-radius:20px;background:${tint};">
+      <span style="font-size:12px;font-weight:700;color:${tone};">${u.remaining}</span>
+      <span style="font-size:10.5px;color:var(--txt3);"> / ${CFG.annualLeaveDays} left</span>
+    </div>
   </div>`;
 }
 
@@ -1215,9 +1267,12 @@ function recalc() {
   const wd = countWorkingDays(s, e);
   const t  = S.types.find(x => x.id === document.getElementById('lv-f-type')?.value);
   const over = t?.max_days_per_request && d > t.max_days_per_request;
-  box.className = over ? 'alert aw' : 'alert ai';
+  const remaining = remainingLeaveDays();
+  const overBalance = d > remaining;
+  box.className = (over || overBalance) ? 'alert aw' : 'alert ai';
   txt.innerHTML = `<strong>${d} day${d === 1 ? '' : 's'}</strong> of leave · ${wd} working day${wd === 1 ? '' : 's'}
-    ${over ? `<br>That is over the ${t.max_days_per_request}-day limit for ${esc(t.name)}.` : ''}`;
+    ${over ? `<br>That is over the ${t.max_days_per_request}-day limit for ${esc(t.name)}.` : ''}
+    ${overBalance ? `<br>You only have ${remaining} day${remaining === 1 ? '' : 's'} left of your ${CFG.annualLeaveDays}-day annual balance.` : ''}`;
 }
 
 function formErr(msg) {
