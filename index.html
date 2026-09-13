@@ -8757,12 +8757,22 @@ function loadAttPunchList() {
   if (!isSalesRep()) _loadAdminFieldVisits();      // admin/manager: all staff, from Supabase
 }
 
-function _renderAttPunchList(elId) {
+async function _renderAttPunchList(elId) {
   const el = document.getElementById(elId);
   if (!el) return;
-  const mine = crmActivities.filter(a => a.created_by === currentUser?.id);
-  const active = mine.filter(a => a.status === 'Punched In');
-  const recent = mine.filter(a => a.status === 'Completed').slice(0, 5);
+  el.innerHTML = '<div class="empty-state" style="padding:16px;">Loading…</div>';
+
+  const today = new Date().toISOString().split('T')[0];
+  const { data, error } = await sb.from('field_visits').select('*')
+    .eq('employee_id', currentUser?.id)
+    .gte('punch_in_time', today + 'T00:00:00')
+    .order('punch_in_time', { ascending: false });
+
+  if (error) { el.innerHTML = `<div class="empty-state" style="padding:16px;color:#A32D2D;">Error: ${error.message}</div>`; return; }
+
+  const rows = data || [];
+  const active = rows.filter(a => a.status === 'Punched In');
+  const recent = rows.filter(a => a.status === 'Completed').slice(0, 5);
 
   if (active.length === 0 && recent.length === 0) {
     el.innerHTML = '<div class="empty-state" style="padding:16px;">No visits logged yet today.</div>';
@@ -8777,7 +8787,7 @@ function _renderAttPunchList(elId) {
     html += `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
       <div style="font-size:20px;">${icon(a.type)}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.subject||''}</div>
+        <div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.contact_name||''}</div>
         <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${a.contact_name||'—'} · since ${inTime}</div>
         ${a.punch_in_location?`<div style="font-size:10.5px;color:var(--royal);margin-top:3px;">📍 ${a.punch_in_location}</div>`:''}
       </div>
@@ -8794,7 +8804,7 @@ function _renderAttPunchList(elId) {
     html += `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
       <div style="font-size:20px;">${icon(a.type)}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.subject||''}</div>
+        <div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.contact_name||''}</div>
         <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${a.contact_name||'—'} · ${inTime} → ${outTime}${duration?` · ${duration}`:''}</div>
       </div>
       <span class="badge bg" style="align-self:flex-start;">Completed</span>
@@ -10412,9 +10422,17 @@ function filterActivities() {
     }).join('');
 }
 
-function openActivityModal(existingId = null) {
+async function openActivityModal(existingId = null) {
   const isPunchOut = !!existingId;
-  const existing = isPunchOut ? crmActivities.find(a => a.id === existingId) : null;
+  let existing = null;
+  if (isPunchOut) {
+    existing = crmActivities.find(a => a.id === existingId) || null;
+    if (!existing) {
+      const { data } = await sb.from('field_visits').select('*').eq('id', existingId).maybeSingle();
+      if (data) existing = { ...data, date: data.punch_in_time ? data.punch_in_time.split('T')[0] : new Date().toISOString().split('T')[0] };
+    }
+    if (!existing) { alert('Could not find that visit — it may already be punched out.'); loadAttPunchList?.(); return; }
+  }
   const d=document.createElement('div'); d.id='crm-activity-modal';
   d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(3px);';
   const clientNames = (isSalesRep() ? visibleClients : allClients).map(c=>c.name);
@@ -10534,8 +10552,7 @@ async function punchInActivity() {
 }
 
 async function confirmPunchOut(actId) {
-  const act = crmActivities.find(a => a.id === actId);
-  if (!act) return;
+  const act = crmActivities.find(a => a.id === actId); // may be null if punched in on another device — that's fine now
 
   const btn = document.getElementById('act-punchin-btn');
   const statusEl = document.getElementById('act-punchin-status');
@@ -10546,20 +10563,28 @@ async function confirmPunchOut(actId) {
   const loc = await _attGetVerifiedLocation();
   if (!loc) { btn.disabled = false; btn.textContent = '🏁 Punch Out'; statusEl.style.display = 'none'; return; }
   const addr = await _attReverseGeocode(loc[0], loc[1]);
+  const punchOutTime = new Date().toISOString();
 
-  act.status = 'Completed';
-  act.feedback = feedback;
-  act.punch_out_time = new Date().toISOString();
-  act.punch_out_lat = loc[0]; act.punch_out_lng = loc[1];
-  act.punch_out_location = addr;
+  if (act) {
+    act.status = 'Completed';
+    act.feedback = feedback;
+    act.punch_out_time = punchOutTime;
+    act.punch_out_lat = loc[0]; act.punch_out_lng = loc[1];
+    act.punch_out_location = addr;
+    saveCRM('activities', crmActivities);
+  }
 
-  saveCRM('activities', crmActivities);
+  const { error } = await sb.from('field_visits').update({
+    status: 'Completed', feedback,
+    punch_out_time: punchOutTime, punch_out_lat: loc[0],
+    punch_out_lng: loc[1], punch_out_location: addr,
+  }).eq('id', actId);
 
-  sb.from('field_visits').update({
-    status: 'Completed', feedback: act.feedback,
-    punch_out_time: act.punch_out_time, punch_out_lat: act.punch_out_lat,
-    punch_out_lng: act.punch_out_lng, punch_out_location: act.punch_out_location,
-  }).eq('id', act.id).then(({ error }) => { if (error) console.error('field_visits sync failed:', error.message); });
+  if (error) {
+    alert('❌ Punch-out failed to save: ' + error.message);
+    btn.disabled = false; btn.textContent = '🏁 Punch Out'; statusEl.style.display = 'none';
+    return;
+  }
 
   document.getElementById('crm-activity-modal')?.remove();
   if (currentScreen === 'crm-activities') loadActivitiesScreen();
