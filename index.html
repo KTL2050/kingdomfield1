@@ -752,8 +752,8 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
             </div>
             <div style="background:var(--bg);border:0.5px solid var(--brd);border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07);margin-bottom:0;">
               <div style="padding:16px 18px 14px;border-bottom:0.5px solid var(--brd);">
-                <div style="font-size:15px;font-weight:700;color:var(--txt);">My Attendance Today</div>
-                <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Your personal clock in/out record</div>
+<div style="font-size:15px;font-weight:700;color:var(--txt);">Who's Clocked In</div>
+<div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Live view of staff punches today</div>
               </div>
               <div id="att-my-card-admin"></div>
             </div>
@@ -764,14 +764,35 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
             <div style="padding:16px 18px 14px;border-bottom:0.5px solid var(--brd);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
               <div>
                 <div style="font-size:15px;font-weight:700;color:var(--txt);">Field Visits</div>
-                <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Punch in when you reach a stop, punch out when you leave</div>
+                <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Where your sales team has punched in/out</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center;">
                 <button onclick="exportFieldVisitsExcel()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;background:var(--gold-mid);color:#fff;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;box-shadow:0 2px 6px rgba(212,160,23,0.3);">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   Export Excel
                 </button>
-                <button onclick="openActivityModal()" style="display:flex;align-items:center;gap:6px;padding:8px 15px;border-radius:9px;background:var(--royal);color:#fff;border:none;cursor:pointer;font-size:12.5px;font-weight:700;font-family:inherit;box-shadow:0 2px 8px rgba(26,58,107,0.3);">📍 Punch In</button>
+              </div>
+            </div>
+            <div style="padding:12px 18px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <label style="font-size:9.5px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;">Range</label>
+                <select id="fv-range-preset" onchange="onFvRangePresetChange()" style="padding:8px 10px;border:0.5px solid var(--brd2);border-radius:9px;font-size:12px;font-family:inherit;background:var(--bg2);color:var(--txt);cursor:pointer;">
+                  <option value="today" selected>Today</option>
+                  <option value="yesterday">Yesterday</option>
+                  <option value="this_week">This Week</option>
+                  <option value="last7">Last 7 Days</option>
+                  <option value="this_month">This Month</option>
+                  <option value="last30">Last 30 Days</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <label style="font-size:9.5px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;">From</label>
+                <input type="date" id="fv-filter-from" onchange="onFvCustomDateChange()" style="padding:8px 10px;border:0.5px solid var(--brd2);border-radius:9px;font-size:12px;font-family:inherit;outline:none;background:var(--bg2);color:var(--txt);width:150px;"/>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <label style="font-size:9.5px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;">To</label>
+                <input type="date" id="fv-filter-to" onchange="onFvCustomDateChange()" style="padding:8px 10px;border:0.5px solid var(--brd2);border-radius:9px;font-size:12px;font-family:inherit;outline:none;background:var(--bg2);color:var(--txt);width:150px;"/>
               </div>
             </div>
             <div id="att-punch-list-admin" style="padding:6px 18px 14px;">
@@ -8259,13 +8280,18 @@ async function loadAttendanceScreen() {
 async function _loadAdminAttendanceView() {
   // Start real-time greeting & clock
   _startAttAdminClock();
-  loadAttPunchList();
 
   const today = new Date().toISOString().split('T')[0];
   const { from: _attInitFrom, to: _attInitTo } = _attGetRangeDates('this_week');
   document.getElementById('att-range-preset').value = 'this_week';
   document.getElementById('att-filter-from').value = _attInitFrom;
   document.getElementById('att-filter-to').value = _attInitTo;
+
+  const { from: _fvInitFrom, to: _fvInitTo } = _fvGetRangeDates('today');
+  document.getElementById('fv-range-preset').value = 'today';
+  document.getElementById('fv-filter-from').value = _fvInitFrom;
+  document.getElementById('fv-filter-to').value = _fvInitTo;
+  loadAttPunchList();
 
   // Load all users
   const { data: allUsers } = await sb.from('users').select('id,full_name,role').order('full_name');
@@ -8289,8 +8315,8 @@ async function _loadAdminAttendanceView() {
   document.getElementById('att-clocked-out').textContent = clockedOut.length;
   document.getElementById('att-late').textContent        = lateArr.length;
 
-  // My own attendance card (admin clocking in for themselves)
-  _renderAdminMyCard();
+  // Team view — who has punched in/out today (admins/managers don't punch themselves)
+  _renderAdminMyCard(records);
 
   // Map
   setTimeout(() => { _initAttAdminMap(records); }, 100);
@@ -8299,78 +8325,29 @@ async function _loadAdminAttendanceView() {
   loadAttendanceTable();
 }
 
-function _renderAdminMyCard() {
+function _renderAdminMyCard(records) {
   const el = document.getElementById('att-my-card-admin');
-  el.innerHTML = `
-    <div style="padding:18px;">
-      <!-- Clock In / Out columns -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
-        <div style="background:#F0F4FF;border-radius:12px;padding:16px;text-align:center;border:1.5px solid #C7D7F8;">
-          <div style="font-size:9.5px;font-weight:800;letter-spacing:.1em;color:#4A6FD4;margin-bottom:12px;">CLOCK IN</div>
-          <div id="att-admin-fp" onclick="openAttFaceModal('in')"
-            style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#4A6FD4,#2451a0);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 16px rgba(74,111,212,0.4);"
-            onmouseover="this.style.transform='scale(1.06)';this.style.boxShadow='0 6px 22px rgba(74,111,212,0.5)'"
-            onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(74,111,212,0.4)'">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-          </div>
-          <div style="font-size:13px;font-weight:800;color:#4A6FD4;" id="att-admin-in">--:--</div>
-          <div style="font-size:10px;color:#7a93c8;margin-top:2px;" id="att-admin-status-lbl">Not clocked in</div>
-        </div>
-        <div style="background:#F7F8FA;border-radius:12px;padding:16px;text-align:center;border:1.5px solid var(--brd);">
-          <div style="font-size:9.5px;font-weight:800;letter-spacing:.1em;color:var(--txt3);margin-bottom:12px;">CLOCK OUT</div>
-          <div onclick="openAttFaceModal('out')"
-            style="width:64px;height:64px;border-radius:50%;background:#E2E8F0;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;cursor:pointer;transition:transform .15s;border:2px dashed #CBD5E0;"
-            onmouseover="this.style.transform='scale(1.06)'"
-            onmouseout="this.style.transform=''">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-          </div>
-          <div style="font-size:13px;font-weight:800;color:var(--txt3);" id="att-admin-out">--:--</div>
-          <div style="font-size:10px;color:var(--txt3);margin-top:2px;" id="att-admin-time-lbl">Not yet</div>
-        </div>
-      </div>
-
-      <!-- Info grid -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 0;border-top:0.5px solid var(--brd);border-bottom:0.5px solid var(--brd);margin-bottom:14px;">
-        <div>
-          <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Location</div>
-          <div style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;" id="att-admin-loc">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4A6FD4" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            Detecting…
-          </div>
-          <button id="att-admin-enable-loc-btn" onclick="_attRetryLocation()" style="display:none;margin-top:5px;padding:3px 9px;border-radius:7px;background:#4A6FD4;color:#fff;border:none;font-size:9.5px;font-weight:600;cursor:pointer;font-family:inherit;">📍 Enable</button>
-        </div>
-        <div>
-          <div style="font-size:10px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Total Hours</div>
-          <div style="font-size:15px;font-weight:800;color:#1D9E75;" id="att-admin-hours">--</div>
-        </div>
-      </div>
-
-      <!-- Face verification banner -->
-      <div style="background:#EEF2FF;border-radius:10px;padding:10px 13px;font-size:12px;color:#4A6FD4;display:flex;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div style="width:30px;height:30px;border-radius:8px;background:rgba(74,111,212,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4A6FD4" stroke-width="1.8"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          </div>
-          <div>
-            <div style="font-weight:700;font-size:12px;">Face verification required</div>
-            <div style="font-size:10px;opacity:0.75;margin-top:1px;">Please verify your identity to clock in or out.</div>
-          </div>
-        </div>
-        <button onclick="openAttFaceModal('in')" style="padding:6px 12px;border-radius:9px;background:#4A6FD4;color:#fff;border:none;cursor:pointer;font-size:11px;font-weight:700;font-family:inherit;white-space:nowrap;box-shadow:0 2px 8px rgba(74,111,212,0.35);">Verify Now →</button>
-      </div>
-    </div>`;
-
-  // Populate with today's record if any
-  _loadMyTodayRecord('admin');
- // Update location label
-  if (_attCurrentLocation) {
-    _attReverseGeocode(_attCurrentLocation[0], _attCurrentLocation[1]).then(addr => {
-      const el2 = document.getElementById('att-admin-loc');
-      if (el2) el2.textContent = _attLocationIsReal ? addr : '⚠ Using office default';
-      const btn = document.getElementById('att-admin-enable-loc-btn');
-      if (btn) btn.style.display = _attLocationIsReal ? 'none' : 'inline-block';
-    });
+  const rows = records || [];
+  if (rows.length === 0) {
+    el.innerHTML = `<div class="empty-state" style="padding:24px 16px;">No one has punched in yet today.</div>`;
+    return;
   }
+  el.innerHTML = rows.map(r => {
+    const inTime  = new Date(r.clock_in).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    const outTime = r.clock_out ? new Date(r.clock_out).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : null;
+    const initials = (r.employee_name || 'E').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-bottom:0.5px solid var(--brd);">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--royal-light);color:var(--royal);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;">${initials}</div>
+          <div style="font-size:12.5px;font-weight:600;">${r.employee_name || '—'}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11.5px;font-weight:700;color:#1D9E75;">In: ${inTime}</div>
+          <div style="font-size:10.5px;color:var(--txt3);">${outTime ? 'Out: ' + outTime : 'Still clocked in'}</div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 async function _loadMyTodayRecord(view) {
@@ -8625,18 +8602,25 @@ async function exportAttendanceCSV() {
 async function exportFieldVisitsExcel() {
   if (typeof ExcelJS === 'undefined') { alert('Export library did not load. Check your connection and try again.'); return; }
 
-  const presetEl = document.getElementById('att-range-preset');
-  const preset = presetEl ? presetEl.value : 'this_week';
-  const { from, to } = _attGetRangeDates(preset);
-
-  let acts = isSalesRep() ? crmActivities.filter(a => a.created_by === currentUser?.id) : crmActivities;
-  acts = acts.filter(a => {
-    const d = a.date || (a.punch_in_time ? a.punch_in_time.split('T')[0] : '');
-    return d >= from && d <= to;
-  });
+  const isRep = isSalesRep();
+  let acts, from, to;
+  if (isRep) {
+    const preset = document.getElementById('att-range-preset')?.value || 'this_week';
+    ({ from, to } = _attGetRangeDates(preset));
+    acts = crmActivities.filter(a => a.created_by === currentUser?.id).filter(a => {
+      const d = a.date || (a.punch_in_time ? a.punch_in_time.split('T')[0] : '');
+      return d >= from && d <= to;
+    });
+  } else {
+    const preset = document.getElementById('fv-range-preset')?.value || 'today';
+    ({ from, to } = _fvGetRangeDates(preset));
+    const { data } = await sb.from('field_visits').select('*')
+      .gte('punch_in_time', from + 'T00:00:00').lte('punch_in_time', to + 'T23:59:59')
+      .order('punch_in_time', { ascending: false });
+    acts = data || [];
+  }
 
   if (acts.length === 0) { alert('No field visits found for this range.'); return; }
-  if (!isSalesRep()) await _ensureRepCache();
 
   const wb = new ExcelJS.Workbook();
   wb.creator = 'KTLSALES';
@@ -8678,7 +8662,7 @@ async function exportFieldVisitsExcel() {
   acts.sort((a,b) => (b.punch_in_time||'').localeCompare(a.punch_in_time||''));
 
   acts.forEach((a, i) => {
-    const repName  = a.created_by === currentUser?.id ? (currentUser?.full_name||'Me') : (_repNameCache[a.created_by] || '—');
+        const repName  = a.employee_name || (a.created_by === currentUser?.id ? (currentUser?.full_name||'Me') : '—');
     const inTime   = a.punch_in_time  ? new Date(a.punch_in_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '—';
     const outTime  = a.punch_out_time ? new Date(a.punch_out_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : '--:--';
     const duration = (a.punch_in_time && a.punch_out_time) ? _attFormatDuration(a.punch_in_time, a.punch_out_time) : (a.status==='Punched In' ? _attRunningHours(a.punch_in_time) : '—');
@@ -8769,7 +8753,8 @@ function _startAttRepClock() {
 // SALES REP VIEW
 // ─────────────────────────────────────────────────────────────
 function loadAttPunchList() {
-  ['att-punch-list', 'att-punch-list-admin'].forEach(id => _renderAttPunchList(id));
+  _renderAttPunchList('att-punch-list');          // sales rep's own device view
+  if (!isSalesRep()) _loadAdminFieldVisits();      // admin/manager: all staff, from Supabase
 }
 
 function _renderAttPunchList(elId) {
@@ -8816,6 +8801,78 @@ function _renderAttPunchList(elId) {
     </div>`;
   });
   el.innerHTML = html;
+}
+
+function _fvGetRangeDates(preset) {
+  const today = new Date();
+  const fmt = d => d.toISOString().split('T')[0];
+  let from, to;
+  if (preset === 'today') { from = to = fmt(today); }
+  else if (preset === 'yesterday') { const d = new Date(today); d.setDate(d.getDate()-1); from = to = fmt(d); }
+  else if (preset === 'this_week') { const d = new Date(today); d.setDate(d.getDate()-d.getDay()); from = fmt(d); to = fmt(today); }
+  else if (preset === 'last7') { const d = new Date(today); d.setDate(d.getDate()-6); from = fmt(d); to = fmt(today); }
+  else if (preset === 'this_month') { from = fmt(new Date(today.getFullYear(), today.getMonth(), 1)); to = fmt(today); }
+  else if (preset === 'last30') { const d = new Date(today); d.setDate(d.getDate()-29); from = fmt(d); to = fmt(today); }
+  else {
+    from = document.getElementById('fv-filter-from')?.value || fmt(today);
+    to   = document.getElementById('fv-filter-to')?.value   || fmt(today);
+  }
+  return { from, to };
+}
+
+function onFvRangePresetChange() {
+  const preset = document.getElementById('fv-range-preset').value;
+  const fromEl = document.getElementById('fv-filter-from');
+  const toEl   = document.getElementById('fv-filter-to');
+  if (preset === 'custom') {
+    if (!fromEl.value) fromEl.value = new Date().toISOString().split('T')[0];
+    if (!toEl.value)   toEl.value   = new Date().toISOString().split('T')[0];
+    _loadAdminFieldVisits();
+    return;
+  }
+  const { from, to } = _fvGetRangeDates(preset);
+  fromEl.value = from; toEl.value = to;
+  _loadAdminFieldVisits();
+}
+
+function onFvCustomDateChange() {
+  document.getElementById('fv-range-preset').value = 'custom';
+  _loadAdminFieldVisits();
+}
+
+async function _loadAdminFieldVisits() {
+  const el = document.getElementById('att-punch-list-admin');
+  if (!el) return;
+  const preset = document.getElementById('fv-range-preset')?.value || 'today';
+  const { from, to } = _fvGetRangeDates(preset);
+  el.innerHTML = '<div class="empty-state" style="padding:16px;">Loading…</div>';
+
+  const { data, error } = await sb.from('field_visits').select('*')
+    .gte('punch_in_time', from + 'T00:00:00')
+    .lte('punch_in_time', to + 'T23:59:59')
+    .order('punch_in_time', { ascending: false });
+
+  if (error) { el.innerHTML = `<div class="empty-state" style="padding:16px;color:#A32D2D;">Error: ${error.message}</div>`; return; }
+
+  const rows = data || [];
+  if (rows.length === 0) { el.innerHTML = '<div class="empty-state" style="padding:16px;">No visits logged for this range.</div>'; return; }
+
+  const icon = t => ({Call:'📞',Meeting:'🤝',Visit:'🚶','Order Generation':'📋',Collections:'💰'}[t] || '📌');
+
+  el.innerHTML = rows.map(a => {
+    const inTime  = a.punch_in_time  ? new Date(a.punch_in_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})  : '';
+    const outTime = a.punch_out_time ? new Date(a.punch_out_time).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) : null;
+    const dateStr = a.punch_in_time ? a.punch_in_time.split('T')[0] : '';
+    return `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
+      <div style="font-size:20px;">${icon(a.type)}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12.5px;font-weight:500;">${a.employee_name || 'Unknown'} — ${a.type}: ${a.contact_name||''}</div>
+        <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${dateStr} · ${inTime}${outTime ? ' → ' + outTime : ' (still out)'}</div>
+        ${a.punch_in_location ? `<div style="font-size:10.5px;color:var(--royal);margin-top:3px;">📍 ${a.punch_in_location}</div>` : ''}
+      </div>
+      <span class="badge ${a.status==='Completed' ? 'bg' : 'ba'}" style="align-self:flex-start;">${a.status==='Completed' ? 'Completed' : 'Active'}</span>
+    </div>`;
+  }).join('');
 }
 
 async function _loadRepAttendanceView() {
@@ -10460,6 +10517,15 @@ async function punchInActivity() {
   };
   crmActivities.unshift(act);
   saveCRM('activities', crmActivities);
+
+  sb.from('field_visits').insert({
+    id: act.id, type: act.type, contact_name: act.contact_name,
+    employee_id: currentUser?.id, employee_name: currentUser?.full_name || 'Unknown',
+    notes: act.notes, status: 'Punched In',
+    punch_in_time: act.punch_in_time, punch_in_lat: act.punch_in_lat,
+    punch_in_lng: act.punch_in_lng, punch_in_location: act.punch_in_location,
+  }).then(({ error }) => { if (error) console.error('field_visits sync failed:', error.message); });
+
   document.getElementById('crm-activity-modal')?.remove();
   if (currentScreen === 'crm-activities') loadActivitiesScreen();
   else if (currentScreen === 'crm-calendar') renderCRMCalendar();
@@ -10488,6 +10554,13 @@ async function confirmPunchOut(actId) {
   act.punch_out_location = addr;
 
   saveCRM('activities', crmActivities);
+
+  sb.from('field_visits').update({
+    status: 'Completed', feedback: act.feedback,
+    punch_out_time: act.punch_out_time, punch_out_lat: act.punch_out_lat,
+    punch_out_lng: act.punch_out_lng, punch_out_location: act.punch_out_location,
+  }).eq('id', act.id).then(({ error }) => { if (error) console.error('field_visits sync failed:', error.message); });
+
   document.getElementById('crm-activity-modal')?.remove();
   if (currentScreen === 'crm-activities') loadActivitiesScreen();
   loadAttPunchList?.();
