@@ -10432,6 +10432,15 @@ async function openActivityModal(existingId = null) {
       if (data) existing = { ...data, date: data.punch_in_time ? data.punch_in_time.split('T')[0] : new Date().toISOString().split('T')[0] };
     }
     if (!existing) { alert('Could not find that visit — it may already be punched out.'); loadAttPunchList?.(); return; }
+  } else {
+    // Block a new punch-in while this rep still has one open, on any device
+    const { data: openVisit } = await sb.from('field_visits').select('id')
+      .eq('employee_id', currentUser?.id).eq('status', 'Punched In')
+      .order('punch_in_time', { ascending: false }).limit(1).maybeSingle();
+    if (openVisit) {
+      alert('You still have an open visit. Please punch out of it before starting a new one.');
+      return openActivityModal(openVisit.id);
+    }
   }
   const d=document.createElement('div'); d.id='crm-activity-modal';
   d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(3px);';
@@ -10501,6 +10510,15 @@ function _actFeedbackPlaceholder(type) {
 }
 
 async function punchInActivity() {
+  const openCheck = await sb.from('field_visits').select('id')
+    .eq('employee_id', currentUser?.id).eq('status', 'Punched In').limit(1).maybeSingle();
+  if (openCheck.data) {
+    alert('You still have an open visit — please punch out of it first.');
+    document.getElementById('crm-activity-modal')?.remove();
+    loadAttPunchList?.();
+    return;
+  }
+
   const typeSel = document.getElementById('act-type').value;
   const type = typeSel === '__other__' ? document.getElementById('act-type-other').value.trim() : typeSel;
   if (!type) { alert('Please specify the activity type.'); return; }
