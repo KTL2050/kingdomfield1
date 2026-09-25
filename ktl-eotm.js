@@ -94,6 +94,13 @@
   border-radius:9px 0 0 9px;box-shadow:-2px 2px 10px rgba(0,0,0,.18);cursor:pointer;
   display:flex;justify-content:center;transition:width .15s,box-shadow .15s;user-select:none;}
 #eotm-tab:hover{width:48px;box-shadow:-3px 3px 14px rgba(0,0,0,.24);}
+#eotm-tab.eotm-attn{animation:eotmAttnPulse 1.1s ease-out infinite;}
+@keyframes eotmAttnPulse{
+  0%{box-shadow:-2px 2px 10px rgba(0,0,0,.18),0 0 0 0 rgba(226,75,74,.55);}
+  70%{box-shadow:-2px 2px 10px rgba(0,0,0,.18),0 0 0 14px rgba(226,75,74,0);}
+  100%{box-shadow:-2px 2px 10px rgba(0,0,0,.18),0 0 0 0 rgba(226,75,74,0);}
+}
+@media(prefers-reduced-motion:reduce){#eotm-tab.eotm-attn{animation:none;}}
 .eotm-tab-badge{position:absolute;top:-15px;left:50%;transform:translateX(-50%);width:30px;height:30px;
   border-radius:50%;background:#fff;color:#A32D2D;display:flex;align-items:center;justify-content:center;
   box-shadow:0 2px 6px rgba(0,0,0,.25);}
@@ -164,14 +171,15 @@
 .eotm-done-card b{color:var(--txt);}
 .eotm-countdown{margin-top:16px;font-size:11px;color:var(--txt3);}
 .eotm-hof{background:var(--bg);border:.5px solid var(--brd);border-radius:12px;padding:14px 16px;
-  margin-bottom:18px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;}
+  margin-bottom:18px;display:flex;align-items:flex-start;gap:12px;position:relative;overflow:hidden;}
 .eotm-hof::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;
   background:linear-gradient(90deg,var(--gold-mid),var(--gold));opacity:.5;}
 .eotm-hof-icon{width:34px;height:34px;border-radius:50%;background:var(--gold-light);color:var(--gold-mid);
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
 .eotm-hof-icon svg{width:17px;height:17px;}
 .eotm-hof-eyebrow{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3);}
 .eotm-hof-name{font-size:14px;font-weight:700;color:var(--txt);margin-top:2px;letter-spacing:-.01em;}
+.eotm-hof-summary{font-size:11.5px;color:var(--txt2);line-height:1.5;margin-top:6px;}
 .eotm-empty{text-align:center;padding:24px 10px;color:var(--txt3);font-size:12px;}
 `;
 
@@ -316,16 +324,51 @@
     })).sort((a, b) => b.points - a.points);
 
     const winner = leaderboard[0] || null;
+    let winnerSummary = null;
+    if (winner) {
+      // The leaderboard entry above only keeps a 3-reason sample; the
+      // summary needs every reason the winner actually received this month.
+      const allWinnerReasons = tally[winner.employee_id].reasons;
+      winnerSummary = await eotmFetchWinnerSummary(winner.full_name, allWinnerReasons);
+    }
     const payload = {
       month_key: prevKey,
       winner_id: winner ? winner.employee_id : null,
       winner_name: winner ? winner.full_name : null,
       winner_points: winner ? winner.points : 0,
+      winner_summary: winnerSummary,
       leaderboard,
     };
     const { data: saved, error: saveErr } = await sb
       .from('eotm_monthly_results').upsert(payload, { onConflict: 'month_key' }).select().maybeSingle();
     eotmState.hof = saveErr ? payload : saved;
+  }
+
+  // Turns every reason the winner received that month into one genuine
+  // summary paragraph, via a Supabase Edge Function that holds the
+  // Anthropic key server-side (see eotm-summarize/index.ts) — this file
+  // never calls api.anthropic.com directly, which would mean shipping an
+  // API key to every browser that loads the app. If the function isn't
+  // deployed yet, or the call fails for any reason, this just returns
+  // null: the reveal still shows the name and points, it simply doesn't
+  // have a summary line, rather than breaking the whole reveal.
+  async function eotmFetchWinnerSummary(winnerName, reasons) {
+    try {
+      const { data, error } = await sb.functions.invoke('eotm-summarize', {
+        body: { winnerName, reasons }
+      });
+      if (error) { console.warn('eotm-summarize:', error.message || error); return null; }
+      if (!data || !data.summary) return null;
+      // The prompt asks for ~100 characters, but models don't count
+      // precisely — this is the hard backstop so the card never shows
+      // something absurdly long even if it overshoots.
+      let s = String(data.summary).trim();
+      if (s.length > 100) s = s.slice(0, 99).trim() + '…';
+      return s;
+    } catch (err) {
+      console.warn('eotm-summarize unreachable:', err);
+      return null;
+    }
   }
 
   function eotmHofBlock() {
@@ -336,6 +379,7 @@
         <div>
           <div class="eotm-hof-eyebrow">${eotmEsc(eotmMonthLabel(eotmState.hof.month_key))} Star</div>
           <div class="eotm-hof-name">${eotmEsc(eotmState.hof.winner_name)} — ${eotmState.hof.winner_points} pts</div>
+          ${eotmState.hof.winner_summary ? `<div class="eotm-hof-summary">${eotmEsc(eotmState.hof.winner_summary)}</div>` : ''}
         </div>
       </div>`;
   }
@@ -396,12 +440,13 @@
         </div>
       </div>
       <label class="eotm-reason-label">What did they do well today?</label>
-      <textarea class="eotm-reason-textarea f-inp" id="eotm-reason" maxlength="300" placeholder="e.g. Closed a tricky order and helped a teammate hit their target too."></textarea>
-      <div class="eotm-char-count"><span id="eotm-char-count">0</span>/300</div>
+      <textarea class="eotm-reason-textarea f-inp" id="eotm-reason" maxlength="75" placeholder="e.g. Closed a tricky order and helped a teammate hit their target too."></textarea>
+      <div class="eotm-char-count"><span id="eotm-char-count">0</span>/75</div>
       <button class="eotm-submit-btn" id="eotm-submit-btn" onclick="eotmSubmitVote()">Submit recognition</button>
       <div id="eotm-submit-err"></div>`;
     const ta = document.getElementById('eotm-reason');
     ta.addEventListener('input', () => {
+      if (ta.value.length > 75) ta.value = ta.value.slice(0, 75);
       document.getElementById('eotm-char-count').textContent = ta.value.length;
     });
     ta.focus();
@@ -413,8 +458,8 @@
     const reason = (ta.value || '').trim();
     const errEl = document.getElementById('eotm-submit-err');
     errEl.innerHTML = '';
-    if (reason.length < 8) {
-      errEl.innerHTML = `<div class="eotm-err">Add a bit more detail (at least 8 characters) so it means something.</div>`;
+    if (reason.length > 75) {
+      errEl.innerHTML = `<div class="eotm-err">Keep it to 75 characters or fewer (you have ${reason.length}).</div>`;
       return;
     }
     eotmState.busy = true;
@@ -463,6 +508,8 @@
   function eotmSetDotVisible(visible) {
     const dot = document.getElementById('eotm-dot');
     if (dot) dot.classList.toggle('hidden', !visible);
+    const tab = document.getElementById('eotm-tab');
+    if (tab) tab.classList.toggle('eotm-attn', visible);
   }
 
   // ── boot ─────────────────────────────────────────────────────────────
