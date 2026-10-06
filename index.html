@@ -8674,7 +8674,7 @@ async function exportFieldVisitsExcel() {
     const status   = a.status || '—';
 
     const row = ws.addRow({
-      rep: repName, type: a.type || '—', contact: a.contact_name || '—', phone: a.phone || '—',
+      rep: repName, type: a.type || '—', contact: (a.contact_name || '—') + (a.is_cover ? ' (COVER' + (a.cover_for ? ' for ' + a.cover_for : '') + ')' : ''), phone: a.phone || '—',
       date: a.date || (a.punch_in_time ? a.punch_in_time.split('T')[0] : '—'),
       in_time: inTime, in_loc: a.punch_in_location || '—',
       out_time: outTime, out_loc: a.punch_out_location || '—',
@@ -8792,7 +8792,7 @@ async function _renderAttPunchList(elId) {
     html += `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
       <div style="font-size:20px;">${icon(a.type)}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.contact_name||''}</div>
+        <div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.contact_name||''}${a.is_cover?' <span class="badge bb" style="font-size:9.5px;">Cover</span>':''}</div>
         <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${a.contact_name||'—'} · since ${inTime}</div>
         ${a.punch_in_location?`<div style="font-size:10.5px;color:var(--royal);margin-top:3px;">📍 ${a.punch_in_location}</div>`:''}
       </div>
@@ -8809,7 +8809,7 @@ async function _renderAttPunchList(elId) {
     html += `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
       <div style="font-size:20px;">${icon(a.type)}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.contact_name||''}</div>
+        <div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.contact_name||''}${a.is_cover?' <span class="badge bb" style="font-size:9.5px;">Cover</span>':''}</div>
         <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${a.contact_name||'—'} · ${inTime} → ${outTime}${duration?` · ${duration}`:''}</div>
       </div>
       <span class="badge bg" style="align-self:flex-start;">Completed</span>
@@ -8881,7 +8881,7 @@ async function _loadAdminFieldVisits() {
     return `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
       <div style="font-size:20px;">${icon(a.type)}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:12.5px;font-weight:500;">${a.employee_name || 'Unknown'} — ${a.type}: ${a.contact_name||''}</div>
+        <div style="font-size:12.5px;font-weight:500;">${a.employee_name || 'Unknown'} — ${a.type}: ${a.contact_name||''}${a.is_cover?' <span class="badge bb" style="font-size:9.5px;">Cover</span>':''}</div>
         <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${dateStr} · ${inTime}${outTime ? ' → ' + outTime : ' (still out)'}</div>
         ${a.punch_in_location ? `<div style="font-size:10.5px;color:var(--royal);margin-top:3px;">📍 ${a.punch_in_location}</div>` : ''}
       </div>
@@ -10451,6 +10451,8 @@ async function openActivityModal(existingId = null) {
   d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(3px);';
   const clientNames = (isSalesRep() ? visibleClients : allClients).map(c=>c.name);
   const clientOptions = clientNames.map(n=>`<option value="${n}">`).join('');
+  window._actCoverClient = null;
+  const canCover = isSalesRep() && !isPunchOut; // admins already see every store
   const typeOpts = ['Call','Meeting','Visit','Order Generation','Collections','Prospecting'];
   const roField = isPunchOut ? 'readonly style="background:var(--bg2);color:var(--txt2);"' : '';
   d.innerHTML=`<div style="background:#fff;border-radius:16px;width:90%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 16px 60px rgba(0,0,0,0.25);">
@@ -10466,14 +10468,29 @@ async function openActivityModal(existingId = null) {
             <option value="__other__" ${existing && !typeOpts.includes(existing.type)?'selected':''}>+ Other (specify)</option>
           </select>
         </div>
-        <div class="fg"><label class="flbl">Contact Name</label>
+        <div class="fg" id="act-contact-fg"><label class="flbl">Contact Name</label>
           <select class="fin" id="act-contact" onchange="toggleActContactOther()" ${isPunchOut?'disabled':''}>
             <option value="">— Select client —</option>
             <option value="__new__">+ Add New Client</option>
             ${clientNames.map(n=>`<option value="${n}" ${existing?.contact_name===n?'selected':''}>${n}</option>`).join('')}
           </select>
         </div>
-        <div class="fg ${existing && existing.contact_name && !clientNames.includes(existing.contact_name)?'':'hidden'}" id="act-contact-other-wrap" style="grid-column:1/-1;"><label class="flbl">New Client Name</label><input class="fin" id="act-contact-other" placeholder="e.g. China Town Store - Lugogo" value="${existing && !clientNames.includes(existing.contact_name)?existing.contact_name||'':''}" ${isPunchOut?'readonly style="background:var(--bg2);"':''}/></div>
+${canCover ? `
+        <div class="fg" style="grid-column:1/-1;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;">
+            <input type="checkbox" id="act-cover-chk" onchange="toggleActCover()" style="width:16px;height:16px;"/>
+            <span>🔁 I'm covering a store outside my portfolio</span>
+          </label>
+        </div>
+        <div class="fg hidden" id="act-cover-wrap" style="grid-column:1/-1;">
+          <label class="flbl">Search store</label>
+          <input class="fin" id="act-cover-search" placeholder="Type the store name…" oninput="actCoverSearch()" autocomplete="off"/>
+          <div id="act-cover-results" style="max-height:170px;overflow-y:auto;border:0.5px solid var(--brd2);border-radius:9px;margin-bottom:10px;"></div>
+          <div id="act-cover-picked" class="hidden" style="background:var(--royal-light);border:0.5px solid var(--royal-border);border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:600;color:var(--royal);margin-bottom:10px;"></div>
+          <label class="flbl">Covering for (optional)</label>
+          <input class="fin" id="act-cover-for" placeholder="e.g. name of the rep who is off"/>
+        </div>` : ''}
+                <div class="fg ${existing && existing.contact_name && !clientNames.includes(existing.contact_name)?'':'hidden'}" id="act-contact-other-wrap" style="grid-column:1/-1;"><label class="flbl">New Client Name</label><input class="fin" id="act-contact-other" placeholder="e.g. China Town Store - Lugogo" value="${existing && !clientNames.includes(existing.contact_name)?existing.contact_name||'':''}" ${isPunchOut?'readonly style="background:var(--bg2);"':''}/></div>
         <div class="fg ${existing && !typeOpts.includes(existing.type)?'':'hidden'}" id="act-type-other-wrap" style="grid-column:1/-1;"><label class="flbl">Custom Activity Type</label><input class="fin" id="act-type-other" placeholder="e.g. Product training" value="${existing && !typeOpts.includes(existing.type)?existing.type:''}" ${isPunchOut?'readonly style="background:var(--bg2);"':''}/></div>
         <div class="fg"><label class="flbl">Calendar</label><input class="fin" type="date" id="act-date" value="${existing?.date || new Date().toISOString().split('T')[0]}" ${roField}/></div>
         <div class="fg" style="grid-column:1/-1;"><label class="flbl">${isPunchOut ? 'Feedback' : 'Notes'}</label><textarea class="fin" id="act-notes" rows="3" style="resize:vertical;" placeholder="${isPunchOut ? _actFeedbackPlaceholder(existing?.type) : ''}">${isPunchOut ? '' : (existing?.notes||'')}</textarea></div>
@@ -10496,6 +10513,40 @@ async function openActivityModal(existingId = null) {
 function toggleActTypeOther() {
   const isOther = document.getElementById('act-type').value === '__other__';
   document.getElementById('act-type-other-wrap').classList.toggle('hidden', !isOther);
+}
+
+function toggleActCover() {
+  const on = document.getElementById('act-cover-chk').checked;
+  document.getElementById('act-cover-wrap').classList.toggle('hidden', !on);
+  document.getElementById('act-contact-fg').classList.toggle('hidden', on);
+  document.getElementById('act-contact-other-wrap').classList.add('hidden');
+  if (on) { actCoverSearch(); document.getElementById('act-cover-search').focus(); }
+  else {
+    window._actCoverClient = null;
+    document.getElementById('act-contact').dispatchEvent(new Event('change')); // re-evaluate "+ Add New Client"
+  }
+}
+
+function actCoverSearch() {
+  const box = document.getElementById('act-cover-results'); if (!box) return;
+  const q = document.getElementById('act-cover-search').value.trim().toLowerCase();
+  const mine = new Set(visibleClients.map(c => String(c.id)));
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  if (q.length < 2) { box.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:var(--txt3);">Type at least 2 letters to search all stores.</div>'; return; }
+  const hits = allClients.filter(c => !mine.has(String(c.id)) && (c.name || '').toLowerCase().includes(q)).slice(0, 30);
+  box.innerHTML = hits.length === 0
+    ? '<div style="padding:10px 12px;font-size:12px;color:var(--txt3);">No matching store outside your portfolio.</div>'
+    : hits.map(c => `<div onclick="actCoverPick('${esc(String(c.id))}')" style="padding:10px 12px;font-size:12.5px;cursor:pointer;border-bottom:0.5px solid var(--brd);">${esc(c.name)}</div>`).join('');
+}
+
+function actCoverPick(id) {
+  const c = allClients.find(x => String(x.id) === String(id)); if (!c) return;
+  window._actCoverClient = c;
+  const picked = document.getElementById('act-cover-picked');
+  picked.textContent = '✔ ' + c.name;
+  picked.classList.remove('hidden');
+  document.getElementById('act-cover-results').innerHTML = '';
+  document.getElementById('act-cover-search').value = c.name;
 }
 
 function toggleActContactOther() {
@@ -10528,9 +10579,19 @@ async function punchInActivity() {
   const type = typeSel === '__other__' ? document.getElementById('act-type-other').value.trim() : typeSel;
   if (!type) { alert('Please specify the activity type.'); return; }
 
-  const contactSel = document.getElementById('act-contact').value;
-  const contact_name = contactSel === '__new__' ? document.getElementById('act-contact-other').value.trim() : contactSel;
-  if (!contact_name) { alert('Please select an existing client or add a new one.'); return; }
+  // Cover mode: a rep helping at a store that isn't in their portfolio
+  const isCover = !!document.getElementById('act-cover-chk')?.checked;
+  const coverClient = isCover ? window._actCoverClient : null;
+  const cover_for = isCover ? (document.getElementById('act-cover-for')?.value || '').trim() : '';
+  let contact_name;
+  if (isCover) {
+    if (!coverClient) { alert('Please search for and pick the store you are covering.'); return; }
+    contact_name = coverClient.name;
+  } else {
+    const contactSel = document.getElementById('act-contact').value;
+    contact_name = contactSel === '__new__' ? document.getElementById('act-contact-other').value.trim() : contactSel;
+    if (!contact_name) { alert('Please select an existing client or add a new one.'); return; }
+  }
 
   const btn = document.getElementById('act-punchin-btn');
   const statusEl = document.getElementById('act-punchin-status');
@@ -10555,17 +10616,30 @@ async function punchInActivity() {
     punch_out_time: null, punch_out_lat: null, punch_out_lng: null, punch_out_location: null,
     created_by: currentUser?.id,
     created_at: new Date().toISOString(),
+    is_cover: isCover, cover_for, client_id: coverClient ? String(coverClient.id) : null,
   };
   crmActivities.unshift(act);
   saveCRM('activities', crmActivities);
 
-  sb.from('field_visits').insert({
+  const fvRow = {
     id: act.id, type: act.type, contact_name: act.contact_name,
     employee_id: currentUser?.id, employee_name: currentUser?.full_name || 'Unknown',
     notes: act.notes, status: 'Punched In',
     punch_in_time: act.punch_in_time, punch_in_lat: act.punch_in_lat,
     punch_in_lng: act.punch_in_lng, punch_in_location: act.punch_in_location,
-  }).then(({ error }) => { if (error) console.error('field_visits sync failed:', error.message); });
+  };
+  const fvPayload = isCover ? { ...fvRow, is_cover: true, cover_for: cover_for || null, client_id: String(coverClient.id) } : fvRow;
+  sb.from('field_visits').insert(fvPayload).then(async ({ error }) => {
+    if (!error) return;
+    // If the cover columns haven't been added yet, still save the punch (cover info goes into notes)
+    if (isCover && (error.code === 'PGRST204' || error.code === '42703' || /column/i.test(error.message || ''))) {
+      const tag = `[COVER${cover_for ? ' for ' + cover_for : ''}] `;
+      const { error: e2 } = await sb.from('field_visits').insert({ ...fvRow, notes: tag + (fvRow.notes || '') });
+      if (e2) console.error('field_visits sync failed:', e2.message);
+    } else {
+      console.error('field_visits sync failed:', error.message);
+    }
+  });
 
   document.getElementById('crm-activity-modal')?.remove();
   if (currentScreen === 'crm-activities') loadActivitiesScreen();
