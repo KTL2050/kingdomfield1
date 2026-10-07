@@ -799,6 +799,13 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                 <label style="font-size:9.5px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;">To</label>
                 <input type="date" id="fv-filter-to" onchange="onFvCustomDateChange()" style="padding:8px 10px;border:0.5px solid var(--brd2);border-radius:9px;font-size:12px;font-family:inherit;outline:none;background:var(--bg2);color:var(--txt);width:150px;"/>
               </div>
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <label style="font-size:9.5px;font-weight:600;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;">Employee</label>
+                <div style="position:relative;">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--txt3)" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                  <input type="text" id="fv-filter-name" placeholder="Search employee..." autocomplete="off" style="padding:8px 10px 8px 32px;border:0.5px solid var(--brd2);border-radius:9px;font-size:12px;font-family:inherit;outline:none;background:var(--bg2);color:var(--txt);width:190px;" oninput="onFvNameInput()" onfocus="this.style.borderColor='var(--royal)'" onblur="this.style.borderColor='var(--brd2)'"/>
+                </div>
+              </div>
             </div>
             <div id="att-punch-list-admin" style="padding:6px 18px 14px;">
               <div class="empty-state" style="padding:16px;">Loading…</div>
@@ -8619,13 +8626,17 @@ async function exportFieldVisitsExcel() {
   } else {
     const preset = document.getElementById('fv-range-preset')?.value || 'today';
     ({ from, to } = _fvGetRangeDates(preset));
-    const { data } = await sb.from('field_visits').select('*')
-      .gte('punch_in_time', from + 'T00:00:00').lte('punch_in_time', to + 'T23:59:59')
+    const { data } = await _fvApplyNameFilter(sb.from('field_visits').select('*')
+      .gte('punch_in_time', from + 'T00:00:00').lte('punch_in_time', to + 'T23:59:59'))
       .order('punch_in_time', { ascending: false });
     acts = data || [];
   }
 
-  if (acts.length === 0) { alert('No field visits found for this range.'); return; }
+  if (acts.length === 0) {
+    const nm = (document.getElementById('fv-filter-name')?.value || '').trim();
+    alert(nm ? `No field visits found for "${nm}" in this range.` : 'No field visits found for this range.');
+    return;
+  }
 
   const wb = new ExcelJS.Workbook();
   wb.creator = 'KTLSALES';
@@ -8649,7 +8660,7 @@ async function exportFieldVisitsExcel() {
 
   ws.mergeCells('A2:L2');
   const sub = ws.getCell('A2');
-  sub.value = `Range: ${from} to ${to}  ·  Generated ${new Date().toLocaleString('en-UG',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}`;
+  sub.value = `Range: ${from} to ${to}${(!isRep && (document.getElementById('fv-filter-name')?.value||'').trim()) ? '  ·  Employee: ' + document.getElementById('fv-filter-name').value.trim() : ''}  ·  Generated ${new Date().toLocaleString('en-UG',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}`;
   sub.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF6B6B67' } };
   ws.getRow(2).height = 16;
   ws.getRow(3).height = 6;
@@ -8835,6 +8846,20 @@ function _fvGetRangeDates(preset) {
   return { from, to };
 }
 
+let _fvNameTimer = null;
+function onFvNameInput() {
+  clearTimeout(_fvNameTimer);
+  _fvNameTimer = setTimeout(_loadAdminFieldVisits, 300); // wait for the user to stop typing
+}
+
+// Applies the employee-name search (if any) to a field_visits query
+function _fvApplyNameFilter(query) {
+  const name = (document.getElementById('fv-filter-name')?.value || '').trim();
+  if (!name) return query;
+  const safe = name.replace(/[\\%_]/g, m => '\\' + m); // treat % and _ literally
+  return query.ilike('employee_name', `%${safe}%`);
+}
+
 function onFvRangePresetChange() {
   const preset = document.getElementById('fv-range-preset').value;
   const fromEl = document.getElementById('fv-filter-from');
@@ -8862,15 +8887,19 @@ async function _loadAdminFieldVisits() {
   const { from, to } = _fvGetRangeDates(preset);
   el.innerHTML = '<div class="empty-state" style="padding:16px;">Loading…</div>';
 
-  const { data, error } = await sb.from('field_visits').select('*')
+  const { data, error } = await _fvApplyNameFilter(sb.from('field_visits').select('*')
     .gte('punch_in_time', from + 'T00:00:00')
-    .lte('punch_in_time', to + 'T23:59:59')
+    .lte('punch_in_time', to + 'T23:59:59'))
     .order('punch_in_time', { ascending: false });
 
   if (error) { el.innerHTML = `<div class="empty-state" style="padding:16px;color:#A32D2D;">Error: ${error.message}</div>`; return; }
 
   const rows = data || [];
-  if (rows.length === 0) { el.innerHTML = '<div class="empty-state" style="padding:16px;">No visits logged for this range.</div>'; return; }
+  if (rows.length === 0) {
+    const nm = (document.getElementById('fv-filter-name')?.value || '').trim().replace(/[<>&"]/g, '');
+    el.innerHTML = `<div class="empty-state" style="padding:16px;">${nm ? `No visits found for "${nm}" in this range.` : 'No visits logged for this range.'}</div>`;
+    return;
+  }
 
   const icon = t => ({Call:'📞',Meeting:'🤝',Visit:'🚶','Order Generation':'📋',Collections:'💰'}[t] || '📌');
 
