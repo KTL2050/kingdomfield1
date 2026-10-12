@@ -373,6 +373,7 @@
 
   function eotmHofBlock() {
     if (!eotmState.hof || !eotmState.hof.winner_name) return '';
+    if (new Date().getDate() !== 1) return '';   // reveal the winner on the 1st of the month only
     return `
       <div class="eotm-hof">
         <div class="eotm-hof-icon">${EOTM_ICON_TROPHY}</div>
