@@ -417,16 +417,25 @@ async function fetchConfirmedByOrder() {
   }, '');
   const history = await _wBuildPurchaseHistory(clientIds, sinceDate);
 
-  const byOrder = {};
+  const byOrder = {}, pointsByOrder = {};
   orders.forEach(o => {
     const cid = String(o.client_id || '');
-    byOrder[o.id] = cid
-      ? _wConfirmedForOrder(o, itemsByOrder[o.id] || [], history.get(cid) || [], M)
-      : 0;
+    const matches = cid
+      ? _wConfirmedMatches(o, itemsByOrder[o.id] || [], history.get(cid) || [], M)
+      : {};
+    byOrder[o.id] = Object.keys(matches).length;
+    pointsByOrder[o.id] = _wPointsOf(matches);
   });
 
   S.cache[key] = byOrder;
+  S.cache[cacheKey('points')] = pointsByOrder;
   return byOrder;
+}
+
+/** Wallet points per order — each confirmed item's saved points (0/1/3; older listings 1). */
+async function fetchPointsByOrder() {
+  await fetchConfirmedByOrder();
+  return S.cache[cacheKey('points')] || {};
 }
 
 async function fetchAttendance() {
@@ -897,6 +906,7 @@ const REPORTS = [
     const orders  = countedOrders(applyOrderFilters(await fetchOrders()));
     const payouts = await fetchPayouts();
     const byOrder = await fetchConfirmedByOrder();
+    const pointsByOrder = await fetchPointsByOrder();
 
     const g = {};
     orders.forEach(o => {
@@ -904,7 +914,7 @@ const REPORTS = [
       if (confirmed === 0) return;   // points are only earned on confirmed purchases
       const k = String(o.created_by || 'none');
       if (!g[k]) g[k] = { rep:userName(o.created_by), earned:0, redeemed:0, listings:0 };
-      g[k].earned  += confirmed * CFG.pointsPerItem;
+      g[k].earned  += pointsByOrder[o.id] || 0;
       g[k].listings += 1;
     });
     payouts.filter(p => ['approved','paid'].includes(p.status)).forEach(p => {

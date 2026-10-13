@@ -15,7 +15,7 @@ const corsHeaders = {
 };
 
 const BRAND_TABLE_MAP: Record<string, string[]> = {
-  UBL:   ["t250", "slobs", "new_items"],
+  UBL:   ["ubl_t100", "ubl_t101_500", "ubl_t501_plus"],
   AWIBI: ["awibi_awina"],
   AWINA: ["awibi_awina"],
 };

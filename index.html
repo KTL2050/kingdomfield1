@@ -2249,13 +2249,14 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
             <span class="card-title">SKU Listing Tables</span>
             <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
               <select class="sel" id="sku-list-view-type" onchange="loadSkuListView()" style="font-size:11.5px;">
-                <option value="t250">T250 — UBL</option>
-                <option value="slobs">SLOBS — UBL</option>
-                <option value="new_items">NEW ITEMS — UBL</option>
+                <option value="ubl_t100">T100 — UBL</option>
+                <option value="ubl_t101_500">T101–500 — UBL</option>
+                <option value="ubl_t501_plus">T501+ — UBL</option>
                 <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
               </select>
               <button class="btn btn-sm btn-royal" onclick="showAddSkuForm()">+ Add SKU</button>
               <button class="btn btn-sm" onclick="showBulkSkuImport()">↑ Bulk Import</button>
+              <button class="btn btn-sm" onclick="showExcelImport()">⇪ Import Excel</button>
             <input type="text" id="sku-list-search" placeholder="Search SKU or name..." 
               style="padding:6px 11px;border:0.5px solid var(--brd2);border-radius:8px;font-size:12px;font-family:inherit;outline:none;min-width:180px;"
               oninput="filterSkuListView()" 
@@ -2273,9 +2274,9 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
               <div class="fg">
                 <label class="flbl">List Table</label>
                 <select class="fin" id="add-sku-table">
-                  <option value="t250">T250 (UBL)</option>
-                  <option value="slobs">SLOBS (UBL)</option>
-                  <option value="new_items">NEW ITEMS (UBL)</option>
+                  <option value="ubl_t100">T100 (UBL)</option>
+                  <option value="ubl_t101_500">T101–500 (UBL)</option>
+                  <option value="ubl_t501_plus">T501+ (UBL)</option>
                   <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
                 </select>
               </div>
@@ -2292,9 +2293,9 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
             <div class="fg">
               <label class="flbl">List Table</label>
               <select class="fin" id="bulk-sku-table" style="margin-bottom:10px;">
-                <option value="t250">T250 (UBL)</option>
-                <option value="slobs">SLOBS (UBL)</option>
-                <option value="new_items">NEW ITEMS (UBL)</option>
+                <option value="ubl_t100">T100 (UBL)</option>
+                <option value="ubl_t101_500">T101–500 (UBL)</option>
+                <option value="ubl_t501_plus">T501+ (UBL)</option>
                 <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
               </select>
               <label class="flbl">Paste SKUs (one per line — optionally: SKU,Item Name)</label>
@@ -2302,6 +2303,29 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
               <div style="font-size:10.5px;color:var(--txt3);margin-top:4px;">Paste from Excel — one SKU per row. Optional second column = item name. Duplicates are skipped automatically.</div>
             </div>
             <button class="btn btn-royal" onclick="saveBulkSkus()">Import SKUs</button>
+          </div>
+          <div class="hidden" id="excel-import-form" style="margin-top:12px;padding:14px;background:var(--bg2);border-radius:9px;border:0.5px solid var(--brd);">
+            <div class="card-hdr" style="margin-bottom:10px;">
+              <span class="card-title" style="font-size:12px;">Import Excel — replaces the whole list</span>
+              <button class="btn btn-sm" onclick="document.getElementById('excel-import-form').classList.add('hidden')">Cancel</button>
+            </div>
+            <div class="fg">
+              <label class="flbl">List to replace</label>
+              <select class="fin" id="excel-import-table" onchange="if(_excelImportFile)readExcelImportFile(_excelImportFile)">
+                <option value="ubl_t100">T100 (UBL) — ranks 1–100 · 0 pts</option>
+                <option value="ubl_t101_500">T101–500 (UBL) — ranks 101–500 · 1 pt</option>
+                <option value="ubl_t501_plus">T501+ (UBL) — ranks 501 and above · 3 pts</option>
+              </select>
+            </div>
+            <label id="excel-drop-zone" ondragover="event.preventDefault();this.style.borderColor='var(--royal)'" ondragleave="this.style.borderColor=''" ondrop="excelDrop(event)"
+              style="display:block;border:1.5px dashed var(--brd2);border-radius:10px;padding:22px;text-align:center;cursor:pointer;background:var(--bg);">
+              <input type="file" id="excel-import-file" accept=".xlsx,.csv" style="display:none;" onchange="if(this.files[0])readExcelImportFile(this.files[0])"/>
+              <div style="font-size:22px;margin-bottom:4px;">📄</div>
+              <div style="font-size:12.5px;font-weight:600;">Drag your Excel file here, or click to choose</div>
+              <div style="font-size:10.5px;color:var(--txt3);margin-top:3px;">.xlsx or .csv · row 1 headers: SKU, Item Name, Rank</div>
+            </label>
+            <div id="excel-import-preview" style="margin-top:10px;"></div>
+            <button class="btn btn-royal" id="excel-import-btn" disabled onclick="replaceListFromExcel()" style="margin-top:10px;">Replace list</button>
           </div>
         </div>
 
@@ -2491,16 +2515,22 @@ let lastSavedListingClient = '';
 
 // ─── BRAND / LISTING TABLE CONFIG ─────────────────────────────────────────────
 const BRAND_TABLE_MAP = {
-  'UBL':   ['t250', 'slobs', 'new_items'],
+  'UBL':   ['ubl_t100', 'ubl_t101_500', 'ubl_t501_plus'],
   'AIWIBI': ['aiwibi_aiwina'],
   'AIWINA': ['aiwibi_aiwina'],
 };
 const TABLE_META = {
+  ubl_t100:      { label: 'T100',      badgeClass: 'br'    },
+  ubl_t101_500:  { label: 'T101–500',  badgeClass: 'bb'    },
+  ubl_t501_plus: { label: 'T501+',     badgeClass: 'bg'    },
   t250:        { label: 'T250',        badgeClass: 'bb'    },
   slobs:       { label: 'SLOBS',       badgeClass: 'ba'    },
   new_items:   { label: 'NEW ITEMS',   badgeClass: 'bg'    },
   aiwibi_aiwina: { label: 'AIWIBI/AIWINA', badgeClass: 'bgold' },
 };
+// Points a confirmed item earns, fixed when it is listed. Lists not named here (AIWIBI/AIWINA) earn 1.
+const LIST_POINTS = { ubl_t100: 0, ubl_t101_500: 1, ubl_t501_plus: 3 };
+const RANK_RANGES = { ubl_t100: [1, 100], ubl_t101_500: [101, 500], ubl_t501_plus: [501, Infinity] };
 let _skuCache       = {};
 let _clientBrandCache = {};
 
@@ -4189,6 +4219,7 @@ async function _finaliseListing(order, items, client, orderRef){
     qty_ordered:  1,
     unit_price:   v.rate,
     line_total:   v.rate,
+    points:       LIST_POINTS[_listingScreenItems.find(e => (e.product_id || 'sku_' + e.sku) === productId)?._table] ?? 1,
   }));
   const {error:itemsError} = await sb.from('order_items').insert(orderItemRows);
   if(itemsError){alert('Listing header saved but items failed: '+itemsError.message);return;}
@@ -4832,7 +4863,8 @@ async function loadSkuListView() {
   const el = document.getElementById('sku-list-view'); el.innerHTML = '<div class="empty-state">Loading...</div>';
   const searchEl = document.getElementById('sku-list-search');
   if (searchEl) searchEl.value = '';
-  const { data, error } = await sb.from(tableName).select('*').order('sku');
+  const ranked = tableName in RANK_RANGES;
+  const { data, error } = await sb.from(tableName).select('*').order(ranked ? 'rank' : 'sku');
   if (error) { el.innerHTML=`<div class="empty-state" style="color:#A32D2D;">Error: ${error.message}</div>`; return; }
   const rows = data||[];
   if (rows.length===0) { el.innerHTML=`<div class="empty-state">No SKUs in <strong>${TABLE_META[tableName]?.label||tableName}</strong> yet.</div>`; return; }
@@ -4854,6 +4886,7 @@ async function loadSkuListView() {
             <th style="width:32px;"></th>
             <th>SKU</th>
             <th>Item Name</th>
+            ${ranked ? '<th>Rank</th>' : ''}
             <th>Added</th>
             <th></th>
           </tr>
@@ -4885,6 +4918,7 @@ async function loadSkuListView() {
                     style="padding:5px 9px;background:transparent;border:0.5px solid var(--brd2);border-radius:7px;cursor:pointer;font-size:12px;color:var(--txt2);white-space:nowrap;">Cancel</button>
                 </div>
               </td>
+              ${ranked ? `<td class="mono">${r.rank ?? '—'}</td>` : ''}
               <td style="font-size:11px;color:var(--txt3);">${r.created_at?new Date(r.created_at).toLocaleDateString():'—'}</td>
               <td><button class="btn btn-sm btn-danger" onclick="deleteSkuFromList('${tableName}','${r.id}','${r.sku}')">Remove</button></td>
             </tr>`).join('')}
@@ -4999,6 +5033,169 @@ function showAddSkuForm(){document.getElementById('add-sku-form').classList.remo
 function showBulkSkuImport(){document.getElementById('bulk-sku-form').classList.remove('hidden');document.getElementById('add-sku-form').classList.add('hidden');document.getElementById('bulk-sku-form').scrollIntoView({behavior:'smooth'});}
 async function saveSkuToList(){const tableName=document.getElementById('add-sku-table').value;const sku=document.getElementById('add-sku-code').value.trim();const name=document.getElementById('add-sku-name').value.trim();if(!sku){alert('SKU is required.');return;}const{error}=await sb.from(tableName).insert({sku,item_name:name||null});if(error){alert('Error: '+error.message);return;}notifySkuTableChanged(tableName);document.getElementById('add-sku-form').classList.add('hidden');document.getElementById('add-sku-code').value='';document.getElementById('add-sku-name').value='';document.getElementById('sku-list-view-type').value=tableName;await loadSkuListView();alert(`SKU ${sku} added.`);}
 async function saveBulkSkus(){const tableName=document.getElementById('bulk-sku-table').value;const raw=document.getElementById('bulk-sku-text').value.trim();if(!raw){alert('Please paste some SKUs first.');return;}const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);const rows=lines.map(line=>{const parts=line.split(/[\t,]/);return{sku:parts[0].trim(),item_name:parts[1]?.trim()||null};}).filter(r=>r.sku);if(rows.length===0){alert('No valid SKUs found.');return;}let saved=0,dupes=0;for(let i=0;i<rows.length;i+=50){const batch=rows.slice(i,i+50);const{data,error}=await sb.from(tableName).upsert(batch,{onConflict:'sku',ignoreDuplicates:true}).select();if(error){alert('Error on batch: '+error.message);break;}saved+=(data||[]).length;dupes+=batch.length-(data||[]).length;}notifySkuTableChanged(tableName);document.getElementById('bulk-sku-form').classList.add('hidden');document.getElementById('bulk-sku-text').value='';document.getElementById('sku-list-view-type').value=tableName;await loadSkuListView();alert(`Import complete: ${saved} SKUs added${dupes>0?`, ${dupes} already existed (skipped)`:''}.`);}
+// ─── EXCEL IMPORT: replace a ranked UBL list from a file ──────────────────────
+let _excelImportFile = null;
+let _excelImportRows = null;
+const _xEsc = t => String(t == null ? '' : t).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+function showExcelImport() {
+  document.getElementById('add-sku-form').classList.add('hidden');
+  document.getElementById('bulk-sku-form').classList.add('hidden');
+  const form = document.getElementById('excel-import-form');
+  form.classList.remove('hidden');
+  _excelImportFile = null;
+  _excelImportRows = null;
+  document.getElementById('excel-import-file').value = '';
+  document.getElementById('excel-import-preview').innerHTML = '';
+  document.getElementById('excel-import-btn').disabled = true;
+  form.scrollIntoView({behavior:'smooth'});
+}
+
+function excelDrop(ev) {
+  ev.preventDefault();
+  ev.currentTarget.style.borderColor = '';
+  const f = ev.dataTransfer?.files?.[0];
+  if (f) readExcelImportFile(f);
+}
+
+function _xCellText(v) {
+  if (v == null) return '';
+  if (typeof v === 'object') {
+    if (Array.isArray(v.richText)) return v.richText.map(p => p.text).join('').trim();
+    if (v.text != null) return String(v.text).trim();
+    if (v.result != null) return String(v.result).trim();
+    if (v instanceof Date) return v.toISOString().split('T')[0];
+    return '';
+  }
+  return String(v).trim();
+}
+
+function _xParseCsv(text) {
+  text = text.replace(/^﻿/, '');
+  const firstLine = text.split('\n')[0];
+  const delim = [',', ';', '\t'].sort((a, b) => firstLine.split(b).length - firstLine.split(a).length)[0];
+  const out = []; let row = [], cell = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else inQ = false; }
+      else cell += c;
+    } else if (c === '"') inQ = true;
+    else if (c === delim) { row.push(cell.trim()); cell = ''; }
+    else if (c === '\n') { row.push(cell.trim()); out.push(row); row = []; cell = ''; }
+    else if (c !== '\r') cell += c;
+  }
+  if (cell || row.length) { row.push(cell.trim()); out.push(row); }
+  return out.filter(r => r.some(c => c));
+}
+
+async function readExcelImportFile(file) {
+  _excelImportFile = file;
+  _excelImportRows = null;
+  const btn = document.getElementById('excel-import-btn');
+  const preview = document.getElementById('excel-import-preview');
+  btn.disabled = true;
+  preview.innerHTML = `<div style="font-size:12px;color:var(--txt3);">Reading ${_xEsc(file.name)}…</div>`;
+  const fail = msg => { preview.innerHTML = `<div class="alert ad" style="font-size:12px;">${msg}</div>`; };
+
+  let grid;
+  try {
+    if (/\.csv$/i.test(file.name)) {
+      grid = _xParseCsv(await file.text());
+    } else if (/\.xlsx$/i.test(file.name)) {
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(await file.arrayBuffer());
+      const ws = wb.worksheets[0];
+      grid = [];
+      if (ws) ws.eachRow({ includeEmpty: false }, row => grid.push(Array.from(row.values).slice(1).map(_xCellText)));
+    } else if (/\.xls$/i.test(file.name)) {
+      return fail('This is an old-style <strong>.xls</strong> file. In Excel, use <em>File → Save As → Excel Workbook (.xlsx)</em>, then drop the new file here.');
+    } else {
+      return fail('Please use an <strong>.xlsx</strong> or <strong>.csv</strong> file.');
+    }
+  } catch (e) {
+    return fail('Could not read this file: ' + _xEsc(e.message));
+  }
+  if (!grid || grid.length < 2) return fail('The file has no rows under the header row.');
+
+  // Find the columns by their header text in row 1 (loosely: "SKU", "sku code", "Item Code"…)
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const headers = grid[0].map(norm);
+  const findCol = names => headers.findIndex(h => names.includes(h));
+  const col = {
+    sku:  findCol(['sku', 'skucode', 'itemcode', 'code', 'itemsku']),
+    name: findCol(['itemname', 'name', 'item', 'productname', 'product', 'description']),
+    rank: findCol(['rank', 'ranking', 'position', 'top']),
+  };
+  if (col.sku < 0 || col.rank < 0) {
+    return fail(`Row 1 must have a <strong>SKU</strong> column and a <strong>Rank</strong> column. Found: ${grid[0].map(h => `"${_xEsc(h)}"`).join(', ') || 'nothing'}.`);
+  }
+
+  const table = document.getElementById('excel-import-table').value;
+  const [lo, hi] = RANK_RANGES[table];
+  const rows = [], seen = new Set(), dupes = [], badRank = [], outOfRange = [];
+  let noSku = 0;
+  grid.slice(1).forEach(r => {
+    const sku = (r[col.sku] || '').trim();
+    if (!sku) { noSku++; return; }
+    const key = sku.toLowerCase();
+    if (seen.has(key)) { dupes.push(sku); return; }
+    seen.add(key);
+    const rankText = (r[col.rank] || '').trim();
+    const rank = /^\d+(\.0+)?$/.test(rankText) ? parseInt(rankText, 10) : null;
+    if (rank === null) badRank.push(sku);
+    else if (rank < lo || rank > hi) outOfRange.push(`${sku} (${rank})`);
+    rows.push({ sku, item_name: col.name >= 0 ? (r[col.name] || '').trim() : '', rank });
+  });
+  if (!rows.length) return fail('No rows with a SKU were found.');
+
+  const label = TABLE_META[table]?.label || table;
+  const sample = list => _xEsc(list.slice(0, 5).join(', ')) + (list.length > 5 ? ` … +${list.length - 5} more` : '');
+  const warnings = [];
+  if (outOfRange.length) warnings.push(`<strong>${outOfRange.length}</strong> rank${outOfRange.length > 1 ? 's are' : ' is'} outside ${label}'s range (${lo}–${hi === Infinity ? 'last' : hi}) — is this the right list? ${sample(outOfRange)}`);
+  if (badRank.length)    warnings.push(`<strong>${badRank.length}</strong> row${badRank.length > 1 ? 's have' : ' has'} no valid rank number (saved without a rank): ${sample(badRank)}`);
+  if (dupes.length)      warnings.push(`<strong>${dupes.length}</strong> duplicate SKU${dupes.length > 1 ? 's' : ''} skipped (first one kept): ${sample(dupes)}`);
+  if (noSku)             warnings.push(`<strong>${noSku}</strong> row${noSku > 1 ? 's' : ''} without a SKU skipped`);
+
+  _excelImportRows = rows;
+  btn.disabled = false;
+  preview.innerHTML = `
+    <div class="alert ag" style="font-size:12px;margin-bottom:8px;">✔ <span><strong>${rows.length}</strong> items ready to load into <strong>${_xEsc(label)}</strong> from ${_xEsc(file.name)}.</span></div>
+    ${warnings.map(w => `<div class="alert aw" style="font-size:11.5px;margin-bottom:6px;">⚠ <span>${w}</span></div>`).join('')}
+    <div style="overflow-x:auto;"><table style="font-size:12px;">
+      <thead><tr><th>Rank</th><th>SKU</th><th>Item Name</th></tr></thead>
+      <tbody>${rows.slice(0, 5).map(r => `<tr><td class="mono">${r.rank ?? '—'}</td><td class="mono">${_xEsc(r.sku)}</td><td>${_xEsc(r.item_name) || '—'}</td></tr>`).join('')}</tbody>
+    </table></div>
+    ${rows.length > 5 ? `<div style="font-size:11px;color:var(--txt3);margin-top:4px;">First 5 of ${rows.length} rows shown.</div>` : ''}`;
+}
+
+async function replaceListFromExcel() {
+  const table = document.getElementById('excel-import-table').value;
+  const rows = _excelImportRows;
+  if (!rows || !rows.length) return;
+  const label = TABLE_META[table]?.label || table;
+  const { count } = await sb.from(table).select('id', { count: 'exact', head: true });
+  showConfirmDialog({
+    icon: '⇪',
+    title: `Replace the ${label} list?`,
+    message: `The current <strong>${count ?? 0}</strong> items in ${_xEsc(label)} will be removed and replaced with the <strong>${rows.length}</strong> items from this file.<br><br>Listings already placed keep the points they were given.`,
+    confirmLabel: 'Replace list',
+    confirmStyle: 'background:var(--royal);color:#fff;border:none;',
+    onConfirm: async () => {
+      const btn = document.getElementById('excel-import-btn');
+      btn.disabled = true; btn.textContent = 'Importing…';
+      const { data, error } = await sb.rpc('replace_ranked_list', { p_table: table, p_rows: rows });
+      btn.textContent = 'Replace list';
+      if (error) { btn.disabled = false; alert('Import failed — the list was not changed.\n\n' + error.message); return; }
+      notifySkuTableChanged(table);
+      document.getElementById('excel-import-form').classList.add('hidden');
+      document.getElementById('sku-list-view-type').value = table;
+      await loadSkuListView();
+      alert(`${label} list replaced: ${data} items loaded.`);
+    }
+  });
+}
+
 function notifySkuTableChanged(tableName) {
   invalidateSkuCache(tableName);
   invalidateBrandCache();
@@ -7406,13 +7603,14 @@ function _wLowerBound(rows, dateStr) {
 }
 
 // ── Matching — identical rules to loadListedItems(), just factored out ─────
-function _wConfirmedForOrder(order, listedItems, histRows, M) {
+function _wConfirmedMatches(order, listedItems, histRows, M) {
   const orderDate = order.order_date || '';
-  if (!orderDate || !listedItems.length || !histRows.length) return 0;
+  if (!orderDate || !listedItems.length || !histRows.length) return {};
 
   const listedBySkuKey = {}, listedByNameKey = {}, listedByProductId = {}, listedByZohoId = {};
   listedItems.forEach(item => {
-    const entry = { sku: item.sku, product_name: item.product_name, order_date: orderDate };
+    // points was fixed when the item was listed; older listings have none and earn 1
+    const entry = { sku: item.sku, product_name: item.product_name, order_date: orderDate, points: item.points ?? 1 };
     if (item.sku)          listedBySkuKey[_wNorm(item.sku)]            = entry;
     if (item.product_name) listedByNameKey[_wNorm(item.product_name)]  = entry;
     if (item.product_id)   listedByProductId[String(item.product_id)]  = entry;
@@ -7480,7 +7678,13 @@ function _wConfirmedForOrder(order, listedItems, histRows, M) {
       confirmedMap[dedupeKey] = { ...e, purchase_date: purchaseDate };
     }
   }
-  return Object.keys(confirmedMap).length;
+  return confirmedMap;
+}
+function _wConfirmedForOrder(order, listedItems, histRows, M) {
+  return Object.keys(_wConfirmedMatches(order, listedItems, histRows, M)).length;
+}
+function _wPointsOf(matches) {
+  return Object.values(matches).reduce((s, e) => s + e.points, 0);
 }
 
 // ── Shared loader: pulls everything for a set of reps in bulk ──────────────
@@ -7505,7 +7709,7 @@ async function _wLoadFor(repIds) {
   }
   console.log(`[wallet] ${orders.length} orders across ${repIds.length} reps`);
   if (!orders.length) {
-    return { orders: [], ordersByRep: new Map(), confirmedByOrder: {}, storesByRep: new Map(), redeemedByRep: new Map() };
+    return { orders: [], ordersByRep: new Map(), confirmedByOrder: {}, pointsByOrder: {}, storesByRep: new Map(), redeemedByRep: new Map() };
   }
 
   // All order_items in a few chunked queries instead of one per rep.
@@ -7514,7 +7718,7 @@ async function _wLoadFor(repIds) {
   const itemTasks = orderIdChunks.map(chunk => async () => {
     for (let from = 0; ; from += 1000) {
       const { data, error } = await sb.from('order_items')
-        .select('order_id, sku, product_id, product_name')
+        .select('order_id, sku, product_id, product_name, points')
         .in('order_id', chunk)
         .order('order_id', { ascending: true })
         .range(from, from + 999);
@@ -7549,6 +7753,7 @@ async function _wLoadFor(repIds) {
   const history = await _wBuildPurchaseHistory(clientIds, sinceDate);
 
   const confirmedByOrder = {};
+  const pointsByOrder = {};
   const ordersByRep = new Map();
   const storesByRep = new Map();
 
@@ -7558,14 +7763,16 @@ async function _wLoadFor(repIds) {
     ordersByRep.get(rep).push(order);
 
     const cid = String(order.client_id || '');
-    const count = cid
-      ? _wConfirmedForOrder(order, itemsByOrder[order.id] || [], history.get(cid) || [], M)
-      : 0;
+    const matches = cid
+      ? _wConfirmedMatches(order, itemsByOrder[order.id] || [], history.get(cid) || [], M)
+      : {};
+    const count = Object.keys(matches).length;
     confirmedByOrder[order.id] = count;
+    pointsByOrder[order.id] = _wPointsOf(matches);
     if (count > 0 && order.client_name) storesByRep.get(rep).add(order.client_name);
   }
 
-  return { orders, ordersByRep, confirmedByOrder, storesByRep, redeemedByRep };
+  return { orders, ordersByRep, confirmedByOrder, pointsByOrder, storesByRep, redeemedByRep };
 }
 
 async function _wCached(key, fn) {
@@ -7593,22 +7800,23 @@ async function loadRepWallet() {
   if (!orders.length) {
     _walletPoints = 0;
     _walletRedeemedPoints = 0;
-    renderRepWalletUI(0, 0, 0, [], {});
+    renderRepWalletUI(0, 0, 0, [], {}, {}, 0);
     return;
   }
 
   const totalConfirmedItems = orders.reduce((s, o) => s + (res.confirmedByOrder[o.id] || 0), 0);
+  const totalPoints = orders.reduce((s, o) => s + (res.pointsByOrder[o.id] || 0), 0);
   const stores = res.storesByRep.get(repId) || new Set();
 
-  _walletPoints = totalConfirmedItems;
+  _walletPoints = totalPoints;
   _walletRedeemedPoints = res.redeemedByRep.get(repId) || 0;
-  const effectivePoints = Math.max(0, totalConfirmedItems - _walletRedeemedPoints);
+  const effectivePoints = Math.max(0, totalPoints - _walletRedeemedPoints);
 
-  renderRepWalletUI(effectivePoints, stores.size, orders.length, orders, res.confirmedByOrder);
+  renderRepWalletUI(effectivePoints, stores.size, orders.length, orders, res.confirmedByOrder, res.pointsByOrder, totalConfirmedItems);
   console.log(`[wallet] rep view in ${Math.round(performance.now() - t0)}ms`);
 }
 
-function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, orders, confirmedByOrder) {
+function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, orders, confirmedByOrder, pointsByOrder, confirmedItemCount) {
   const points  = totalConfirmedItems; // already has redemptions deducted when called from loadRepWallet
   const ugxValue = points * 1000;
   const pct     = Math.min(100, Math.round((points / 50) * 100));
@@ -7638,10 +7846,10 @@ function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, order
   const alertText = document.getElementById('wallet-alert-text');
   if (points >= 50) {
     alertEl.className = 'alert ag';
-    alertText.innerHTML = `🎉 You have <strong>${points} points (UGX ${ugxValue.toLocaleString()})</strong> from ${totalConfirmedItems} confirmed purchases — you are eligible to request a payout!`;
+    alertText.innerHTML = `🎉 You have <strong>${points} points (UGX ${ugxValue.toLocaleString()})</strong> from ${confirmedItemCount} confirmed purchases — you are eligible to request a payout!`;
   } else {
     alertEl.className = 'alert aw';
-    alertText.innerHTML = `You have <strong>${points} points</strong> from ${totalConfirmedItems} confirmed purchased items. Need ${needed} more to reach 50 pts (UGX 50,000).<br><br>✅ Points are earned when a listed item appears in <strong>"Successful Listing"</strong> tab — meaning the store actually bought it.`;
+    alertText.innerHTML = `You have <strong>${points} points</strong> from ${confirmedItemCount} confirmed purchased items. Need ${needed} more to reach 50 pts (UGX 50,000).<br><br>✅ Points are earned when a listed item appears in <strong>"Successful Listing"</strong> tab — meaning the store actually bought it.`;
   }
 
   // Redeem card
@@ -7651,7 +7859,7 @@ function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, order
     document.getElementById('wallet-redeem-body').style.display  = 'none';
     document.getElementById('wallet-eligible-body').style.display = 'block';
     document.getElementById('wallet-eligible-ugx').textContent   = `UGX ${ugxValue.toLocaleString()}`;
-    document.getElementById('wallet-eligible-pts').textContent   = `${points} points from ${totalConfirmedItems} confirmed purchases`;
+    document.getElementById('wallet-eligible-pts').textContent   = `${points} points from ${confirmedItemCount} confirmed purchases`;
   } else {
     document.getElementById('wallet-redeem-body').style.display  = 'block';
     document.getElementById('wallet-eligible-body').style.display = 'none';
@@ -7666,7 +7874,7 @@ function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, order
   } else {
     document.getElementById('wallet-recent-earnings').innerHTML = earned.map(o => {
       const count   = confirmedByOrder[o.id] || 0;
-      const pts     = count * 1;
+      const pts     = pointsByOrder[o.id] || 0;
       const dateStr = new Date(o.created_at).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' });
       return `<div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--brd);">
         <div class="tl-icon tl-earn" style="font-size:13px;">✓</div>
@@ -7681,7 +7889,7 @@ function renderRepWalletUI(totalConfirmedItems, uniqueStores, totalOrders, order
     const thisMonth = new Date().toISOString().slice(0, 7);
     const monthPts  = orders
       .filter(o => (o.created_at || '').startsWith(thisMonth) && (confirmedByOrder[o.id] || 0) > 0)
-      .reduce((s, o) => s + (confirmedByOrder[o.id] || 0), 0);
+      .reduce((s, o) => s + (pointsByOrder[o.id] || 0), 0);
     document.getElementById('wallet-earnings-badge').textContent = `+${monthPts} pts this month`;
   }
 }
@@ -7739,8 +7947,9 @@ async function loadAdminWallet() {
       const key = String(rep.id);
       const orders = res.ordersByRep.get(key) || [];
       const items  = orders.reduce((s, o) => s + (res.confirmedByOrder[o.id] || 0), 0);
+      const earnedPts = orders.reduce((s, o) => s + (res.pointsByOrder[o.id] || 0), 0);
       const redeemedPts = res.redeemedByRep.get(key) || 0;
-      const net = Math.max(0, items - redeemedPts);
+      const net = Math.max(0, earnedPts - redeemedPts);
 
       repStats[rep.id].items    = items;
       repStats[rep.id].points   = net;
