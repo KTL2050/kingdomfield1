@@ -2255,7 +2255,6 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                 <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
               </select>
               <button class="btn btn-sm btn-royal" onclick="showAddSkuForm()">+ Add SKU</button>
-              <button class="btn btn-sm" onclick="showBulkSkuImport()">↑ Bulk Import</button>
               <button class="btn btn-sm" onclick="showExcelImport()">⇪ Import Excel</button>
             <input type="text" id="sku-list-search" placeholder="Search SKU or name..." 
               style="padding:6px 11px;border:0.5px solid var(--brd2);border-radius:8px;font-size:12px;font-family:inherit;outline:none;min-width:180px;"
@@ -2284,25 +2283,6 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
               <div class="fg" style="grid-column:1/-1;"><label class="flbl">Item Name (optional)</label><input class="fin" id="add-sku-name" placeholder="e.g. UBL Detergent 1kg"/></div>
             </div>
             <button class="btn btn-royal" onclick="saveSkuToList()">Save SKU</button>
-          </div>
-          <div class="hidden" id="bulk-sku-form" style="margin-top:12px;padding:14px;background:var(--bg2);border-radius:9px;border:0.5px solid var(--brd);">
-            <div class="card-hdr" style="margin-bottom:10px;">
-              <span class="card-title" style="font-size:12px;">Bulk Import SKUs</span>
-              <button class="btn btn-sm" onclick="document.getElementById('bulk-sku-form').classList.add('hidden')">Cancel</button>
-            </div>
-            <div class="fg">
-              <label class="flbl">List Table</label>
-              <select class="fin" id="bulk-sku-table" style="margin-bottom:10px;">
-                <option value="ubl_t100">T100 (UBL)</option>
-                <option value="ubl_t101_500">T101–500 (UBL)</option>
-                <option value="ubl_t501_plus">T501+ (UBL)</option>
-                <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
-              </select>
-              <label class="flbl">Paste SKUs (one per line — optionally: SKU,Item Name)</label>
-              <textarea class="fin" id="bulk-sku-text" rows="8" placeholder="AG0001,UBL Detergent 1kg&#10;AG0002,UBL Powder 500g&#10;AG0003" style="resize:vertical;font-family:'SF Mono','Courier New',monospace;font-size:12px;margin-top:4px;"></textarea>
-              <div style="font-size:10.5px;color:var(--txt3);margin-top:4px;">Paste from Excel — one SKU per row. Optional second column = item name. Duplicates are skipped automatically.</div>
-            </div>
-            <button class="btn btn-royal" onclick="saveBulkSkus()">Import SKUs</button>
           </div>
           <div class="hidden" id="excel-import-form" style="margin-top:12px;padding:14px;background:var(--bg2);border-radius:9px;border:0.5px solid var(--brd);">
             <div class="card-hdr" style="margin-bottom:10px;">
@@ -5029,10 +5009,8 @@ async function saveSkuName(tableName, id) {
 
   cancelEditSkuName(id);
 }
-function showAddSkuForm(){document.getElementById('add-sku-form').classList.remove('hidden');document.getElementById('bulk-sku-form').classList.add('hidden');document.getElementById('add-sku-form').scrollIntoView({behavior:'smooth'});}
-function showBulkSkuImport(){document.getElementById('bulk-sku-form').classList.remove('hidden');document.getElementById('add-sku-form').classList.add('hidden');document.getElementById('bulk-sku-form').scrollIntoView({behavior:'smooth'});}
+function showAddSkuForm(){document.getElementById('add-sku-form').classList.remove('hidden');document.getElementById('excel-import-form').classList.add('hidden');document.getElementById('add-sku-form').scrollIntoView({behavior:'smooth'});}
 async function saveSkuToList(){const tableName=document.getElementById('add-sku-table').value;const sku=document.getElementById('add-sku-code').value.trim();const name=document.getElementById('add-sku-name').value.trim();if(!sku){alert('SKU is required.');return;}const{error}=await sb.from(tableName).insert({sku,item_name:name||null});if(error){alert('Error: '+error.message);return;}notifySkuTableChanged(tableName);document.getElementById('add-sku-form').classList.add('hidden');document.getElementById('add-sku-code').value='';document.getElementById('add-sku-name').value='';document.getElementById('sku-list-view-type').value=tableName;await loadSkuListView();alert(`SKU ${sku} added.`);}
-async function saveBulkSkus(){const tableName=document.getElementById('bulk-sku-table').value;const raw=document.getElementById('bulk-sku-text').value.trim();if(!raw){alert('Please paste some SKUs first.');return;}const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);const rows=lines.map(line=>{const parts=line.split(/[\t,]/);return{sku:parts[0].trim(),item_name:parts[1]?.trim()||null};}).filter(r=>r.sku);if(rows.length===0){alert('No valid SKUs found.');return;}let saved=0,dupes=0;for(let i=0;i<rows.length;i+=50){const batch=rows.slice(i,i+50);const{data,error}=await sb.from(tableName).upsert(batch,{onConflict:'sku',ignoreDuplicates:true}).select();if(error){alert('Error on batch: '+error.message);break;}saved+=(data||[]).length;dupes+=batch.length-(data||[]).length;}notifySkuTableChanged(tableName);document.getElementById('bulk-sku-form').classList.add('hidden');document.getElementById('bulk-sku-text').value='';document.getElementById('sku-list-view-type').value=tableName;await loadSkuListView();alert(`Import complete: ${saved} SKUs added${dupes>0?`, ${dupes} already existed (skipped)`:''}.`);}
 // ─── EXCEL IMPORT: replace a ranked UBL list from a file ──────────────────────
 let _excelImportFile = null;
 let _excelImportRows = null;
@@ -5040,7 +5018,6 @@ const _xEsc = t => String(t == null ? '' : t).replace(/[&<>"']/g, ch => ({'&':'&
 
 function showExcelImport() {
   document.getElementById('add-sku-form').classList.add('hidden');
-  document.getElementById('bulk-sku-form').classList.add('hidden');
   const form = document.getElementById('excel-import-form');
   form.classList.remove('hidden');
   _excelImportFile = null;
