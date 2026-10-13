@@ -77,15 +77,17 @@
 
   // ── styles (TRACKER look: Inter, blue accent, flat hairline cards) ─────
   const CSS = `
-#chat-btn{position:fixed;right:24px;bottom:24px;z-index:150;width:54px;height:54px;border-radius:50%;border:none;
+#chat-btn{position:fixed;right:24px;bottom:24px;z-index:150;height:50px;padding:0 20px 0 16px;gap:9px;border-radius:999px;border:none;
   background:var(--royal);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
   box-shadow:0 6px 18px rgba(37,99,235,.35);transition:transform .15s,background .15s;}
 #chat-btn:hover{background:var(--royal-mid);transform:translateY(-1px);}
-#chat-btn svg{width:24px;height:24px;}
+#chat-btn svg{width:22px;height:22px;flex-shrink:0;}
+.chat-btn-label{font-size:14px;font-weight:600;font-family:inherit;white-space:nowrap;}
 #chat-btn-count{position:absolute;top:-3px;right:-3px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;
   background:#d0361c;color:#fff;font-size:11px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid #fff;}
 #chat-btn-count.show{display:flex;}
-@media(max-width:700px){#chat-btn{right:14px;bottom:146px;width:50px;height:50px;}}
+@media(max-width:700px){#chat-btn{right:14px;bottom:146px;width:50px;height:50px;padding:0;border-radius:50%;}
+  .chat-btn-label{display:none;}}
 .chat-ov{display:none;position:fixed;inset:0;background:rgba(16,24,40,.35);z-index:400;}
 .chat-ov.open{display:block;}
 .chat-panel{position:fixed;top:0;right:-440px;width:420px;max-width:100vw;height:100vh;height:100dvh;background:var(--bg);z-index:401;
@@ -156,7 +158,7 @@
 
   // ── markup ────────────────────────────────────────────────────────────
   const HTML = `
-<button id="chat-btn" type="button" aria-label="Open chat" onclick="chatOpen()">${ICON_CHAT}<span id="chat-btn-count"></span></button>
+<button id="chat-btn" type="button" aria-label="Open chat" onclick="chatOpen()">${ICON_CHAT}<span class="chat-btn-label">Chat now</span><span id="chat-btn-count"></span></button>
 <div class="chat-ov" id="chat-ov" onclick="chatClose()"></div>
 <div class="chat-panel" id="chat-panel" role="dialog" aria-label="Chat">
   <div class="chat-hd" id="chat-hd"></div>
