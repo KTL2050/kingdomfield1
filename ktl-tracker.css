@@ -1,0 +1,228 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   KTLSALES — TRACKER LOOK
+   Same font, colours and structure as the container tracker (TRACKER repo):
+   Inter, indigo sidebar, blue accent, light-grey page, white flat cards with
+   hairline borders and no shadows.
+
+   Install: loaded LAST in <head> of index.html, after the inline <style>.
+   It replaces the Ledger theme — ktl-theme.css is no longer linked (the file
+   is kept; re-link it and remove this one to go back).
+
+   Gold is kept only where money is shown: the Wallet screen, the payout
+   request dialog and the payment receipt. Everywhere else gold becomes blue.
+
+   Sizes and paddings live inside @media(min-width:769px) so the existing
+   phone layout rules in index.html keep working unchanged.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── 1. TOKENS ──────────────────────────────────────────────────────────── */
+:root{
+  /* accent (the old navy variables now carry TRACKER blue) */
+  --royal:#2563eb; --royal-mid:#1d4ed8; --royal-light:#eaf1ff; --royal-border:#c7d7fe;
+  /* gold → blue outside money areas (re-declared as real gold in section 2) */
+  --gold:#2563eb; --gold-mid:#2563eb; --gold-light:#eaf1ff;
+  /* workspace */
+  --bg:#ffffff; --bg2:#f6f7f9; --bg3:#f6f7f9;
+  --brd:#e6e8ec; --brd2:#d8dbe1;
+  /* text */
+  --txt:#121720; --txt2:#667085; --txt3:#98a2b3;
+  /* sidebar */
+  --sidebar:#222b9c; --sidebar-hover:#2b3bb6; --sidebar-active:#3349cc; --sidebar-text:#aebdd1;
+  /* status */
+  --success:#17864f; --success-soft:#e7f6ee;
+  --danger:#d0361c;  --danger-soft:#fdeeea;
+  --warning:#b6650a; --warning-soft:#fdf1e0;
+  --neutral:#667085; --neutral-soft:#f2f4f7;
+}
+
+/* ─── 2. MONEY KEEPS ITS GOLD ────────────────────────────────────────────── */
+#screen-wallet,
+.wallet-modal-backdrop,
+#ktl-receipt-modal{
+  --gold:#b8860b; --gold-mid:#d4a017; --gold-light:#fdf3d0;
+}
+
+/* ─── 3. TYPE ────────────────────────────────────────────────────────────── */
+body{
+  font-family:'Inter',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  background:var(--bg2);color:var(--txt);
+  -webkit-font-smoothing:antialiased;
+}
+/* modules that set their own font */
+html #eotm-tab,html .eotm-panel,html #ktl-role-toast{font-family:inherit;}
+:focus-visible{outline:2px solid var(--royal);outline-offset:2px;}
+
+/* ─── 4. SIDEBAR + MOBILE BAR + DRAWER ───────────────────────────────────── */
+.sidebar,.drawer,
+body.role-rep .sidebar,body.role-manager .sidebar,body.role-admin .sidebar{background:var(--sidebar);}
+.sb-logo,.drawer-hdr{border-bottom:none;}
+.sb-box{background:#fff;box-shadow:none;border-radius:7px;}
+.sb-box span{color:var(--sidebar);}
+.sb-name{font-weight:600;color:#fff;letter-spacing:0;}
+.sb-sub{color:var(--sidebar-text);}
+.nav-sec{color:rgba(174,189,209,.6);letter-spacing:.08em;}
+.nav-item{border-radius:6px;font-weight:500;color:var(--sidebar-text);}
+.nav-item:hover{background:var(--sidebar-hover);color:#fff;}
+.nav-item.active{background:var(--sidebar-active);color:#fff;box-shadow:none;}
+.ni,.nav-item.active .ni,.nav-item:hover .ni{opacity:1;}
+.sb-user{background:transparent;border-top:1px solid rgba(255,255,255,.1);}
+.sb-av{background:var(--sidebar-active);box-shadow:none;}
+.sb-urole{color:var(--sidebar-text);}
+.mob-bar{background:var(--sidebar);box-shadow:none;}
+.ham{border-radius:8px;}
+.drawer-close{border-radius:8px;}
+@media(min-width:769px){
+  nav{padding:8px 12px;}
+  .sb-logo{padding:14px 16px;}
+  .sb-name{font-size:15px;}
+  .nav-item{padding:8px 12px;font-size:13.5px;margin-bottom:2px;gap:12px;}
+  .ni{width:17px;height:17px;}
+}
+
+/* ─── 5. TOPBAR + USER CHIP ──────────────────────────────────────────────── */
+.topbar{background:var(--bg);border-bottom:1px solid var(--brd);box-shadow:none;}
+.topbar-greeting-name{font-weight:600;letter-spacing:-.01em;color:var(--txt);}
+.topbar-greeting-sub{color:var(--txt2);}
+.sync-btn{background:var(--royal);border-radius:8px;box-shadow:none;font-weight:500;}
+.sync-btn:hover{background:var(--royal-mid);box-shadow:none;}
+.signout-btn{border:1px solid var(--brd);border-radius:8px;}
+.signout-btn:hover{background:var(--bg2);border-color:var(--brd2);}
+.tb-user{border:1px solid var(--brd);border-radius:8px;}
+.tb-user:hover{background:var(--bg2);border-color:var(--brd2);}
+.tb-av{background:var(--royal-light);color:var(--royal);}
+.tb-menu{border:1px solid var(--brd);border-radius:8px;box-shadow:0 10px 30px rgba(16,24,40,.12);}
+.tb-menu-item:hover{background:var(--bg2);}
+@media(min-width:769px){
+  .topbar{padding:0 24px;height:64px;}
+  .topbar-greeting-name{font-size:20px;}
+  .topbar-greeting-sub{font-size:12.5px;}
+  .content{padding:24px;}
+}
+
+/* ─── 6. CARDS ───────────────────────────────────────────────────────────── */
+.card{border:1px solid var(--brd);border-radius:12px;box-shadow:none;}
+.card-title{font-weight:600;color:var(--txt);letter-spacing:-.005em;}
+.order-sum{border:1px solid var(--brd);border-radius:10px;}
+@media(min-width:769px){
+  .card{padding:20px;margin-bottom:16px;}
+  .card-title{font-size:14px;}
+}
+
+/* ─── 7. KPI CARDS ── icon square · label · big number · grey caption ───── */
+.mc,
+:is(#screen-dashboard,#screen-attendance,#screen-wallet,#screen-targets,#screen-admin,#screen-team,#screen-clients,#screen-orders) .mc{
+  background:var(--bg);border:1px solid var(--brd);border-radius:12px;box-shadow:none;transform:none;
+}
+:is(#screen-dashboard,#screen-attendance,#screen-wallet,#screen-targets,#screen-admin) .mc:hover{box-shadow:none;transform:none;border-color:var(--brd2);}
+.mc::after{content:none;}
+.mc-dots{display:none;}
+.mc-ico,:is(#screen-dashboard,#screen-attendance) .mc-ico{border-radius:8px;}
+.mc-top,:is(#screen-dashboard,#screen-attendance) .mc-top{align-items:center;gap:12px;}
+.mc-lbl,
+:is(#screen-dashboard,#screen-attendance,#screen-wallet,#screen-targets,#screen-admin) .mc-lbl{
+  font-weight:400;color:var(--txt2);text-transform:none!important;letter-spacing:0!important;
+}
+.mc-val,
+:is(#screen-dashboard,#screen-attendance,#screen-wallet,#screen-targets,#screen-admin) .mc-val{
+  font-weight:600;letter-spacing:-.01em;color:var(--txt);
+}
+.mc-sub,
+:is(#screen-dashboard,#screen-attendance,#screen-wallet,#screen-targets,#screen-admin) .mc-sub{color:var(--txt3);}
+@media(min-width:769px){
+  .metrics-grid,:is(#screen-dashboard,#screen-attendance) .metrics-grid{gap:16px;}
+  .mc,:is(#screen-dashboard,#screen-attendance) .mc{padding:16px;}
+  .mc-ico,:is(#screen-dashboard,#screen-attendance) .mc-ico{width:40px;height:40px;}
+  .mc-lbl,:is(#screen-dashboard,#screen-attendance,#screen-wallet,#screen-targets,#screen-admin) .mc-lbl{font-size:12.5px;margin-bottom:2px;}
+  .mc-val,:is(#screen-dashboard,#screen-attendance,#screen-wallet,#screen-targets,#screen-admin) .mc-val{font-size:22px;line-height:1.2;}
+  .mc-sub,:is(#screen-dashboard,#screen-attendance,#screen-wallet,#screen-targets,#screen-admin) .mc-sub{font-size:11px;}
+}
+
+/* ─── 8. BUTTONS ─────────────────────────────────────────────────────────── */
+.btn{border:1px solid var(--brd2);border-radius:8px;font-weight:500;}
+.btn:hover{background:var(--bg2);}
+.btn-royal{background:var(--royal);border-color:var(--royal);color:#fff;box-shadow:none;}
+.btn-royal:hover{background:var(--royal-mid);box-shadow:none;}
+.btn-gold{background:var(--gold-mid);border-color:var(--gold-mid);color:#fff;box-shadow:none;}
+.btn-gold:hover{background:var(--gold-mid);filter:brightness(.92);}
+.btn-green{background:var(--success);border-color:var(--success);box-shadow:none;}
+.btn-green:hover{background:#126b3f;}
+.btn-danger{background:#fff;color:var(--danger);border-color:#f5c2b8;}
+.btn-danger:hover{background:var(--danger-soft);}
+.login-btn{background:var(--royal);border-radius:8px;box-shadow:none;}
+.login-btn:hover{background:var(--royal-mid);box-shadow:none;}
+.date-preset-btn{border:1px solid var(--brd2);border-radius:6px;}
+.date-preset-btn:hover,.date-preset-btn.active{background:var(--royal);border-color:var(--royal);color:#fff;}
+.pwa-btn{border-radius:8px;}
+html .eotm-row-btn:hover,html .eotm-submit-btn:hover{background:var(--royal-mid);}
+
+/* ─── 9. BADGES + ALERTS ─────────────────────────────────────────────────── */
+.badge{border-radius:6px;padding:3px 8px;font-size:11px;font-weight:500;letter-spacing:0;}
+.bb{background:var(--royal-light);color:var(--royal);}
+.bg{background:var(--success-soft);color:var(--success);}
+.br{background:var(--danger-soft);color:var(--danger);}
+.ba{background:var(--warning-soft);color:var(--warning);}
+.bgold{background:var(--gold-light);color:var(--gold);}
+.bn{background:var(--neutral-soft);color:var(--neutral);}       /* new: neutral, e.g. leave "Completed" */
+.alert{border-radius:8px;}
+.ai{background:var(--royal-light);color:#1e40af;border:1px solid var(--royal-border);}
+.ag{background:var(--success-soft);color:var(--success);border:1px solid #bfe5cf;}
+.aw{background:var(--warning-soft);color:var(--warning);border:1px solid #f6d7ae;}
+.ad{background:var(--danger-soft);color:var(--danger);border:1px solid #f5c2b8;}
+.err-msg{background:var(--danger-soft);color:var(--danger);border:1px solid #f5c2b8;border-radius:8px;}
+.suc-msg{background:var(--success-soft);color:var(--success);border:1px solid #bfe5cf;border-radius:8px;}
+.rep-scope-banner{background:var(--royal-light);border:1px solid var(--royal-border);border-radius:8px;}
+/* warnings that used gold */
+#t-risk{color:var(--warning)!important;}
+#att-reg-banner{background:var(--warning-soft)!important;color:var(--warning)!important;border:1px solid #f6d7ae!important;}
+
+/* ─── 10. TABLES ─────────────────────────────────────────────────────────── */
+th{font-size:12px;font-weight:500;color:var(--txt3);text-transform:none;letter-spacing:0;border-bottom:1px solid var(--brd);}
+td{border-bottom:1px solid var(--brd);}
+tr:hover td{background:var(--bg2);}
+@media(min-width:769px){
+  th{padding:10px 12px;}
+  td{padding:12px;}
+}
+
+/* ─── 11. TABS ───────────────────────────────────────────────────────────── */
+.tabs,.saved-listings-tabs{border-bottom:1px solid var(--brd);}
+.tab,.saved-listings-tab{font-weight:500;color:var(--txt2);}
+.tab:hover,.saved-listings-tab:hover{color:var(--txt);}
+.tab.active,.saved-listings-tab.active{color:var(--royal);border-bottom-color:var(--royal);}
+
+/* ─── 12. INPUTS ─────────────────────────────────────────────────────────── */
+.f-inp,.f-sel,.fin,.si,.sel,.date-range-strip input[type=date]{border:1px solid var(--brd2);border-radius:8px;}
+.f-inp:focus,.f-sel:focus,.fin:focus,.si:focus,.sel:focus{outline:none;border-color:var(--royal);box-shadow:0 0 0 3px rgba(37,99,235,.15);}
+.f-lbl,.flbl{color:var(--txt2);font-weight:500;}
+
+/* ─── 13. LOGIN + LOADING ────────────────────────────────────────────────── */
+.login-wrap{background:var(--bg2);}
+.login-card{border:1px solid var(--brd);border-radius:12px;box-shadow:0 10px 30px rgba(16,24,40,.08);}
+.ktl-mark{background:var(--sidebar);border-radius:10px;box-shadow:none;}
+.loading-overlay{background:rgba(34,43,156,.96);}
+
+/* ─── 14. DIALOGS ────────────────────────────────────────────────────────── */
+.confirm-box,.sync-modal,.wallet-modal{border-radius:12px;}
+.sync-modal-hdr,.wallet-modal-hdr{background:var(--sidebar);}
+.sync-log{border-radius:8px;}
+
+/* ─── 15. WALLET + SHARE PANELS (indigo, like the sidebar) ───────────────── */
+.wallet-hero,.share-panel{background:linear-gradient(135deg,var(--sidebar) 0%,var(--sidebar-active) 100%);border-radius:12px;}
+.earner-bar-fill{background:var(--royal);}
+.earner-ugx{color:var(--royal);}
+
+/* ─── 16. MODULES ────────────────────────────────────────────────────────── */
+/* Reports Centre keeps its layout; colours and font follow the tracker */
+html #rpt-root{
+  --rp-ink:#121720;
+  --rp-royal:#2563eb; --rp-royal-soft:#eaf1ff;
+  --rp-gold:#2563eb;  --rp-gold-soft:#eaf1ff;
+  --rp-paper:#ffffff; --rp-canvas:#f6f7f9;
+  --rp-rule:#e6e8ec;  --rp-rule-mid:#d8dbe1; --rp-rule-strong:#121720;
+  --rp-txt:#121720;   --rp-txt2:#667085;     --rp-txt3:#98a2b3;
+  --rp-pos:#17864f;   --rp-neg:#d0361c;
+  --rp-serif:'Inter',ui-sans-serif,system-ui,sans-serif;
+}
+html #rpt-root .rp-seg button.gold:hover{background:var(--royal-mid);}
+/* Stock: "Sold today" strip was a darker navy */
+html .sp-calc-strip{background:var(--sidebar);}

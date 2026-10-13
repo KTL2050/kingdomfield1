@@ -35,11 +35,11 @@ const STATUS_LABEL = {
 };
 const STATUS_BADGE = {
   pending:'ba', approved:'bg', rejected:'br', cancelled:'bb',
-  upcoming:'bb', active:'bg', completed:'bgold',
+  upcoming:'bb', active:'bg', completed:'bn',
 };
 const STATUS_COLOR = {
   pending:'#854F0B', approved:'#3B6D11', rejected:'#A32D2D', cancelled:'#6b6b67',
-  upcoming:'#2451a0', active:'#1D9E75', completed:'#b8860b',
+  upcoming:'#2563eb', active:'#1D9E75', completed:'#667085',
 };
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ function badge(status) {
 }
 function typeColor(r) {
   const t = S.types.find(x => x.id === r.leave_type_id);
-  return t?.color || '#2451a0';
+  return t?.color || '#2563eb';
 }
 function userName(id) {
   if (id == null) return '—';
@@ -353,7 +353,7 @@ const NOTIF_META = {
   approved:        { icon:'✅', color:'#3B6D11' },
   rejected:        { icon:'❌', color:'#A32D2D' },
   cancelled:       { icon:'🚫', color:'#6b6b67' },
-  upcoming:        { icon:'📅', color:'#2451a0' },
+  upcoming:        { icon:'📅', color:'#2563eb' },
   stock_submitted: { icon:'📦', color:'#1D9E75' },
 };
 
@@ -915,9 +915,9 @@ function renderCalendarShell() {
   <div id="lv-cal-host"></div>
   <div class="lv-legend">
     <span class="lv-lg"><span class="lv-lgd" style="background:repeating-linear-gradient(45deg,#EF9F27,#EF9F27 3px,#e0942190 3px,#e0942190 6px);"></span>Pending</span>
-    <span class="lv-lg"><span class="lv-lgd" style="background:#2451a0;"></span>Approved / upcoming</span>
+    <span class="lv-lg"><span class="lv-lgd" style="background:#2563eb;"></span>Approved / upcoming</span>
     <span class="lv-lg"><span class="lv-lgd" style="background:#1D9E75;"></span>On leave now</span>
-    <span class="lv-lg"><span class="lv-lgd" style="background:#b8860b;"></span>Completed</span>
+    <span class="lv-lg"><span class="lv-lgd" style="background:#667085;"></span>Completed</span>
     <span class="lv-lg" style="color:var(--txt3);">Rejected and cancelled leave is hidden from the calendar.</span>
   </div>`;
 }

@@ -1427,7 +1427,7 @@ function visitLabel(id) {
 }
 
 const CAT_STYLE = {
-  Listings:   { accent:'#1A3A6B', tint:'#EAF0F8', source:'Listings & items' },
+  Listings:   { accent:'#2563eb', tint:'#eaf1ff', source:'Listings & items' },
   Attendance: { accent:'#0F766E', tint:'#E3F1EF', source:'Clock in / out'  },
   Leave:      { accent:'#6B3FA0', tint:'#F1EAFA', source:'Leave requests'  },
   Wallet:     { accent:'#A97406', tint:'#FAF2DE', source:'Points & payouts'},

@@ -1336,7 +1336,7 @@ function showSubmitted(ref, lines) {
       ${mcCard('#EEF0FF', '#5B5BD6', '<path d="M9 2h6a1 1 0 011 1v2H8V3a1 1 0 011-1z"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><path d="M9 12h6M9 16h4"/>', 'SKUs counted', lines.length, `Out of ${skuRows.length} at this store`)}
       ${mcCard('#E7F7F0', '#12A171', '<path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/>', 'Sellable units', sellable, 'Closing count, less damage')}
       ${mcCard('#FDECEC', '#E24B4A', '<circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/>', 'Damaged', damaged, 'Written off this visit')}
-      ${mcCard('#FAF2DE', '#A97406', '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/>', 'Need reorder', reorder.length, `To hold ${DEFAULT_COVER_DAYS} days of cover`)}
+      ${mcCard('#fdf1e0', '#b6650a','<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/>', 'Need reorder', reorder.length, `To hold ${DEFAULT_COVER_DAYS} days of cover`)}
     </div>
     ${reorder.length ? `<div class="alert aw"><span>&#128230;</span><span><strong>${reorder.length} SKU${reorder.length > 1 ? 's' : ''}</strong> should be reordered to hold ${DEFAULT_COVER_DAYS} days of cover: ${esc(reorder.slice(0, 4).map(l => `${l.name} (${l.suggested})`).join(', '))}${reorder.length > 4 ? '…' : ''}</span></div>` : ''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;">

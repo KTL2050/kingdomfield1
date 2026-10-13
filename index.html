@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>KTLSALES — Kingdom Trading Ltd</title>
 <link rel="manifest" href="/manifest.json"/>
-<meta name="theme-color" content="#1a3a6b"/>   
+<meta name="theme-color" content="#222b9c"/>   
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/> 
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -505,7 +505,10 @@ body.role-admin .sidebar           { background: var(--royal); }
 /* Rep topbar status label */
 body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
 </style>
-<link rel="stylesheet" href="ktl-theme.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
+<link rel="stylesheet" href="ktl-tracker.css"/>
 </head>
 <body>
 
@@ -715,7 +718,7 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
             <div class="mc">
               <div class="mc-dots">•••</div>
               <div class="mc-top">
-                <div class="mc-ico" style="background:#EAF2FE;color:#2451a0;">
+                <div class="mc-ico" style="background:#EAF1FF;color:#2563eb;">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
                 </div>
                 <div class="mc-body">
@@ -932,7 +935,7 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
             <div class="mc">
               <div class="mc-dots">•••</div>
               <div class="mc-top">
-                <div class="mc-ico" style="background:#EAF2FE;color:#2451a0;">
+                <div class="mc-ico" style="background:#EAF1FF;color:#2563eb;">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
                 </div>
                 <div class="mc-body">
@@ -962,7 +965,7 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                 <div style="background:#F0F4FF;border-radius:14px;padding:18px;text-align:center;border:1.5px solid #C7D7F8;" id="att-clockin-col">
                   <div style="font-size:10px;font-weight:800;letter-spacing:.1em;color:#4A6FD4;margin-bottom:14px;">CLOCK IN</div>
                   <div id="att-fp-in-wrap"
-                    style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#4A6FD4,#2451a0);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 16px rgba(74,111,212,0.4);"
+                    style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#2563eb);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 16px rgba(74,111,212,0.4);"
                     onclick="openAttFaceModal('in')"
                     onmouseover="this.style.transform='scale(1.06)';this.style.boxShadow='0 6px 22px rgba(74,111,212,0.5)'"
                     onmouseout="this.style.transform='';this.style.boxShadow='0 4px 16px rgba(74,111,212,0.4)'">
@@ -1056,7 +1059,7 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   Export Excel
                 </button>
-                <button onclick="openActivityModal()" style="display:flex;align-items:center;gap:6px;padding:8px 15px;border-radius:9px;background:var(--royal);color:#fff;border:none;cursor:pointer;font-size:12.5px;font-weight:700;font-family:inherit;box-shadow:0 2px 8px rgba(26,58,107,0.3);">📍 Punch In</button>
+                <button onclick="openActivityModal()" style="display:flex;align-items:center;gap:6px;padding:8px 15px;border-radius:9px;background:var(--royal);color:#fff;border:none;cursor:pointer;font-size:12.5px;font-weight:700;font-family:inherit;box-shadow:0 2px 8px rgba(37,99,235,0.3);">📍 Punch In</button>
               </div>
             </div>
             <div id="att-punch-list" style="padding:6px 18px 14px;">
@@ -1186,7 +1189,7 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
   <div class="mc">
     <div class="mc-dots">•••</div>
     <div class="mc-top">
-      <div class="mc-ico" style="background:#EAF2FE;color:#2451a0;">
+      <div class="mc-ico" style="background:#EAF1FF;color:#2563eb;">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6a1 1 0 011 1v2H8V3a1 1 0 011-1z"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><path d="M9 12h6M9 16h4"/></svg>
       </div>
       <div class="mc-body">
@@ -3266,7 +3269,7 @@ function _renderTargetProgress(targets) {
     ? '<div class="empty-state">No targets set yet.</div>'
     : targets.map(t=>{
         const pct=t.target_qty>0?Math.min(100,Math.round((t.sold_qty||0)/t.target_qty*100)):0;
-        const clr=pct>=100?'#1D9E75':pct>=60?'var(--royal)':pct>=40?'var(--gold-mid)':'#E24B4A';
+        const clr=pct>=100?'#1D9E75':pct>=60?'var(--royal)':pct>=40?'var(--warning)':'#E24B4A';
         const cn=allClients.find(c=>c.id===t.client_id)?.name||'—';
         const pn=allProducts.find(p=>p.id===t.product_id)?.name||'—';
         return `<div class="pbar-row"><div class="pbar-top"><span>${cn.slice(0,30)} — ${pn.slice(0,25)}</span><span style="font-weight:600;color:${clr};">${pct}%</span></div><div class="pbar"><div class="pfill" style="width:${pct}%;background:${clr};"></div></div></div>`;
@@ -4384,7 +4387,7 @@ async function loadTargets(){
   document.getElementById('t-exceeded').textContent=exceeded;
   document.getElementById('t-risk').textContent=atrisk;
   if(targets.length===0){document.getElementById('targets-list').innerHTML='<div class="empty-state">No targets for this period.</div>';return;}
-  document.getElementById('targets-list').innerHTML=`<div style="overflow-x:auto;"><table><thead><tr><th>Client</th><th>Product</th><th>Period</th><th>Target Qty</th><th>Sold</th><th>Balance</th><th>Progress</th><th>Status</th></tr></thead><tbody>${targets.map(t=>{const pct=t.target_qty>0?Math.min(100,Math.round((t.sold_qty||0)/t.target_qty*100)):0;const clr=pct>=100?'#1D9E75':pct>=60?'var(--royal)':pct>=40?'var(--gold-mid)':'#E24B4A';const statusBadge=pct>=100?'<span class="badge bg">Exceeded</span>':pct>=60?'<span class="badge bb">On track</span>':pct>=40?'<span class="badge bgold">At risk</span>':'<span class="badge br">Behind</span>';const cname=allClients.find(c=>c.id===t.client_id)?.name||'—';const pname=allProducts.find(p=>p.id===t.product_id)?.name||'—';return`<tr><td>${cname.slice(0,25)}</td><td>${pname.slice(0,25)}</td><td>${t.period_label}</td><td>${t.target_qty}</td><td>${t.sold_qty||0}</td><td>${Math.max(0,t.target_qty-(t.sold_qty||0))}</td><td><div style="width:80px;"><div class="pbar"><div class="pfill" style="width:${pct}%;background:${clr};"></div></div><div style="font-size:10px;color:${clr};margin-top:2px;font-weight:600;">${pct}%</div></div></td><td>${statusBadge}</td></tr>`;}).join('')}</tbody></table></div>`;
+  document.getElementById('targets-list').innerHTML=`<div style="overflow-x:auto;"><table><thead><tr><th>Client</th><th>Product</th><th>Period</th><th>Target Qty</th><th>Sold</th><th>Balance</th><th>Progress</th><th>Status</th></tr></thead><tbody>${targets.map(t=>{const pct=t.target_qty>0?Math.min(100,Math.round((t.sold_qty||0)/t.target_qty*100)):0;const clr=pct>=100?'#1D9E75':pct>=60?'var(--royal)':pct>=40?'var(--warning)':'#E24B4A';const statusBadge=pct>=100?'<span class="badge bg">Exceeded</span>':pct>=60?'<span class="badge bb">On track</span>':pct>=40?'<span class="badge bgold">At risk</span>':'<span class="badge br">Behind</span>';const cname=allClients.find(c=>c.id===t.client_id)?.name||'—';const pname=allProducts.find(p=>p.id===t.product_id)?.name||'—';return`<tr><td>${cname.slice(0,25)}</td><td>${pname.slice(0,25)}</td><td>${t.period_label}</td><td>${t.target_qty}</td><td>${t.sold_qty||0}</td><td>${Math.max(0,t.target_qty-(t.sold_qty||0))}</td><td><div style="width:80px;"><div class="pbar"><div class="pfill" style="width:${pct}%;background:${clr};"></div></div><div style="font-size:10px;color:${clr};margin-top:2px;font-weight:600;">${pct}%</div></div></td><td>${statusBadge}</td></tr>`;}).join('')}</tbody></table></div>`;
 }
 function loadTargetDropdowns(){const tClient=document.getElementById('t-client');if(tClient){const list=isSalesRep()?visibleClients:allClients;tClient.innerHTML='<option value="">Select client</option>'+list.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');}const tProduct=document.getElementById('t-product');if(tProduct)tProduct.innerHTML='<option value="">Select product</option>'+allProducts.map(p=>`<option value="${p.id}">${p.sku} — ${p.name.slice(0,40)}</option>`).join('');}
 function showAddTarget(){if(isSalesRep()){alert('Only managers and admins can set targets.');return;}document.getElementById('add-target-form').classList.remove('hidden');document.getElementById('add-target-form').scrollIntoView({behavior:'smooth'});}
@@ -6362,7 +6365,7 @@ async function viewTeamListingItems(orderId, orderRef, orderDate) {
         <div style="font-size:12px;font-weight:600;color:var(--royal);">📋 ${orderRef} · ${orderDate}</div>
         <div style="display:flex;align-items:center;gap:6px;">
           <span class="badge bb">${items.length} items</span>
-          <button onclick="document.getElementById('team-listing-items-detail').innerHTML=''" style="width:20px;height:20px;border-radius:4px;background:rgba(26,58,107,0.1);border:none;cursor:pointer;color:var(--royal);font-size:13px;">×</button>
+          <button onclick="document.getElementById('team-listing-items-detail').innerHTML=''" style="width:20px;height:20px;border-radius:4px;background:rgba(37,99,235,0.1);border:none;cursor:pointer;color:var(--royal);font-size:13px;">×</button>
         </div>
       </div>
       <div style="max-height:200px;overflow-y:auto;">
@@ -6498,7 +6501,7 @@ async function viewSavedListingItems(orderId, orderRef, orderDate, clientName) {
       <div style="font-size:12.5px;font-weight:600;color:var(--royal);">📋 ${orderRef} &nbsp;·&nbsp; <span style="font-weight:400;font-size:11.5px;">${clientName} · ${orderDate}</span></div>
       <div style="display:flex;align-items:center;gap:6px;">
         <span class="badge bb">${items.length} item${items.length !== 1 ? 's' : ''}</span>
-        <button onclick="document.getElementById('sl-preview-box').remove()" style="width:22px;height:22px;border-radius:5px;background:rgba(26,58,107,0.1);border:none;cursor:pointer;color:var(--royal);font-size:14px;display:flex;align-items:center;justify-content:center;">×</button>
+        <button onclick="document.getElementById('sl-preview-box').remove()" style="width:22px;height:22px;border-radius:5px;background:rgba(37,99,235,0.1);border:none;cursor:pointer;color:var(--royal);font-size:14px;display:flex;align-items:center;justify-content:center;">×</button>
       </div>
     </div>
     <div style="max-height:220px;overflow-y:auto;">
@@ -6878,7 +6881,7 @@ function openPaymentReceiptModal(data) {
         padding:14px 20px;background:#f8f9fb;
         border-radius:20px 20px 0 0;border-bottom:1px solid #e8eaf0;
       }
-      #ktl-receipt-actions .ra-title {font-size:13px;font-weight:600;color:#1a3a6b;}
+      #ktl-receipt-actions .ra-title {font-size:13px;font-weight:600;color:#222b9c;}
       #ktl-receipt-actions .ra-btns {display:flex;gap:8px;}
       .ra-btn {
         display:inline-flex;align-items:center;gap:6px;
@@ -6886,8 +6889,8 @@ function openPaymentReceiptModal(data) {
         font-weight:600;cursor:pointer;border:none;font-family:inherit;
         transition:all 0.15s;
       }
-      .ra-btn-print  {background:#1a3a6b;color:#fff;}
-      .ra-btn-print:hover {background:#0f2550;}
+      .ra-btn-print  {background:#2563eb;color:#fff;}
+      .ra-btn-print:hover {background:#1d4ed8;}
       .ra-btn-close  {background:#fff;color:#6b6b67;border:1px solid #dde1ea;}
       .ra-btn-close:hover {background:#f0f2f7;}
 
@@ -6906,19 +6909,19 @@ function openPaymentReceiptModal(data) {
         border-bottom:2px solid #f0f2f7;
       }
       .rec-brand-mark {
-        width:44px;height:44px;border-radius:11px;background:#1a3a6b;
+        width:44px;height:44px;border-radius:11px;background:#222b9c;
         display:flex;align-items:center;justify-content:center;
-        box-shadow:0 4px 14px rgba(26,58,107,0.3);
+        box-shadow:0 4px 14px rgba(34,43,156,0.3);
       }
       .rec-brand-mark span {color:#fff;font-size:12px;font-weight:700;letter-spacing:0.05em;}
       .rec-brand-info {margin-top:5px;}
-      .rec-brand-name {font-family:'DM Serif Display',serif;font-size:17px;color:#1a3a6b;line-height:1.1;}
+      .rec-brand-name {font-family:'DM Serif Display',serif;font-size:17px;color:#222b9c;line-height:1.1;}
       .rec-brand-sub  {font-size:10px;color:#9b9b96;letter-spacing:0.1em;text-transform:uppercase;margin-top:1px;}
 
       .rec-doc-meta {text-align:right;}
       .rec-doc-type {
         font-family:'DM Serif Display',serif;font-style:italic;
-        font-size:22px;color:#1a3a6b;margin-bottom:4px;
+        font-size:22px;color:#222b9c;margin-bottom:4px;
       }
       .rec-doc-no {
         font-family:'IBM Plex Mono',monospace;font-size:11px;
@@ -6929,29 +6932,29 @@ function openPaymentReceiptModal(data) {
 
       /* Gold divider accent */
       .rec-accent {
-        height:3px;background:linear-gradient(90deg,#1a3a6b,#2451a0,#b8860b,#d4a017);
+        height:3px;background:linear-gradient(90deg,#222b9c,#3349cc,#b8860b,#d4a017);
         border-radius:3px;margin-bottom:24px;opacity:0.85;
       }
 
       /* Recipient section */
       .rec-recipient {
-        background:linear-gradient(135deg,#f0f4fc,#e8eef8);
+        background:linear-gradient(135deg,#f5f8ff,#eaf1ff);
         border-radius:14px;padding:18px 20px;margin-bottom:22px;
-        border:1px solid #b8c8e8;display:flex;align-items:center;gap:16px;
+        border:1px solid #c7d7fe;display:flex;align-items:center;gap:16px;
       }
       .rec-rep-av {
         width:52px;height:52px;border-radius:50%;
-        background:linear-gradient(135deg,#1a3a6b,#2451a0);
+        background:linear-gradient(135deg,#222b9c,#3349cc);
         color:#fff;display:flex;align-items:center;justify-content:center;
         font-size:17px;font-weight:700;flex-shrink:0;
-        box-shadow:0 3px 12px rgba(26,58,107,0.3);
+        box-shadow:0 3px 12px rgba(34,43,156,0.3);
       }
       .rec-rep-name {font-size:16px;font-weight:700;color:#1a1a18;margin-bottom:2px;}
       .rec-rep-sub  {font-size:11.5px;color:#6b6b67;}
       .rec-rep-phone {
         margin-left:auto;text-align:right;
         font-family:'IBM Plex Mono',monospace;font-size:12px;
-        color:#1a3a6b;font-weight:600;
+        color:#222b9c;font-weight:600;
       }
       .rec-rep-phone-lbl {font-size:10px;color:#9b9b96;font-family:'DM Sans',sans-serif;margin-bottom:2px;}
 
@@ -6965,15 +6968,15 @@ function openPaymentReceiptModal(data) {
       .rec-item-label {color:#6b6b67;}
       .rec-item-value {font-weight:600;color:#1a1a18;font-family:'IBM Plex Mono',monospace;font-size:12px;text-align:right;max-width:55%;word-break:break-word;}
       .rec-item-value.gold  {color:#b8860b;}
-      .rec-item-value.royal {color:#1a3a6b;}
+      .rec-item-value.royal {color:#222b9c;}
       .rec-item-value.green {color:#1D9E75;}
 
       /* Total box */
       .rec-total {
-        background:linear-gradient(135deg,#1a3a6b 0%,#2451a0 100%);
+        background:linear-gradient(135deg,#222b9c 0%,#3349cc 100%);
         border-radius:14px;padding:20px 22px;margin-bottom:20px;
         display:flex;justify-content:space-between;align-items:center;
-        box-shadow:0 6px 24px rgba(26,58,107,0.25);
+        box-shadow:0 6px 24px rgba(34,43,156,0.25);
       }
       .rec-total-label {font-size:11px;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;}
       .rec-total-amount {
@@ -6999,7 +7002,7 @@ function openPaymentReceiptModal(data) {
       .rec-approval-lbl {color:#6b6b67;}
       .rec-approval-val {font-weight:600;color:#1a1a18;}
       .rec-sig-line {
-        border-top:1.5px solid #1a3a6b;margin-top:8px;padding-top:6px;
+        border-top:1.5px solid #222b9c;margin-top:8px;padding-top:6px;
         display:flex;justify-content:space-between;font-size:10px;color:#6b6b67;
       }
 
@@ -7008,10 +7011,10 @@ function openPaymentReceiptModal(data) {
         text-align:center;padding-top:16px;border-top:1px solid #f0f2f7;
         font-size:10.5px;color:#9b9b96;line-height:1.7;
       }
-      .rec-footer strong {color:#1a3a6b;}
+      .rec-footer strong {color:#222b9c;}
       .rec-watermark {
         font-family:'DM Serif Display',serif;font-style:italic;
-        font-size:11px;color:#b8c8e8;margin-top:6px;
+        font-size:11px;color:#c7d7fe;margin-top:6px;
         letter-spacing:0.05em;
       }
 
@@ -7078,7 +7081,7 @@ function openPaymentReceiptModal(data) {
           <div>
             <div class="rec-rep-name">${data.rep_name}</div>
             <div class="rec-rep-sub">Sales Representative</div>
-            <div style="margin-top:5px;font-size:10.5px;color:#1a3a6b;font-weight:600;">
+            <div style="margin-top:5px;font-size:10.5px;color:#222b9c;font-weight:600;">
               📞 ${data.mobile_number}
             </div>
           </div>
@@ -9728,7 +9731,7 @@ async function _initAttAdminMap(records) {
     if (employees.length > 1) {
       const clusterIcon = L.divIcon({
         className: '',
-        html: `<div style="width:22px;height:22px;border-radius:50%;background:#1a3a6b;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(26,58,107,0.4);">${employees.length}</div>`,
+        html: `<div style="width:22px;height:22px;border-radius:50%;background:#222b9c;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(34,43,156,0.4);">${employees.length}</div>`,
         iconSize:   [22, 22],
         iconAnchor: [11, 11],
       });
@@ -11140,7 +11143,7 @@ function renderWAConversationsList(filter = '') {
     const lastMsg  = conv.messages?.[conv.messages.length - 1] || {};
     const unread   = (conv.messages || []).filter(m => !m.read && m.from === 'contact').length;
     const initials = (conv.name || '?').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-    const colors   = ['#1a3a6b','#25d366','#d4a017','#9b59b6','#e24b4a'];
+    const colors   = ['#222b9c','#25d366','#d4a017','#9b59b6','#e24b4a'];
     const color    = colors[(conv.name || '').charCodeAt(0) % colors.length];
     const isActive = activeWAConvId === conv.id;
     const timeStr  = lastMsg.time || '';
@@ -11188,7 +11191,7 @@ function openWAConversation(convId) {
 
   // Set header
   const initials = (conv.name || '?').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-  const colors   = ['#1a3a6b','#25d366','#d4a017','#9b59b6','#e24b4a'];
+  const colors   = ['#222b9c','#25d366','#d4a017','#9b59b6','#e24b4a'];
   const color    = colors[(conv.name || '').charCodeAt(0) % colors.length];
   document.getElementById('wa-header-av').textContent  = initials;
   document.getElementById('wa-header-av').style.background = color;
@@ -11260,7 +11263,7 @@ function renderWAMessages(conv) {
         };padding:7px 12px 8px;box-shadow:0 1px 2px rgba(0,0,0,0.12);position:relative;cursor:pointer;"
         onmouseover="this.querySelector('.wa-msg-menu').style.opacity='1'"
         onmouseout="this.querySelector('.wa-msg-menu').style.opacity='0'">
-        ${!isMe && isFirst ? `<div style="font-size:11px;color:${['#1a3a6b','#25d366','#d4a017'][conv.name?.charCodeAt(0)%3]};font-weight:700;margin-bottom:2px;">${conv.name}</div>` : ''}
+        ${!isMe && isFirst ? `<div style="font-size:11px;color:${['#222b9c','#25d366','#d4a017'][conv.name?.charCodeAt(0)%3]};font-weight:700;margin-bottom:2px;">${conv.name}</div>` : ''}
         <div style="font-size:14px;line-height:1.4;word-wrap:break-word;">${m.text}</div>
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:3px;">
           <span style="font-size:10.5px;color:#667781;">${m.time || ''}</span>
