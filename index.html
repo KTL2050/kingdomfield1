@@ -2289,17 +2289,11 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
           </div>
           <div class="hidden" id="excel-import-form" style="margin-top:12px;padding:14px;background:var(--bg2);border-radius:9px;border:0.5px solid var(--brd);">
             <div class="card-hdr" style="margin-bottom:10px;">
-              <span class="card-title" style="font-size:12px;">Import Excel — replaces the whole list</span>
+              <span class="card-title" style="font-size:12px;">Import Excel — replaces all three UBL lists</span>
               <button class="btn btn-sm" onclick="document.getElementById('excel-import-form').classList.add('hidden')">Cancel</button>
             </div>
-            <div class="fg">
-              <label class="flbl">List to replace</label>
-              <select class="fin" id="excel-import-table" onchange="if(_excelImportFile)readExcelImportFile(_excelImportFile)">
-                <option value="ubl_t100">T100 (UBL) — ranks 1–100 · 0 pts</option>
-                <option value="ubl_t101_500">T101–500 (UBL) — ranks 101–500 · 1 pt</option>
-                <option value="ubl_t501_plus">T501+ (UBL) — ranks 501 and above · 3 pts</option>
-              </select>
-            </div>
+            <div style="font-size:11.5px;color:var(--txt2);margin-bottom:10px;line-height:1.5;">One file with every UBL product. Each row goes to its list by rank:
+              <strong>1–100 → T100</strong> (0 pts) · <strong>101–500 → T101–500</strong> (1 pt) · <strong>501+ → T501+</strong> (3 pts).</div>
             <label id="excel-drop-zone" ondragover="event.preventDefault();this.style.borderColor='var(--royal)'" ondragleave="this.style.borderColor=''" ondrop="excelDrop(event)"
               style="display:block;border:1.5px dashed var(--brd2);border-radius:10px;padding:22px;text-align:center;cursor:pointer;background:var(--bg);">
               <input type="file" id="excel-import-file" accept=".xlsx,.csv" style="display:none;" onchange="if(this.files[0])readExcelImportFile(this.files[0])"/>
@@ -2308,7 +2302,7 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
               <div style="font-size:10.5px;color:var(--txt3);margin-top:3px;">.xlsx or .csv · row 1 headers: SKU, Item Name, Rank</div>
             </label>
             <div id="excel-import-preview" style="margin-top:10px;"></div>
-            <button class="btn btn-royal" id="excel-import-btn" disabled onclick="replaceListFromExcel()" style="margin-top:10px;">Replace list</button>
+            <button class="btn btn-royal" id="excel-import-btn" disabled onclick="replaceListFromExcel()" style="margin-top:10px;">Replace lists</button>
           </div>
         </div>
 
@@ -5111,9 +5105,7 @@ async function readExcelImportFile(file) {
     return fail(`Row 1 must have a <strong>SKU</strong> column and a <strong>Rank</strong> column. Found: ${grid[0].map(h => `"${_xEsc(h)}"`).join(', ') || 'nothing'}.`);
   }
 
-  const table = document.getElementById('excel-import-table').value;
-  const [lo, hi] = RANK_RANGES[table];
-  const rows = [], seen = new Set(), dupes = [], badRank = [], outOfRange = [];
+  const rows = [], seen = new Set(), dupes = [], badRank = [];
   let noSku = 0;
   grid.slice(1).forEach(r => {
     const sku = (r[col.sku] || '').trim();
@@ -5123,55 +5115,59 @@ async function readExcelImportFile(file) {
     seen.add(key);
     const rankText = (r[col.rank] || '').trim();
     const rank = /^\d+(\.0+)?$/.test(rankText) ? parseInt(rankText, 10) : null;
-    if (rank === null) badRank.push(sku);
-    else if (rank < lo || rank > hi) outOfRange.push(`${sku} (${rank})`);
+    if (rank === null || rank < 1) { badRank.push(sku); return; }   // no rank → skipped
     rows.push({ sku, item_name: col.name >= 0 ? (r[col.name] || '').trim() : '', rank });
   });
-  if (!rows.length) return fail('No rows with a SKU were found.');
+  if (!rows.length) return fail('No rows with both a SKU and a rank were found.');
 
-  const label = TABLE_META[table]?.label || table;
+  // Which list each row lands in, by rank
+  const listOf = rank => Object.keys(RANK_RANGES).find(t => rank >= RANK_RANGES[t][0] && rank <= RANK_RANGES[t][1]);
+  const perList = {}; Object.keys(RANK_RANGES).forEach(t => perList[t] = 0);
+  rows.forEach(r => perList[listOf(r.rank)]++);
+
   const sample = list => _xEsc(list.slice(0, 5).join(', ')) + (list.length > 5 ? ` … +${list.length - 5} more` : '');
   const warnings = [];
-  if (outOfRange.length) warnings.push(`<strong>${outOfRange.length}</strong> rank${outOfRange.length > 1 ? 's are' : ' is'} outside ${label}'s range (${lo}–${hi === Infinity ? 'last' : hi}) — is this the right list? ${sample(outOfRange)}`);
-  if (badRank.length)    warnings.push(`<strong>${badRank.length}</strong> row${badRank.length > 1 ? 's have' : ' has'} no valid rank number (saved without a rank): ${sample(badRank)}`);
-  if (dupes.length)      warnings.push(`<strong>${dupes.length}</strong> duplicate SKU${dupes.length > 1 ? 's' : ''} skipped (first one kept): ${sample(dupes)}`);
-  if (noSku)             warnings.push(`<strong>${noSku}</strong> row${noSku > 1 ? 's' : ''} without a SKU skipped`);
+  if (badRank.length) warnings.push(`<strong>${badRank.length}</strong> row${badRank.length > 1 ? 's' : ''} with no rank skipped: ${sample(badRank)}`);
+  if (dupes.length)   warnings.push(`<strong>${dupes.length}</strong> duplicate SKU${dupes.length > 1 ? 's' : ''} skipped (first one kept): ${sample(dupes)}`);
+  if (noSku)          warnings.push(`<strong>${noSku}</strong> row${noSku > 1 ? 's' : ''} without a SKU skipped`);
 
   _excelImportRows = rows;
   btn.disabled = false;
   preview.innerHTML = `
-    <div class="alert ag" style="font-size:12px;margin-bottom:8px;">✔ <span><strong>${rows.length}</strong> items ready to load into <strong>${_xEsc(label)}</strong> from ${_xEsc(file.name)}.</span></div>
+    <div class="alert ag" style="font-size:12px;margin-bottom:8px;">✔ <span><strong>${rows.length.toLocaleString()}</strong> items ready from ${_xEsc(file.name)} —
+      ${Object.keys(perList).map(t => `<strong>${_xEsc(TABLE_META[t]?.label || t)}</strong>: ${perList[t].toLocaleString()}`).join(' · ')}</span></div>
     ${warnings.map(w => `<div class="alert aw" style="font-size:11.5px;margin-bottom:6px;">⚠ <span>${w}</span></div>`).join('')}
     <div style="overflow-x:auto;"><table style="font-size:12px;">
-      <thead><tr><th>Rank</th><th>SKU</th><th>Item Name</th></tr></thead>
-      <tbody>${rows.slice(0, 5).map(r => `<tr><td class="mono">${r.rank ?? '—'}</td><td class="mono">${_xEsc(r.sku)}</td><td>${_xEsc(r.item_name) || '—'}</td></tr>`).join('')}</tbody>
+      <thead><tr><th>Rank</th><th>SKU</th><th>Item Name</th><th>List</th></tr></thead>
+      <tbody>${rows.slice(0, 5).map(r => `<tr><td class="mono">${r.rank}</td><td class="mono">${_xEsc(r.sku)}</td><td>${_xEsc(r.item_name) || '—'}</td><td>${_xEsc(TABLE_META[listOf(r.rank)]?.label || '')}</td></tr>`).join('')}</tbody>
     </table></div>
     ${rows.length > 5 ? `<div style="font-size:11px;color:var(--txt3);margin-top:4px;">First 5 of ${rows.length} rows shown.</div>` : ''}`;
 }
 
 async function replaceListFromExcel() {
-  const table = document.getElementById('excel-import-table').value;
   const rows = _excelImportRows;
   if (!rows || !rows.length) return;
-  const label = TABLE_META[table]?.label || table;
-  const { count } = await sb.from(table).select('id', { count: 'exact', head: true });
+  // current size of each list, for the confirm message
+  const tables = Object.keys(RANK_RANGES);
+  const before = await Promise.all(tables.map(t => sb.from(t).select('id', { count: 'exact', head: true })));
+  const after = tables.map(t => rows.filter(r => r.rank >= RANK_RANGES[t][0] && r.rank <= RANK_RANGES[t][1]).length);
   showConfirmDialog({
     icon: '⇪',
-    title: `Replace the ${label} list?`,
-    message: `The current <strong>${count ?? 0}</strong> items in ${_xEsc(label)} will be removed and replaced with the <strong>${rows.length}</strong> items from this file.<br><br>Listings already placed keep the points they were given.`,
-    confirmLabel: 'Replace list',
+    title: 'Replace all three UBL lists?',
+    message: tables.map((t, i) => `<strong>${_xEsc(TABLE_META[t]?.label || t)}</strong>: ${(before[i].count ?? 0).toLocaleString()} → ${after[i].toLocaleString()}`).join('<br>')
+      + '<br><br>Listings already placed keep the points they were given.',
+    confirmLabel: 'Replace lists',
     confirmStyle: 'background:var(--royal);color:#fff;border:none;',
     onConfirm: async () => {
       const btn = document.getElementById('excel-import-btn');
       btn.disabled = true; btn.textContent = 'Importing…';
-      const { data, error } = await sb.rpc('replace_ranked_list', { p_table: table, p_rows: rows });
-      btn.textContent = 'Replace list';
-      if (error) { btn.disabled = false; alert('Import failed — the list was not changed.\n\n' + error.message); return; }
-      notifySkuTableChanged(table);
+      const { data, error } = await sb.rpc('replace_all_ranked_lists', { p_rows: rows });
+      btn.textContent = 'Replace lists';
+      if (error) { btn.disabled = false; alert('Import failed — none of the lists were changed.\n\n' + error.message); return; }
+      tables.forEach(t => notifySkuTableChanged(t));
       document.getElementById('excel-import-form').classList.add('hidden');
-      document.getElementById('sku-list-view-type').value = table;
       await loadSkuListView();
-      alert(`${label} list replaced: ${data} items loaded.`);
+      alert(`UBL lists replaced — T100: ${data.ubl_t100} · T101–500: ${data.ubl_t101_500} · T501+: ${data.ubl_t501_plus}`);
     }
   });
 }
