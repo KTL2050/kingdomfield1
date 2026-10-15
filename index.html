@@ -2252,10 +2252,11 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
             <span class="card-title">SKU Listing Tables</span>
             <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;">
               <select class="sel" id="sku-list-view-type" onchange="loadSkuListView()" style="font-size:11.5px;">
-                <option value="ubl_t100">T100 — UBL</option>
-                <option value="ubl_t101_500">T101–500 — UBL</option>
-                <option value="ubl_t501_plus">T501+ — UBL</option>
-                <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
+                <option value="ubl_t100">Top 100</option>
+                <option value="ubl_t101_500">Top 101–500</option>
+                <option value="ubl_t501_plus">Others</option>
+                <option value="list_slobs">SLOBS</option>
+                <option value="aiwibi_aiwina">AIWIBI / AIWINA (Stock Position only)</option>
               </select>
               <button class="btn btn-sm btn-royal" onclick="showAddSkuForm()">+ Add SKU</button>
               <button class="btn btn-sm" onclick="showExcelImport()">⇪ Import Excel</button>
@@ -2276,10 +2277,11 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
               <div class="fg">
                 <label class="flbl">List Table</label>
                 <select class="fin" id="add-sku-table">
-                  <option value="ubl_t100">T100 (UBL)</option>
-                  <option value="ubl_t101_500">T101–500 (UBL)</option>
-                  <option value="ubl_t501_plus">T501+ (UBL)</option>
-                  <option value="aiwibi_aiwina">AIWIBI / AIWINA</option>
+                  <option value="ubl_t100">Top 100</option>
+                  <option value="ubl_t101_500">Top 101–500</option>
+                  <option value="ubl_t501_plus">Others</option>
+                  <option value="list_slobs">SLOBS</option>
+                  <option value="aiwibi_aiwina">AIWIBI / AIWINA (Stock Position only)</option>
                 </select>
               </div>
               <div class="fg"><label class="flbl">SKU</label><input class="fin" id="add-sku-code" placeholder="e.g. AG0001"/></div>
@@ -2289,11 +2291,12 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
           </div>
           <div class="hidden" id="excel-import-form" style="margin-top:12px;padding:14px;background:var(--bg2);border-radius:9px;border:0.5px solid var(--brd);">
             <div class="card-hdr" style="margin-bottom:10px;">
-              <span class="card-title" style="font-size:12px;">Import Excel — replaces all three UBL lists</span>
+              <span class="card-title" style="font-size:12px;">Import Excel — replaces all four lists</span>
               <button class="btn btn-sm" onclick="document.getElementById('excel-import-form').classList.add('hidden')">Cancel</button>
             </div>
-            <div style="font-size:11.5px;color:var(--txt2);margin-bottom:10px;line-height:1.5;">One file with every UBL product. Each row goes to its list by rank:
-              <strong>1–100 → T100</strong> (0 pts) · <strong>101–500 → T101–500</strong> (1 pt) · <strong>501+ → T501+</strong> (3 pts).</div>
+            <div style="font-size:11.5px;color:var(--txt2);margin-bottom:10px;line-height:1.5;">One file with every product (UBL, AIWIBI, AIWINA). Columns: <strong>SKU, Item Name, Rank, Status</strong>.<br>
+              <strong>Status SLOB → SLOBS</strong> (3 pts, rank optional) · otherwise by rank:
+              <strong>1–100 → Top 100</strong> (0 pts) · <strong>101–500 → Top 101–500</strong> (1 pt) · <strong>501+ → Others</strong> (3 pts).</div>
             <label id="excel-drop-zone" ondragover="event.preventDefault();this.style.borderColor='var(--royal)'" ondragleave="this.style.borderColor=''" ondrop="excelDrop(event)"
               style="display:block;border:1.5px dashed var(--brd2);border-radius:10px;padding:22px;text-align:center;cursor:pointer;background:var(--bg);">
               <input type="file" id="excel-import-file" accept=".xlsx,.csv" style="display:none;" onchange="if(this.files[0])readExcelImportFile(this.files[0])"/>
@@ -2491,22 +2494,20 @@ let lastSavedListingItems = [];
 let lastSavedListingClient = '';
 
 // ─── BRAND / LISTING TABLE CONFIG ─────────────────────────────────────────────
-const BRAND_TABLE_MAP = {
-  'UBL':   ['ubl_t100', 'ubl_t101_500', 'ubl_t501_plus'],
-  'AIWIBI': ['aiwibi_aiwina'],
-  'AIWINA': ['aiwibi_aiwina'],
-};
+// The four listing tables, shared by all brands (UBL, AIWIBI, AIWINA)
+const LISTING_TABLES = ['ubl_t100', 'ubl_t101_500', 'ubl_t501_plus', 'list_slobs'];
 const TABLE_META = {
-  ubl_t100:      { label: 'T100',      badgeClass: 'br'    },
-  ubl_t101_500:  { label: 'T101–500',  badgeClass: 'bb'    },
-  ubl_t501_plus: { label: 'T501+',     badgeClass: 'bg'    },
+  ubl_t100:      { label: 'Top 100',     badgeClass: 'br'    },
+  ubl_t101_500:  { label: 'Top 101–500', badgeClass: 'bb'    },
+  ubl_t501_plus: { label: 'Others',      badgeClass: 'bg'    },
+  list_slobs:    { label: 'SLOBS',       badgeClass: 'ba'    },
   t250:        { label: 'T250',        badgeClass: 'bb'    },
   slobs:       { label: 'SLOBS',       badgeClass: 'ba'    },
   new_items:   { label: 'NEW ITEMS',   badgeClass: 'bg'    },
   aiwibi_aiwina: { label: 'AIWIBI/AIWINA', badgeClass: 'bgold' },
 };
 // Points a confirmed item earns, fixed when it is listed. Lists not named here (AIWIBI/AIWINA) earn 1.
-const LIST_POINTS = { ubl_t100: 0, ubl_t101_500: 1, ubl_t501_plus: 3 };
+const LIST_POINTS = { ubl_t100: 0, ubl_t101_500: 1, ubl_t501_plus: 3, list_slobs: 3 };
 const RANK_RANGES = { ubl_t100: [1, 100], ubl_t101_500: [101, 500], ubl_t501_plus: [501, Infinity] };
 let _skuCache       = {};
 let _clientBrandCache = {};
@@ -3591,15 +3592,9 @@ async function loadListableItems(clientId) {
   if (!tableEl) return;
   const id = clientId || currentDetailClientId;
   if (!id) { tableEl.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3);">No client selected.</div>'; return; }
-  tableEl.innerHTML = `<div style="padding:24px;text-align:center;color:var(--txt3);"><div style="font-size:22px;margin-bottom:8px;">⏳</div>Checking brand assignments &amp; purchase history...</div>`;
+  tableEl.innerHTML = `<div style="padding:24px;text-align:center;color:var(--txt3);"><div style="font-size:22px;margin-bottom:8px;">⏳</div>Checking purchase history...</div>`;
   const client = allClients.find(c=>c.id===id);
-  const clientBrands = await getClientBrands(id);
-  if (clientBrands.length===0) {
-    tableEl.innerHTML = `<div style="padding:30px 20px;text-align:center;"><div style="font-size:28px;margin-bottom:10px;">🏷️</div><div style="font-weight:600;font-size:13px;margin-bottom:6px;">No brands assigned to this client</div><div style="font-size:12px;color:var(--txt3);">${canAdmin() ? `<button class="btn btn-sm btn-royal" onclick="goTo('admin')">Go to Admin → Assign Brands</button>` : 'Ask your admin to assign brands to this client.'}</div></div>`;
-    return;
-  }
-  const tablesToQuery = new Set();
-  clientBrands.forEach(brand => (BRAND_TABLE_MAP[brand]||[]).forEach(t=>tablesToQuery.add(t)));
+  const tablesToQuery = new Set(LISTING_TABLES);
   const allSkuRows = (await Promise.all([...tablesToQuery].map(t=>getTableSkus(t)))).flat();
   const seenSkus = new Set();
   const uniqueSkuRows = allSkuRows.filter(r=>{
@@ -3736,14 +3731,13 @@ const purchasedItemIdDates = {}; // itemId  -> [dates]
 
   const inCatalogue    = enriched.filter(e=>e.in_catalogue);
   const notInCatalogue = enriched.filter(e=>!e.in_catalogue);
-  const brandColors  = {UBL:'bb', AIWIBI:'bgold', AIWINA:'bg'};
-  const brandBadges  = clientBrands.map(b=>`<span class="badge ${brandColors[b]||'bb'}">${b}</span>`).join(' ');
+  const brandBadges  = '<span class="badge bb">UBL · AIWIBI · AIWINA</span>';
   const tableNames   = [...tablesToQuery].map(t=>TABLE_META[t]?.label||t).join(', ');
   const tableBadge = t => { const m = TABLE_META[t]; if(!m) return `<span class="badge bb">${t}</span>`; return `<span class="badge ${m.badgeClass}" style="font-size:9.5px;">${m.label}</span>`; };
 
   tableEl.innerHTML = `
     <div style="margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <span style="font-size:11.5px;font-weight:600;color:var(--txt2);">Brands stocked:</span>
+      <span style="font-size:11.5px;font-weight:600;color:var(--txt2);">Brands:</span>
       ${brandBadges}
       <span style="font-size:10.5px;color:var(--txt3);">· Tables: ${tableNames}</span>
     </div>
@@ -3877,21 +3871,8 @@ async function loadClientProducts(preselectedProductId=null){
     <div style="font-size:20px;margin-bottom:8px;">⏳</div>Loading items to list for this store...</td></tr>`;
   _listingClientId = clientId;
 
-  // 1. Get brands assigned to this client
-  const clientBrands = await getClientBrands(clientId);
-  if(clientBrands.length===0){
-    tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:28px;">
-      <div style="font-size:28px;margin-bottom:10px;">🏷️</div>
-      <div style="font-weight:600;font-size:13px;margin-bottom:6px;">No brands assigned to this client</div>
-      <div style="font-size:12px;color:var(--txt3);">${canAdmin()?'Go to Admin → Client Brand Assignments.':'Ask your admin to assign brands.'}</div>
-    </td></tr>`;
-    _listingScreenItems=[];
-    return;
-  }
-
-  // 2. Collect all SKUs from the brand listing tables
-  const tablesToQuery = new Set();
-  clientBrands.forEach(brand=>(BRAND_TABLE_MAP[brand]||[]).forEach(t=>tablesToQuery.add(t)));
+  // 1–2. Collect all SKUs from the four listing tables (all brands, every store)
+  const tablesToQuery = new Set(LISTING_TABLES);
   const allSkuRows = (await Promise.all([...tablesToQuery].map(t=>getTableSkus(t)))).flat();
 
   // Deduplicate by SKU
@@ -3989,8 +3970,7 @@ if (!product && nameKey.length > 4) {
   _listingScreenItems = enriched;
 
   // 5. Build info banner
-  const brandColors = {UBL:'bb', AIWIBI:'bgold', AIWINA:'bg'};
-  const brandBadges = clientBrands.map(b=>`<span class="badge ${brandColors[b]||'bb'}">${b}</span>`).join(' ');
+  const brandBadges = '<span class="badge bb">UBL · AIWIBI · AIWINA</span>';
   const tableBadges = [...tablesToQuery].map(t=>{
     const m=TABLE_META[t];
     return `<span class="badge ${m?.badgeClass||'bb'}" style="font-size:9.5px;">${m?.label||t}</span>`;
@@ -4840,8 +4820,8 @@ async function loadSkuListView() {
   const el = document.getElementById('sku-list-view'); el.innerHTML = '<div class="empty-state">Loading...</div>';
   const searchEl = document.getElementById('sku-list-search');
   if (searchEl) searchEl.value = '';
-  const ranked = tableName in RANK_RANGES;
-  const { data, error } = await sb.from(tableName).select('*').order(ranked ? 'rank' : 'sku');
+  const ranked = tableName in LIST_POINTS;
+  const { data, error } = await sb.from(tableName).select('*').order(ranked ? 'rank' : 'sku', ranked ? { nullsFirst: false } : undefined);
   if (error) { el.innerHTML=`<div class="empty-state" style="color:#A32D2D;">Error: ${error.message}</div>`; return; }
   const rows = data||[];
   if (rows.length===0) { el.innerHTML=`<div class="empty-state">No SKUs in <strong>${TABLE_META[tableName]?.label||tableName}</strong> yet.</div>`; return; }
@@ -5012,6 +4992,8 @@ async function saveSkuToList(){const tableName=document.getElementById('add-sku-
 let _excelImportFile = null;
 let _excelImportRows = null;
 const _xEsc = t => String(t == null ? '' : t).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+// Which list an imported row goes to: SLOB status first, otherwise by rank
+const _xListOf = r => r.slob ? 'list_slobs' : Object.keys(RANK_RANGES).find(t => r.rank >= RANK_RANGES[t][0] && r.rank <= RANK_RANGES[t][1]);
 
 function showExcelImport() {
   document.getElementById('add-sku-form').classList.add('hidden');
@@ -5100,6 +5082,7 @@ async function readExcelImportFile(file) {
     sku:  findCol(['sku', 'skucode', 'itemcode', 'code', 'itemsku']),
     name: findCol(['itemname', 'name', 'item', 'productname', 'product', 'description']),
     rank: findCol(['rank', 'ranking', 'position', 'top']),
+    status: findCol(['status', 'slob', 'slobstatus', 'slobs']),
   };
   if (col.sku < 0 || col.rank < 0) {
     return fail(`Row 1 must have a <strong>SKU</strong> column and a <strong>Rank</strong> column. Found: ${grid[0].map(h => `"${_xEsc(h)}"`).join(', ') || 'nothing'}.`);
@@ -5115,19 +5098,20 @@ async function readExcelImportFile(file) {
     seen.add(key);
     const rankText = (r[col.rank] || '').trim();
     const rank = /^\d+(\.0+)?$/.test(rankText) ? parseInt(rankText, 10) : null;
-    if (rank === null || rank < 1) { badRank.push(sku); return; }   // no rank → skipped
-    rows.push({ sku, item_name: col.name >= 0 ? (r[col.name] || '').trim() : '', rank });
+    const slob = col.status >= 0 && ['slob', 'slobs'].includes(norm(r[col.status]));
+    if (!slob && (rank === null || rank < 1)) { badRank.push(sku); return; }   // not-SLOB needs a rank
+    rows.push({ sku, item_name: col.name >= 0 ? (r[col.name] || '').trim() : '', rank: rank >= 1 ? rank : null, slob });
   });
-  if (!rows.length) return fail('No rows with both a SKU and a rank were found.');
+  if (!rows.length) return fail('No usable rows were found (each needs a SKU, and a rank unless its Status is SLOB).');
 
-  // Which list each row lands in, by rank
-  const listOf = rank => Object.keys(RANK_RANGES).find(t => rank >= RANK_RANGES[t][0] && rank <= RANK_RANGES[t][1]);
-  const perList = {}; Object.keys(RANK_RANGES).forEach(t => perList[t] = 0);
-  rows.forEach(r => perList[listOf(r.rank)]++);
+  // Which list each row lands in: SLOB status first, otherwise by rank
+  const perList = {}; LISTING_TABLES.forEach(t => perList[t] = 0);
+  rows.forEach(r => perList[_xListOf(r)]++);
 
   const sample = list => _xEsc(list.slice(0, 5).join(', ')) + (list.length > 5 ? ` … +${list.length - 5} more` : '');
   const warnings = [];
-  if (badRank.length) warnings.push(`<strong>${badRank.length}</strong> row${badRank.length > 1 ? 's' : ''} with no rank skipped: ${sample(badRank)}`);
+  if (col.status < 0) warnings.push('No <strong>Status</strong> column found — nothing will go to <strong>SLOBS</strong>, and the current SLOBS list will be emptied.');
+  if (badRank.length) warnings.push(`<strong>${badRank.length}</strong> row${badRank.length > 1 ? 's' : ''} with no rank (and not SLOB) skipped: ${sample(badRank)}`);
   if (dupes.length)   warnings.push(`<strong>${dupes.length}</strong> duplicate SKU${dupes.length > 1 ? 's' : ''} skipped (first one kept): ${sample(dupes)}`);
   if (noSku)          warnings.push(`<strong>${noSku}</strong> row${noSku > 1 ? 's' : ''} without a SKU skipped`);
 
@@ -5138,8 +5122,8 @@ async function readExcelImportFile(file) {
       ${Object.keys(perList).map(t => `<strong>${_xEsc(TABLE_META[t]?.label || t)}</strong>: ${perList[t].toLocaleString()}`).join(' · ')}</span></div>
     ${warnings.map(w => `<div class="alert aw" style="font-size:11.5px;margin-bottom:6px;">⚠ <span>${w}</span></div>`).join('')}
     <div style="overflow-x:auto;"><table style="font-size:12px;">
-      <thead><tr><th>Rank</th><th>SKU</th><th>Item Name</th><th>List</th></tr></thead>
-      <tbody>${rows.slice(0, 5).map(r => `<tr><td class="mono">${r.rank}</td><td class="mono">${_xEsc(r.sku)}</td><td>${_xEsc(r.item_name) || '—'}</td><td>${_xEsc(TABLE_META[listOf(r.rank)]?.label || '')}</td></tr>`).join('')}</tbody>
+      <thead><tr><th>Rank</th><th>SKU</th><th>Item Name</th><th>Status</th><th>List</th></tr></thead>
+      <tbody>${rows.slice(0, 5).map(r => `<tr><td class="mono">${r.rank ?? '—'}</td><td class="mono">${_xEsc(r.sku)}</td><td>${_xEsc(r.item_name) || '—'}</td><td>${r.slob ? 'SLOB' : 'Not SLOB'}</td><td>${_xEsc(TABLE_META[_xListOf(r)]?.label || '')}</td></tr>`).join('')}</tbody>
     </table></div>
     ${rows.length > 5 ? `<div style="font-size:11px;color:var(--txt3);margin-top:4px;">First 5 of ${rows.length} rows shown.</div>` : ''}`;
 }
@@ -5148,12 +5132,12 @@ async function replaceListFromExcel() {
   const rows = _excelImportRows;
   if (!rows || !rows.length) return;
   // current size of each list, for the confirm message
-  const tables = Object.keys(RANK_RANGES);
+  const tables = LISTING_TABLES;
   const before = await Promise.all(tables.map(t => sb.from(t).select('id', { count: 'exact', head: true })));
-  const after = tables.map(t => rows.filter(r => r.rank >= RANK_RANGES[t][0] && r.rank <= RANK_RANGES[t][1]).length);
+  const after = tables.map(t => rows.filter(r => _xListOf(r) === t).length);
   showConfirmDialog({
     icon: '⇪',
-    title: 'Replace all three UBL lists?',
+    title: 'Replace all four lists?',
     message: tables.map((t, i) => `<strong>${_xEsc(TABLE_META[t]?.label || t)}</strong>: ${(before[i].count ?? 0).toLocaleString()} → ${after[i].toLocaleString()}`).join('<br>')
       + '<br><br>Listings already placed keep the points they were given.',
     confirmLabel: 'Replace lists',
@@ -5167,7 +5151,7 @@ async function replaceListFromExcel() {
       tables.forEach(t => notifySkuTableChanged(t));
       document.getElementById('excel-import-form').classList.add('hidden');
       await loadSkuListView();
-      alert(`UBL lists replaced — T100: ${data.ubl_t100} · T101–500: ${data.ubl_t101_500} · T501+: ${data.ubl_t501_plus}`);
+      alert(`Lists replaced — Top 100: ${data.ubl_t100} · Top 101–500: ${data.ubl_t101_500} · Others: ${data.ubl_t501_plus} · SLOBS: ${data.list_slobs ?? 0}`);
     }
   });
 }
@@ -6264,11 +6248,10 @@ async function selectTeamClient(clientId, clientName, repId, repName) {
     .limit(20);
 
   // Fetch items to list (brand-based, never purchased)
-  const clientBrands = await getClientBrands(clientId);
+  const clientBrands = await getClientBrands(clientId);   // shown for information only
   let toListCount = 0;
-  if (clientBrands.length > 0) {
-    const tablesToQuery = new Set();
-    clientBrands.forEach(brand => (BRAND_TABLE_MAP[brand]||[]).forEach(t=>tablesToQuery.add(t)));
+  {
+    const tablesToQuery = new Set(LISTING_TABLES);
     const allSkuRows = (await Promise.all([...tablesToQuery].map(t=>getTableSkus(t)))).flat();
     const seenSkus = new Set();
     const uniqueSkuRows = allSkuRows.filter(r=>{
@@ -6377,11 +6360,7 @@ async function loadTeamClientToList(clientId, clientName) {
   if(!el) return;
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--txt3);">⏳ Loading items to list...</div>';
 
-  const clientBrands = await getClientBrands(clientId);
-  if(clientBrands.length===0){ el.innerHTML='<div style="padding:20px;text-align:center;color:var(--txt3);">No brands assigned to this client.</div>'; return; }
-
-  const tablesToQuery = new Set();
-  clientBrands.forEach(brand=>(BRAND_TABLE_MAP[brand]||[]).forEach(t=>tablesToQuery.add(t)));
+  const tablesToQuery = new Set(LISTING_TABLES);
   const allSkuRows = (await Promise.all([...tablesToQuery].map(t=>getTableSkus(t)))).flat();
   const seenSkus = new Set();
   const uniqueSkuRows = allSkuRows.filter(r=>{ const key=r.sku.trim().toLowerCase(); if(seenSkus.has(key)) return false; seenSkus.add(key); return true; });

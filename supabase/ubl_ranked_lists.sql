@@ -59,3 +59,42 @@ begin
 end $$;
 
 notify pgrst, 'reload schema';
+
+-- ─── Four listing tables for all brands (UBL, AIWIBI, AIWINA) ──────────────
+-- ubl_t100 / ubl_t101_500 / ubl_t501_plus keep their names (shown as Top 100,
+-- Top 101–500, Others); SLOBS is new. Status "SLOB" rows go to SLOBS whatever
+-- their rank; every other row is placed by rank.
+create table if not exists public.list_slobs (like public.ubl_t100 including all);
+
+create or replace function public.replace_all_ranked_lists(p_rows jsonb)
+returns jsonb language plpgsql as $$
+declare a integer; b integer; c integer; d integer;
+begin
+  delete from public.ubl_t100      where true;
+  delete from public.ubl_t101_500  where true;
+  delete from public.ubl_t501_plus where true;
+  delete from public.list_slobs    where true;
+  insert into public.ubl_t100 (sku, item_name, rank)
+    select r->>'sku', nullif(r->>'item_name',''), (r->>'rank')::int
+    from jsonb_array_elements(p_rows) r
+    where not coalesce((r->>'slob')::boolean, false) and (r->>'rank')::int between 1 and 100;
+  get diagnostics a = row_count;
+  insert into public.ubl_t101_500 (sku, item_name, rank)
+    select r->>'sku', nullif(r->>'item_name',''), (r->>'rank')::int
+    from jsonb_array_elements(p_rows) r
+    where not coalesce((r->>'slob')::boolean, false) and (r->>'rank')::int between 101 and 500;
+  get diagnostics b = row_count;
+  insert into public.ubl_t501_plus (sku, item_name, rank)
+    select r->>'sku', nullif(r->>'item_name',''), (r->>'rank')::int
+    from jsonb_array_elements(p_rows) r
+    where not coalesce((r->>'slob')::boolean, false) and (r->>'rank')::int >= 501;
+  get diagnostics c = row_count;
+  insert into public.list_slobs (sku, item_name, rank)
+    select r->>'sku', nullif(r->>'item_name',''), (r->>'rank')::int
+    from jsonb_array_elements(p_rows) r
+    where coalesce((r->>'slob')::boolean, false);
+  get diagnostics d = row_count;
+  return jsonb_build_object('ubl_t100', a, 'ubl_t101_500', b, 'ubl_t501_plus', c, 'list_slobs', d);
+end $$;
+
+notify pgrst, 'reload schema';
