@@ -585,6 +585,40 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
       <option value="sales_rep">Sales Representative</option>
     </select>
     <button class="login-btn" onclick="doLogin()">Sign in</button>
+    <div style="text-align:center;margin-top:14px;font-size:12px;color:var(--txt2);">New here? <span onclick="showSignup()" style="color:var(--royal);cursor:pointer;text-decoration:underline;font-weight:500;">Create an account</span></div>
+  </div>
+</div>
+
+<div class="login-wrap hidden" id="signup-screen">
+  <div class="login-card">
+    <div class="ktl-mark"><span>KTL</span></div>
+    <div class="login-title">Create an account</div>
+    <div class="login-sub">An admin will review your request and assign your role.</div>
+    <div class="err-msg" id="su-err"></div>
+    <label class="f-lbl">Full name</label>
+    <input class="f-inp" id="su-name" placeholder="e.g. Sarah Kyomugisha"/>
+    <label class="f-lbl">Email address</label>
+    <input class="f-inp" type="email" id="su-email" placeholder="you@kingdomtrading.limited"/>
+    <label class="f-lbl">Country</label>
+    <select class="f-sel" id="su-country">
+      <option value="UG">Uganda</option>
+      <option value="KE">Kenya</option>
+    </select>
+    <label class="f-lbl">Password</label>
+    <input class="f-inp" type="password" id="su-pass" placeholder="Min. 8 characters"/>
+    <label class="f-lbl">Confirm password</label>
+    <input class="f-inp" type="password" id="su-pass2" placeholder="Repeat password"/>
+    <button class="login-btn" onclick="doSignup()">Create account</button>
+    <div style="text-align:center;margin-top:14px;font-size:12px;color:var(--txt2);">Already have an account? <span onclick="backToLogin()" style="color:var(--royal);cursor:pointer;text-decoration:underline;font-weight:500;">Sign in</span></div>
+  </div>
+</div>
+
+<div class="login-wrap hidden" id="pending-screen">
+  <div class="login-card" style="text-align:center;">
+    <div class="ktl-mark"><span>KTL</span></div>
+    <div class="login-title" id="pending-title">Waiting for approval</div>
+    <div class="login-sub" id="pending-msg" style="line-height:1.6;"></div>
+    <button class="login-btn" onclick="backToLogin()">Back to sign in</button>
   </div>
 </div>
 
@@ -2311,6 +2345,7 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
 
         <div class="card">
           <div class="card-hdr"><span class="card-title">Users</span><button class="btn btn-sm btn-royal" onclick="showAddUser()">+ Add User</button></div>
+          <div id="pending-signups"></div>
           <div id="users-list"><div class="empty-state">Loading...</div></div>
         </div>
 
@@ -2341,6 +2376,12 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                 <option value="sales_rep">Sales Representative</option>
                 <option value="manager">Manager</option>
                 <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div class="fg"><label class="flbl">Country</label>
+              <select class="fin" id="u-country">
+                <option value="UG">Uganda</option>
+                <option value="KE">Kenya</option>
               </select>
             </div>
             <div class="fg">
@@ -2535,6 +2576,26 @@ const isSalesRep = () => currentUser?.role === 'sales_rep';
 const canAdmin   = () => currentUser?.role === 'admin';
 const canManage  = () => ['admin','manager'].includes(currentUser?.role);
 
+// ─── COUNTRY (Uganda / Kenya) ──────────────────────────────────────────────────
+// Every user belongs to one country. Kenyan accounts see the Kenya interface;
+// Ugandan admins/managers can switch which country they're viewing (ktl-country.js).
+const COUNTRY_NAMES = { UG: 'Uganda', KE: 'Kenya' };
+const COUNTRY_MAP_CENTRE = { UG: [0.3136, 32.5811], KE: [-1.2864, 36.8172] };   // Kampala, Nairobi
+const myCountry = () => currentUser?.country || 'UG';
+function viewCountry() {
+  if (myCountry() !== 'UG' || !canManage()) return myCountry();
+  try { const v = localStorage.getItem('ktl_view_country'); return COUNTRY_NAMES[v] ? v : 'UG'; } catch (e) { return 'UG'; }
+}
+const _countryIdCache = {};
+/** Ids of everyone in a country (default: the country being viewed) — for filtering attendance/leave rows. */
+async function countryUserIds(country = viewCountry()) {
+  if (!_countryIdCache[country]) {
+    const { data } = await sb.from('users').select('id').eq('country', country);
+    _countryIdCache[country] = (data || []).map(u => String(u.id));
+  }
+  return _countryIdCache[country];
+}
+
 
 const NAV = [
     {id:'attendance', label:'Attendance', sec:'Main', icon:'M8 1a7 7 0 100 14A7 7 0 008 1zm0 3v4l3 2M3.5 13.5l9-9'},
@@ -2630,7 +2691,17 @@ const managerIds  = ['dashboard','clients','orders','wallet','targets','reports'
 window.onload = async () => {
   setLoading('Checking session...');
   const stored = localStorage.getItem('ktl_user');
-  if (stored) { currentUser = JSON.parse(stored); await bootApp(); }
+  if (stored) {
+    currentUser = JSON.parse(stored);
+    // Re-read the account: picks up country / approval changes and deactivation since the last visit
+    try {
+      const { data: fresh } = await sb.from('users').select('*').eq('id', currentUser.id).maybeSingle();
+      if (fresh) { currentUser = { ...fresh }; localStorage.setItem('ktl_user', JSON.stringify(currentUser)); }
+      if (fresh && fresh.is_active === false) { hideLoading(); backToLogin(); return; }
+      if (fresh && (fresh.status || 'approved') !== 'approved') { hideLoading(); showPending(fresh); return; }
+    } catch (e) { console.warn('Could not refresh account:', e.message); }
+    await bootApp();
+  }
   else { hideLoading(); showLogin(); }
 };
 
@@ -2683,12 +2754,61 @@ async function doLogin() {
     if (user.is_active===false) { hideLoading(); errEl.textContent='Account deactivated. Contact your admin.'; errEl.style.display='block'; return; }
     const validPass = user.password_hash || 'ktlsales2024';
     if (pass !== validPass) { hideLoading(); errEl.textContent='Incorrect password.'; errEl.style.display='block'; return; }
+    if ((user.status || 'approved') !== 'approved') { hideLoading(); showPending(user); return; }
     if (user.role !== role) { hideLoading(); errEl.textContent=`You are registered as a ${user.role.replace('_',' ')}. Please select the correct role.`; errEl.style.display='block'; return; }
     currentUser = { ...user };
     localStorage.setItem('ktl_user', JSON.stringify(currentUser));
     if (user.must_change_password) { hideLoading(); showChangePasswordScreen(); return; }
     await bootApp();
   } catch(e) { hideLoading(); errEl.textContent='Connection error: '+e.message; errEl.style.display='block'; }
+}
+
+// ─── SIGN-UP + APPROVAL ─────────────────────────────────────────────────────────
+// New people create a pending account; an admin approves it in User Management
+// and sets their role and country. Until then signing in shows "Waiting for approval".
+function _showAuthCard(id) {
+  ['login-screen', 'change-password-screen', 'signup-screen', 'pending-screen']
+    .forEach(x => document.getElementById(x)?.classList.toggle('hidden', x !== id));
+}
+function showSignup() { document.getElementById('su-err').style.display = 'none'; _showAuthCard('signup-screen'); }
+function backToLogin() {
+  localStorage.removeItem('ktl_user');
+  currentUser = null;
+  _showAuthCard('login-screen');
+}
+function showPending(user) {
+  const rejected = user.status === 'rejected';
+  document.getElementById('pending-title').textContent = rejected ? 'Account not approved' : 'Waiting for approval';
+  document.getElementById('pending-msg').innerHTML = rejected
+    ? `Your account (${_xEsc(user.email)}) was not approved. Contact your admin if you think this is a mistake.`
+    : `Your account (${_xEsc(user.email)}) has been created but hasn't been approved yet. An admin needs to review your request and assign your role before you can sign in.`;
+  _showAuthCard('pending-screen');
+}
+async function doSignup() {
+  const name    = document.getElementById('su-name').value.trim();
+  const email   = document.getElementById('su-email').value.trim();
+  const country = document.getElementById('su-country').value;
+  const pass    = document.getElementById('su-pass').value;
+  const pass2   = document.getElementById('su-pass2').value;
+  const errEl   = document.getElementById('su-err');
+  const fail = msg => { errEl.textContent = msg; errEl.style.display = 'block'; };
+  errEl.style.display = 'none';
+  if (!name || !email) return fail('Please enter your name and email.');
+  if (!/^\S+@\S+\.\S+$/.test(email)) return fail('Please enter a valid email address.');
+  if (pass.length < 8) return fail('Password must be at least 8 characters.');
+  if (pass !== pass2) return fail('Passwords do not match.');
+  setLoading('Creating your account...');
+  try {
+    const { data: existing } = await sb.from('users').select('id').eq('email', email).limit(1);
+    if (existing && existing.length) { hideLoading(); return fail('An account with this email already exists. Sign in instead.'); }
+    // role is a placeholder — the admin picks the real role when approving
+    const row = { full_name: name, email, country, role: 'sales_rep', status: 'pending', is_active: true, password_hash: pass, must_change_password: false };
+    const { error } = await sb.from('users').insert(row);
+    hideLoading();
+    if (error) return fail('Could not create your account: ' + error.message);
+    ['su-name', 'su-email', 'su-pass', 'su-pass2'].forEach(id => { document.getElementById(id).value = ''; });
+    showPending(row);
+  } catch (e) { hideLoading(); fail('Connection error: ' + e.message); }
 }
 
 function showChangePasswordScreen() {
@@ -2740,15 +2860,16 @@ async function bootApp() {
     });
 
     hideLoading();
-    goTo('dashboard');
-    loadDashboard();
+    const landing = viewCountry() === 'KE' ? 'attendance' : 'dashboard';   // Kenya starts on Attendance
+    goTo(landing);
+    if (landing === 'dashboard') loadDashboard();
     _startLocationBroadcast();
 
   } catch(e) {
     console.error('bootApp error:', e);
     hideLoading();
     document.getElementById('app').classList.remove('hidden');
-    goTo('dashboard');
+    goTo(viewCountry() === 'KE' ? 'attendance' : 'dashboard');
     _startLocationBroadcast();
   }
 }
@@ -4505,8 +4626,9 @@ async function loadAdmin() {
 
     // Load users for dropdowns
     const { data: allUsers } = await sb.from('users').select('*').order('full_name');
-    const reps = (allUsers || []).filter(u => u.role === 'sales_rep' && u.is_active !== false);
-    
+    const inView = u => (u.country || 'UG') === viewCountry();
+    const reps = (allUsers || []).filter(u => u.role === 'sales_rep' && u.is_active !== false && inView(u) && (u.status || 'approved') === 'approved');
+
     // Populate assign-rep dropdown
     const repSel = document.getElementById('assign-rep');
     if (repSel) {
@@ -4553,7 +4675,10 @@ async function loadAdmin() {
     }
     
     // ─── FOR ADMIN: Show everything and load users table properly ───
-    const us = allUsers || [];
+    // Sign-ups waiting for approval (both countries), then the viewed country's users
+    _renderPendingSignups((allUsers || []).filter(u => u.status === 'pending'));
+    const us = (allUsers || []).filter(u => inView(u) && u.status !== 'pending');
+    const uCountry = document.getElementById('u-country'); if (uCountry) uCountry.value = viewCountry();
     const roleLabel = r => r.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
     const roleBadge = { admin: 'bb', manager: 'bb', sales_rep: 'bgold' };
     
@@ -4580,6 +4705,7 @@ async function loadAdmin() {
                 <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">User</th>
                 <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Email</th>
                 <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Role</th>
+                <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Country</th>
                 <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Status</th>
                 <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Actions</th>
               </tr>
@@ -4604,7 +4730,8 @@ async function loadAdmin() {
             </td>
             <td style="padding: 10px 8px; vertical-align: middle; font-size: 12px; color: var(--txt2);">${u.email}</td>
             <td style="padding: 10px 8px; vertical-align: middle;"><span class="badge ${roleBadge[u.role] || 'bb'}">${roleLabel(u.role || '')}</span></td>
-            <td style="padding: 10px 8px; vertical-align: middle;"><span class="badge ${u.is_active ? 'bg' : 'br'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+            <td style="padding: 10px 8px; vertical-align: middle; font-size: 12px;">${COUNTRY_NAMES[u.country || 'UG'] || u.country}</td>
+            <td style="padding: 10px 8px; vertical-align: middle;">${u.status === 'rejected' ? '<span class="badge br">Rejected</span>' : `<span class="badge ${u.is_active ? 'bg' : 'br'}">${u.is_active ? 'Active' : 'Inactive'}</span>`}</td>
             <td style="padding: 10px 8px; vertical-align: middle;">
               <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center;">
         `;
@@ -5295,13 +5422,53 @@ async function removeClientFromRep(repId, clientId, clientName) {
 
 
 // ─── USER MANAGEMENT ───────────────────────────────────────────────────────────
+// Pending sign-ups box at the top of the Users card (admins only, both countries)
+function _renderPendingSignups(pending) {
+  const el = document.getElementById('pending-signups'); if (!el) return;
+  if (!pending.length) { el.innerHTML = ''; return; }
+  const roles = [['sales_rep', 'Sales Rep'], ['manager', 'Manager'], ['admin', 'Admin'], ['other', 'Other']];
+  el.innerHTML = `
+    <div class="alert aw" style="margin-bottom:10px;">⏳ <span><strong>${pending.length}</strong> sign-up${pending.length > 1 ? 's' : ''} waiting for approval — choose a role and country, then approve.</span></div>
+    <div style="overflow-x:auto;margin-bottom:18px;"><table style="font-size:12.5px;">
+      <thead><tr><th>Name</th><th>Email</th><th>Country</th><th>Role</th><th>Signed up</th><th></th></tr></thead>
+      <tbody>${pending.map(u => `<tr>
+        <td style="font-weight:500;">${_xEsc(u.full_name)}</td>
+        <td style="color:var(--txt2);">${_xEsc(u.email)}</td>
+        <td><select class="sel" id="ps-country-${u.id}">${Object.entries(COUNTRY_NAMES).map(([k, v]) => `<option value="${k}"${(u.country || 'UG') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
+        <td><select class="sel" id="ps-role-${u.id}">${roles.map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></td>
+        <td style="font-size:11px;color:var(--txt3);">${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
+        <td style="white-space:nowrap;">
+          <button class="btn btn-sm btn-green" onclick="approveSignup('${u.id}')">Approve</button>
+          <button class="btn btn-sm btn-danger" onclick="rejectSignup('${u.id}','${_xEsc(u.full_name).replace(/'/g, "\\'")}')">Reject</button>
+        </td></tr>`).join('')}</tbody>
+    </table></div>`;
+}
+async function approveSignup(id) {
+  const role = document.getElementById('ps-role-' + id).value;
+  const country = document.getElementById('ps-country-' + id).value;
+  const { error } = await sb.from('users').update({ status: 'approved', role, country, is_active: true }).eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  Object.keys(_countryIdCache).forEach(k => delete _countryIdCache[k]);
+  if (window.ktlRefreshPending) ktlRefreshPending();
+  loadAdmin();
+}
+function rejectSignup(id, name) {
+  showConfirmDialog({ icon: '🚫', title: 'Reject sign-up', message: `<strong>${name}</strong> won't be able to sign in. You can remove the account afterwards.`,
+    confirmLabel: 'Reject', confirmStyle: 'background:#A32D2D;color:#fff;border:none;',
+    onConfirm: async () => {
+      const { error } = await sb.from('users').update({ status: 'rejected' }).eq('id', id);
+      if (error) { alert('Error: ' + error.message); return; }
+      if (window.ktlRefreshPending) ktlRefreshPending();
+      loadAdmin();
+    } });
+}
 function showAddUser(){document.getElementById('add-user-form').classList.remove('hidden');document.getElementById('add-user-form').scrollIntoView({behavior:'smooth'});}
 function confirmDeactivateUser(userId,userName){showConfirmDialog({icon:'🔒',title:'Deactivate User',message:`<strong>${userName}</strong> will no longer be able to log in.`,confirmLabel:'Deactivate',confirmStyle:'background:var(--gold-mid);color:#fff;border:none;',onConfirm:async()=>{const{error}=await sb.from('users').update({is_active:false}).eq('id',userId);if(error){alert('Error: '+error.message);return;}loadAdmin();}});}
 function reactivateUser(userId,userName){showConfirmDialog({icon:'✅',title:'Reactivate User',message:`<strong>${userName}</strong> will be able to log in again.`,confirmLabel:'Reactivate',confirmStyle:'background:#1D9E75;color:#fff;border:none;',onConfirm:async()=>{const{error}=await sb.from('users').update({is_active:true}).eq('id',userId);if(error){alert('Error: '+error.message);return;}loadAdmin();}});}
 function confirmRemoveUser(userId,userName){showConfirmDialog({icon:'🗑️',title:'Remove User',message:`This will <strong>permanently delete ${userName}</strong>. Cannot be undone.`,confirmLabel:'Yes, Remove Permanently',confirmStyle:'background:#A32D2D;color:#fff;border:none;',onConfirm:async()=>{const{error}=await sb.from('users').delete().eq('id',userId);if(error){alert('Error: '+error.message);return;}loadAdmin();}});}
 function showConfirmDialog({icon,title,message,confirmLabel,confirmStyle,onConfirm}){const existing=document.getElementById('confirm-dialog');if(existing)existing.remove();const d=document.createElement('div');d.id='confirm-dialog';d.className='confirm-overlay';d.innerHTML=`<div class="confirm-box"><div style="font-size:32px;text-align:center;margin-bottom:10px;">${icon}</div><div style="font-size:15px;font-weight:700;text-align:center;margin-bottom:8px;">${title}</div><div style="font-size:12.5px;color:var(--txt2);text-align:center;line-height:1.65;margin-bottom:22px;">${message}</div><div style="display:flex;gap:8px;"><button onclick="document.getElementById('confirm-dialog').remove()" style="flex:1;padding:10px;border-radius:9px;background:transparent;border:0.5px solid var(--brd2);cursor:pointer;font-size:13px;font-family:inherit;font-weight:500;">Cancel</button><button id="confirm-action-btn" style="flex:1;padding:10px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;${confirmStyle}">${confirmLabel}</button></div></div>`;document.body.appendChild(d);document.getElementById('confirm-action-btn').addEventListener('click',async()=>{d.remove();await onConfirm();});d.addEventListener('click',(e)=>{if(e.target===d)d.remove();});}
 function generateOTP(){const chars='ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';const otp=Array.from({length:10},()=>chars[Math.floor(Math.random()*chars.length)]).join('');document.getElementById('u-otp').value=otp;}
-async function addUser(){const name=document.getElementById('u-name').value.trim();const email=document.getElementById('u-email').value.trim();const role=document.getElementById('u-role').value;const otp=document.getElementById('u-otp').value.trim();if(!name||!email){alert('Please fill name and email.');return;}if(!otp){alert('Please set a one-time password or click Generate.');return;}const{error}=await sb.from('users').insert({full_name:name,email,role,is_active:true,password_hash:otp,must_change_password:true});if(error){alert('Error: '+error.message);return;}document.getElementById('add-user-form').classList.add('hidden');document.getElementById('u-name').value='';document.getElementById('u-email').value='';document.getElementById('u-otp').value='';loadAdmin();showOTPDialog(name,email,otp);}
+async function addUser(){const name=document.getElementById('u-name').value.trim();const email=document.getElementById('u-email').value.trim();const role=document.getElementById('u-role').value;const otp=document.getElementById('u-otp').value.trim();if(!name||!email){alert('Please fill name and email.');return;}if(!otp){alert('Please set a one-time password or click Generate.');return;}const country=document.getElementById('u-country')?.value||viewCountry();const{error}=await sb.from('users').insert({full_name:name,email,role,country,status:'approved',is_active:true,password_hash:otp,must_change_password:true});if(error){alert('Error: '+error.message);return;}document.getElementById('add-user-form').classList.add('hidden');document.getElementById('u-name').value='';document.getElementById('u-email').value='';document.getElementById('u-otp').value='';loadAdmin();showOTPDialog(name,email,otp);}
 function showOTPDialog(name,email,otp){const existing=document.getElementById('otp-dialog');if(existing)existing.remove();const d=document.createElement('div');d.id='otp-dialog';d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(3px);';d.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px 32px;max-width:380px;width:90%;box-shadow:0 12px 48px rgba(0,0,0,0.2);"><div style="font-size:30px;text-align:center;margin-bottom:8px;">🔐</div><div style="font-size:16px;font-weight:700;text-align:center;margin-bottom:4px;">User Created!</div><div style="font-size:12px;color:var(--txt3);text-align:center;margin-bottom:18px;">Share these credentials securely with <strong>${name}</strong></div><div style="background:var(--bg2);border-radius:9px;padding:13px 15px;margin-bottom:10px;"><div style="font-size:10.5px;font-weight:600;color:var(--txt3);margin-bottom:3px;">EMAIL</div><div style="font-size:13px;font-weight:500;">${email}</div></div><div style="background:var(--gold-light);border:1.5px dashed var(--gold-mid);border-radius:9px;padding:13px 15px;margin-bottom:18px;"><div style="font-size:10.5px;font-weight:600;color:var(--gold);margin-bottom:6px;">ONE-TIME PASSWORD</div><div style="font-size:22px;font-weight:700;letter-spacing:0.12em;color:var(--royal);font-family:'SF Mono','Courier New',monospace;">${otp}</div><div style="font-size:10.5px;color:var(--txt3);margin-top:6px;">⚠ User will be prompted to change this on first login.</div></div><button onclick="navigator.clipboard.writeText('${otp}').then(()=>{this.textContent='✓ Copied!';this.style.background='#1D9E75';})" style="width:100%;padding:10px;border-radius:9px;background:var(--royal);color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:600;margin-bottom:8px;">Copy Password</button><button onclick="document.getElementById('otp-dialog').remove()" style="width:100%;padding:10px;border-radius:9px;background:transparent;border:0.5px solid var(--brd2);cursor:pointer;font-size:13px;color:var(--txt2);font-weight:500;">Done</button></div>`;document.body.appendChild(d);}
 
 // ─── SYNC MODAL ────────────────────────────────────────────────────────────────
@@ -6140,7 +6307,7 @@ let _teamSelectedRepId = null;
 let _teamSelectedRepName = '';
 
 async function loadTeamScreen() {
-  const { data: allUsers } = await sb.from('users').select('*').order('full_name');
+  const { data: allUsers } = await sb.from('users').select('*').eq('country', viewCountry()).order('full_name');
   const reps = (allUsers||[]).filter(u => u.role==='sales_rep' && u.is_active!==false);
   document.getElementById('team-rep-count').textContent = reps.length + ' reps';
 
@@ -7885,7 +8052,7 @@ async function loadAdminWallet() {
   const lb = document.getElementById('wadmin-leaderboard-list');
   if (lb) lb.innerHTML = '<div class="empty-state">Calculating wallet balances…</div>';
 
-  const { data: allUsers } = await sb.from('users').select('id,full_name,email,role').order('full_name');
+  const { data: allUsers } = await sb.from('users').select('id,full_name,email,role,is_active').eq('country', viewCountry()).order('full_name');
   const reps = (allUsers || []).filter(u => u.role === 'sales_rep' && u.is_active !== false);
 
   const repStats = {};
@@ -8469,16 +8636,16 @@ async function _loadAdminAttendanceView() {
   document.getElementById('fv-filter-to').value = _fvInitTo;
   loadAttPunchList();
 
-  // Load all users
-  const { data: allUsers } = await sb.from('users').select('id,full_name,role').order('full_name');
-  const reps = (allUsers || []).filter(u => u.is_active !== false);
-  const totalStaff = reps.length;
+  // Load this country's users; staff expected to clock in = active, approved sales reps
+  const { data: allUsers } = await sb.from('users').select('id,full_name,role,is_active,status').eq('country', viewCountry()).order('full_name');
+  const reps = (allUsers || []).filter(u => u.is_active !== false && u.role === 'sales_rep' && (u.status || 'approved') === 'approved');
+  const countryIds = (allUsers || []).map(u => String(u.id));
 
-  // Load today's attendance
-  const { data: todayRecs } = await sb.from('attendance').select('*').gte('clock_in', today + 'T00:00:00').order('clock_in', { ascending: false });
+  // Load today's attendance (this country only)
+  const { data: todayRecs } = await sb.from('attendance').select('*').in('employee_id', countryIds).gte('clock_in', today + 'T00:00:00').order('clock_in', { ascending: false });
   const records = todayRecs || [];
 
-  const presentIds = new Set(records.map(r => r.employee_id));
+  const presentIds = new Set(records.map(r => String(r.employee_id)));
   const clockedOut = records.filter(r => r.clock_out);
   const lateArr    = records.filter(r => {
     const h = new Date(r.clock_in).getHours();
@@ -8487,7 +8654,7 @@ async function _loadAdminAttendanceView() {
   });
 
   document.getElementById('att-present').textContent     = presentIds.size;
-  document.getElementById('att-absent').textContent      = Math.max(0, totalStaff - presentIds.size);
+  document.getElementById('att-absent').textContent      = reps.filter(u => !presentIds.has(String(u.id))).length;
   document.getElementById('att-clocked-out').textContent = clockedOut.length;
   document.getElementById('att-late').textContent        = lateArr.length;
 
@@ -8630,7 +8797,7 @@ async function loadAttendanceTable() {
 
   tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:16px;color:var(--txt3);">Loading…</td></tr>';
 
-  const { data: recs, error } = await sb.from('attendance').select('*').gte('clock_in', from + 'T00:00:00').lte('clock_in', to + 'T23:59:59').order('clock_in', { ascending: false });
+  const { data: recs, error } = await sb.from('attendance').select('*').in('employee_id', await countryUserIds()).gte('clock_in', from + 'T00:00:00').lte('clock_in', to + 'T23:59:59').order('clock_in', { ascending: false });
 
   if (error) { tbody.innerHTML = `<tr><td colspan="9" style="color:#A32D2D;text-align:center;padding:16px;">Error: ${error.message}</td></tr>`; return; }
 
@@ -8670,7 +8837,7 @@ async function exportAttendanceCSV() {
   const preset = document.getElementById('att-range-preset')?.value || 'this_week';
   const { from, to } = _attGetRangeDates(preset);
   const nameVal = (document.getElementById('att-filter-name')?.value || '').trim();
-  const { data: recs } = await sb.from('attendance').select('*').gte('clock_in', from + 'T00:00:00').lte('clock_in', to + 'T23:59:59').order('clock_in', { ascending: false });
+  const { data: recs } = await sb.from('attendance').select('*').in('employee_id', await countryUserIds()).gte('clock_in', from + 'T00:00:00').lte('clock_in', to + 'T23:59:59').order('clock_in', { ascending: false });
   let rows = recs || [];
   if (nameVal) rows = rows.filter(r => (r.employee_name || '').toLowerCase().includes(nameVal.toLowerCase()));
 
@@ -8790,7 +8957,7 @@ async function exportFieldVisitsExcel() {
   } else {
     const preset = document.getElementById('fv-range-preset')?.value || 'today';
     ({ from, to } = _fvGetRangeDates(preset));
-    const { data } = await _fvApplyNameFilter(sb.from('field_visits').select('*')
+    const { data } = await _fvApplyNameFilter(sb.from('field_visits').select('*').in('employee_id', await countryUserIds())
       .gte('punch_in_time', from + 'T00:00:00').lte('punch_in_time', to + 'T23:59:59'))
       .order('punch_in_time', { ascending: false });
     acts = data || [];
@@ -9051,7 +9218,7 @@ async function _loadAdminFieldVisits() {
   const { from, to } = _fvGetRangeDates(preset);
   el.innerHTML = '<div class="empty-state" style="padding:16px;">Loading…</div>';
 
-  const { data, error } = await _fvApplyNameFilter(sb.from('field_visits').select('*')
+  const { data, error } = await _fvApplyNameFilter(sb.from('field_visits').select('*').in('employee_id', await countryUserIds())
     .gte('punch_in_time', from + 'T00:00:00')
     .lte('punch_in_time', to + 'T23:59:59'))
     .order('punch_in_time', { ascending: false });
@@ -9625,7 +9792,7 @@ async function _initAttAdminMap(records) {
   const wrap = document.getElementById('att-map-wrap'); if (!wrap) return;
   if (_attAdminMap) { _attAdminMap.remove(); _attAdminMap = null; }
 
-  _attAdminMap = L.map(wrap, { zoomControl: true, scrollWheelZoom: false }).setView(ATT_OFFICE, 13);
+  _attAdminMap = L.map(wrap, { zoomControl: true, scrollWheelZoom: false }).setView(COUNTRY_MAP_CENTRE[viewCountry()] || ATT_OFFICE, 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(_attAdminMap);
 
   const bounds = [];
@@ -9634,6 +9801,7 @@ async function _initAttAdminMap(records) {
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
   const { data: liveData } = await sb.from('live_locations')
     .select('*')
+    .in('employee_id', await countryUserIds())
     .gte('updated_at', fiveMinutesAgo);
 
   // ── Group employees by rounded position to detect overlaps ──
@@ -9749,7 +9917,7 @@ function _initAttRepMap() {
   const wrap = document.getElementById('att-rep-map-wrap'); if (!wrap) return;
   if (_attRepMap) { _attRepMap.remove(); _attRepMap = null; }
 
-  const center = _attCurrentLocation || ATT_OFFICE;
+  const center = _attCurrentLocation || COUNTRY_MAP_CENTRE[myCountry()] || ATT_OFFICE;
   _attRepMap = L.map(wrap, { zoomControl: true, scrollWheelZoom: false }).setView(center, 15);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(_attRepMap);
   if (_attCurrentLocation) L.marker(_attCurrentLocation, { icon: _attBlueDot() }).addTo(_attRepMap).bindPopup('You');
@@ -11803,6 +11971,7 @@ function saveCRMSettings(){alert('✅ CRM settings saved!');}
 <script src="ktl-stock.js"></script>
 <script src="ktl-eotm.js"></script>
 <script src="ktl-role-other.js"></script>
+<script src="ktl-country.js"></script>
 <script src="ktl-chat.js"></script>
 </body>
 </html>

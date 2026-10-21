@@ -215,8 +215,8 @@
     const hasUser = typeof currentUser !== 'undefined' && currentUser;
     if (hasUser && appEl && !appEl.classList.contains('hidden')) {
       clearInterval(readyPoll);
-      filterNavContainer('sidebar-nav');
-      filterNavContainer('drawer-nav');
+      applyFilterIfOther('sidebar-nav');   // only filter for "Other" accounts
+      applyFilterIfOther('drawer-nav');
       observeNavContainer('sidebar-nav');
       observeNavContainer('drawer-nav');
     }

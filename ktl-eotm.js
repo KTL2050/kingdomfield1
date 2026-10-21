@@ -279,7 +279,7 @@
       eotmSetDotVisible(true);
 
       const { data: users, error: usersErr } = await sb
-        .from('users').select('id,full_name,role').eq('is_active', true).order('full_name');
+        .from('users').select('id,full_name,role').eq('is_active', true).eq('country', eotmCountry()).order('full_name');
       if (usersErr) throw usersErr;
       eotmState.users = (users || []).filter(u => u.id !== currentUser.id);
       eotmState.step = 'list';
@@ -292,17 +292,24 @@
     }
   }
 
+  // Star of the Day runs separately per country: you nominate people in your
+  // own country, and each country gets its own monthly winner.
+  function eotmCountry() { return currentUser?.country || 'UG'; }
+
   async function eotmEnsurePreviousMonthComputed() {
     const prevKey = eotmPrevMonthKey();
+    const country = eotmCountry();
     const { data: existing } = await sb
-      .from('eotm_monthly_results').select('*').eq('month_key', prevKey).maybeSingle();
+      .from('eotm_monthly_results').select('*').eq('month_key', prevKey).eq('country', country).maybeSingle();
     if (existing) { eotmState.hof = existing; return; }
 
     // Not computed yet — aggregate this once and store it. Idempotent:
-    // an upsert on month_key means a near-simultaneous second computation
+    // an upsert on (month_key, country) means a near-simultaneous second computation
     // from another device just overwrites with the same deterministic result.
+    const { data: people } = await sb.from('users').select('id').eq('country', country);
     const { data: votes, error } = await sb
-      .from('eotm_votes').select('nominee_id,reason').eq('month_key', prevKey);
+      .from('eotm_votes').select('nominee_id,reason').eq('month_key', prevKey)
+      .in('nominee_id', (people || []).map(p => p.id));
     if (error || !votes || votes.length === 0) { eotmState.hof = null; return; }
 
     const tally = {};
@@ -333,6 +340,7 @@
     }
     const payload = {
       month_key: prevKey,
+      country,
       winner_id: winner ? winner.employee_id : null,
       winner_name: winner ? winner.full_name : null,
       winner_points: winner ? winner.points : 0,
@@ -340,7 +348,7 @@
       leaderboard,
     };
     const { data: saved, error: saveErr } = await sb
-      .from('eotm_monthly_results').upsert(payload, { onConflict: 'month_key' }).select().maybeSingle();
+      .from('eotm_monthly_results').upsert(payload, { onConflict: 'month_key,country' }).select().maybeSingle();
     eotmState.hof = saveErr ? payload : saved;
   }
 

@@ -85,7 +85,8 @@ async function loadStaff() {
 
   let users = S().users || [];
   if (!users.length) {
-    const { data } = await DB().from('users').select('id,full_name,email,role,is_active').order('full_name');
+    let vc = 'UG'; try { vc = viewCountry(); } catch (e) {}
+    const { data } = await DB().from('users').select('id,full_name,email,role,is_active').eq('country', vc).order('full_name');
     users = data || [];
   }
   const active = users.filter(x => x.is_active !== false);
@@ -409,8 +410,10 @@ async function notifyUsers(userIds, type, title, body, requestId) {
 async function approverIds(employeeId) {
   const { data } = await DB().from('leave_approvers').select('manager_id').eq('employee_id', employeeId);
   let ids = (data || []).map(r => r.manager_id);
-  if (!ids.length) {
-    const { data: admins } = await DB().from('users').select('id').eq('role','admin').eq('is_active', true);
+  if (!ids.length) {   // nobody assigned yet → that country's admins, else any admin
+    const { data: emp } = await DB().from('users').select('country').eq('id', employeeId).maybeSingle();
+    let { data: admins } = await DB().from('users').select('id').eq('role','admin').eq('is_active', true).eq('country', emp?.country || 'UG');
+    if (!admins || !admins.length) ({ data: admins } = await DB().from('users').select('id').eq('role','admin').eq('is_active', true));
     ids = (admins || []).map(x => x.id);
   }
   return [...new Set(ids.map(String))].filter(id => String(id) !== String(employeeId));

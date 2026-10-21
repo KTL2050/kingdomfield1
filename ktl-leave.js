@@ -276,8 +276,12 @@ async function loadTypes() {
   S.types = data || [];
 }
 
+// Country being viewed (index.html); everything below is limited to it
+function VC() { try { return viewCountry(); } catch (e) { return 'UG'; } }
+async function countryIds() { try { return await countryUserIds(); } catch (e) { return (S.users || []).map(u => String(u.id)); } }
+
 async function loadUsers() {
-  const { data } = await DB().from('users').select('id,full_name,email,role,is_active').order('full_name');
+  const { data } = await DB().from('users').select('id,full_name,email,role,is_active').eq('country', VC()).order('full_name');
   S.users = data || [];
 }
 
@@ -290,10 +294,11 @@ async function loadApprovers() {
 async function resolveScope() {
   const u = me();
   if (!u) { S.teamIds = []; return; }
-  if (roleAdmin()) { S.teamIds = null; return; }
+  if (roleAdmin()) { S.teamIds = await countryIds(); return; }   // admins: everyone in the viewed country
   if (roleRep())   { S.teamIds = [String(u.id)]; return; }
   const { data } = await DB().from('leave_approvers').select('employee_id').eq('manager_id', u.id);
-  const ids = new Set((data || []).map(r => String(r.employee_id)));
+  const inCountry = new Set(await countryIds());
+  const ids = new Set((data || []).map(r => String(r.employee_id)).filter(id => inCountry.has(id)));
   ids.add(String(u.id));                       // managers see their own leave too
   S.teamIds = [...ids];
 }
@@ -304,6 +309,7 @@ async function loadRoster() {
   const from = iso(addDays(new Date(), -45));
   const { data, error } = await DB().from('leave_requests')
     .select('id,employee_id,employee_name,leave_type_id,leave_type_name,start_date,end_date,days_count,status')
+    .in('employee_id', await countryIds())
     .eq('status', 'approved').gte('end_date', from)
     .order('start_date', { ascending: true }).limit(500);
   if (error) { console.warn('[leave] roster:', error.message); S.roster = []; return; }
@@ -321,8 +327,10 @@ async function loadRequests() {
 async function approverIdsFor(employeeId) {
   const { data } = await DB().from('leave_approvers').select('manager_id').eq('employee_id', employeeId);
   let ids = (data || []).map(r => r.manager_id);
-  if (!ids.length) {                            // nobody assigned yet → fall back to admins
-    const { data: admins } = await DB().from('users').select('id').eq('role', 'admin').eq('is_active', true);
+  if (!ids.length) {                            // nobody assigned yet → that country's admins, else any admin
+    const { data: emp } = await DB().from('users').select('country').eq('id', employeeId).maybeSingle();
+    let { data: admins } = await DB().from('users').select('id').eq('role', 'admin').eq('is_active', true).eq('country', emp?.country || 'UG');
+    if (!admins || !admins.length) ({ data: admins } = await DB().from('users').select('id').eq('role', 'admin').eq('is_active', true));
     ids = (admins || []).map(u => u.id);
   }
   return [...new Set(ids.map(String))].filter(id => String(id) !== String(employeeId));

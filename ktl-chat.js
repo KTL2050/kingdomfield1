@@ -14,7 +14,7 @@
    • New messages and read receipts arrive instantly (Supabase Realtime).
 
    DATA MODEL (see supabase/chat_schema.sql)
-   • chat_messages — one row per message ('all' or 'dm:<id>:<id>')
+   • chat_messages — one row per message ('all:UG' / 'all:KE' or 'dm:<id>:<id>')
    • chat_reads    — how far each person has read each conversation
    • storage bucket chat-files — private; opened via short-lived signed links
 
@@ -37,7 +37,8 @@
     recentScan: 500,       // recent private messages scanned to build the conversation list
     signedUrlSecs: 3600,
   };
-  const ALL = 'all';
+  // "Everyone" is per country ('all:UG', 'all:KE'); set from your own country at boot
+  let ALL = 'all:UG';
 
   // ── helpers ───────────────────────────────────────────────────────────
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -196,7 +197,8 @@
 
   // ── loading ───────────────────────────────────────────────────────────
   async function loadUsers() {
-    const { data, error } = await sb.from('users').select('id,full_name,role').eq('is_active', true).order('full_name');
+    const { data, error } = await sb.from('users').select('id,full_name,role').eq('is_active', true)
+      .eq('country', me()?.country || 'UG').order('full_name');
     if (error) throw error;
     chat.users = new Map((data || []).map(u => [String(u.id), u]));
   }
@@ -568,6 +570,7 @@
     const hasSb = typeof sb !== 'undefined' && sb;
     if (!(hasUser && hasSb && appEl && !appEl.classList.contains('hidden'))) return;
     clearInterval(readyPoll);
+    ALL = 'all:' + (currentUser.country || 'UG');
     injectOnce();
     try {
       await loadUsers();

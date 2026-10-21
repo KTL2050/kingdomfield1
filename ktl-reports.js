@@ -357,7 +357,7 @@ table.rp-tbl tfoot td:last-child{padding-right:30px;}
 async function loadRefData() {
   if (S.users.length && S.clients.length && S.leaveTypes.length) return;
   const [u, c, lt] = await Promise.all([
-    DB().from('users').select('id,full_name,email,role,is_active').order('full_name'),
+    DB().from('users').select('id,full_name,email,role,is_active').eq('country', viewCountry()).order('full_name'),
     DB().from('clients').select('id,name').order('name'),
     DB().from('leave_types').select('id,name').order('sort_order'),
   ]);
@@ -442,6 +442,7 @@ async function fetchAttendance() {
   const key = cacheKey('att');
   if (S.cache[key]) return S.cache[key];
   const { data, error } = await DB().from('attendance').select('*')
+    .in('employee_id', await countryUserIds())          // viewed country only
     .gte('clock_in', S.from + 'T00:00:00').lte('clock_in', S.to + 'T23:59:59')
     .order('clock_in', { ascending: false }).limit(CFG.rowLimit);
   if (error) throw new Error('Attendance: ' + error.message);
@@ -468,6 +469,7 @@ async function fetchLeave() {
   const key = cacheKey('leave');
   if (S.cache[key]) return S.cache[key];
   const { data, error } = await DB().from('leave_requests').select('*')
+    .in('employee_id', await countryUserIds())          // viewed country only
     .lte('start_date', S.to).gte('end_date', S.from)
     .order('start_date', { ascending: false }).limit(CFG.rowLimit);
   if (error) { console.warn('[reports] leave:', error.message); S.cache[key] = []; return []; }

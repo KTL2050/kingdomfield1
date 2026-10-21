@@ -1500,7 +1500,7 @@ async function loadAccess() {
   const wrap = document.getElementById('sp-access-list');
   wrap.innerHTML = '<div class="empty-state">Loading...</div>';
   const [{ data: users }, acc] = await Promise.all([
-    db.from('users').select('id,full_name,email,role,is_active').order('full_name'),
+    db.from('users').select('id,full_name,email,role,is_active').eq('country', viewCountry()).order('full_name'),
     db.from('stock_audit_access').select('user_id,can_access')
   ]);
   if (acc.error) { wrap.innerHTML = `<div class="alert ad"><span>&#9888;</span><span>Could not load access settings: ${esc(acc.error.message)}. Create the <span class="mono">stock_audit_access</span> table first.</span></div>`; return; }
