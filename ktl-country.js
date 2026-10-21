@@ -26,7 +26,6 @@
   window.__ktlCountryLoaded = true;
 
   const KENYA_SOON_TEXT = 'Coming soon for Kenyan Team';
-  const FLAG = { UG: '🇺🇬', KE: '🇰🇪' };
 
   const user = () => (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null;
   const kenyaView = () => { try { return viewCountry() === 'KE'; } catch (e) { return false; } };
@@ -148,12 +147,18 @@
     if (mine === 'UG' && ['admin', 'manager'].includes(u.role)) {
       const v = viewCountry();
       html = `<select id="ktl-country-switch" onchange="ktlSwitchCountry(this.value)" aria-label="Country">
-        <option value="UG"${v === 'UG' ? ' selected' : ''}>${FLAG.UG} Uganda</option>
-        <option value="KE"${v === 'KE' ? ' selected' : ''}>${FLAG.KE} Kenya</option></select>`;
+        <option value="UG"${v === 'UG' ? ' selected' : ''}>Uganda</option>
+        <option value="KE"${v === 'KE' ? ' selected' : ''}>Kenya</option></select>`;
     } else if (mine === 'KE') {
-      html = `<span id="ktl-country-chip">${FLAG.KE} Kenya</span>`;
+      html = `<span id="ktl-country-chip">Kenya</span>`;
     } else return;
     right.insertAdjacentHTML('afterbegin', html);
+  }
+  // "Sync Zoho" syncs Uganda's Zoho — hide it while viewing Kenya
+  function hideUgandaOnlyControls() {
+    if (!kenyaView()) return;
+    const sync = document.getElementById('sync-zoho-btn');
+    if (sync) sync.style.display = 'none';
   }
 
   // ── pending sign-ups (admins) ─────────────────────────────────────────
@@ -177,6 +182,7 @@
     applyNav('sidebar-nav'); applyNav('drawer-nav');
     observeNav('sidebar-nav'); observeNav('drawer-nav');
     renderCountryControl();
+    hideUgandaOnlyControls();
     refreshPendingCount().catch(() => {});
     setInterval(() => refreshPendingCount().catch(() => {}), 120000);
   }, 300);

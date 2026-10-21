@@ -86,7 +86,7 @@ async function loadStaff() {
   let users = S().users || [];
   if (!users.length) {
     let vc = 'UG'; try { vc = viewCountry(); } catch (e) {}
-    const { data } = await DB().from('users').select('id,full_name,email,role,is_active').eq('country', vc).order('full_name');
+    const { data } = await DB().from('users').select('id,full_name,email,role,is_active').eq('country', vc).eq('status', 'approved').order('full_name');
     users = data || [];
   }
   const active = users.filter(x => x.is_active !== false);

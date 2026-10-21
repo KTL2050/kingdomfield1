@@ -49,6 +49,7 @@ const S = {
   tab:         'overview',      // overview | approvals | calendar | requests | settings
   types:       [],
   users:       [],              // id, full_name, email, role, is_active
+  approverPool: [],             // active managers + admins from BOTH countries (can approve across countries)
   approvers:   [],              // { employee_id, manager_id }
   requests:    [],
   roster:      [],              // approved leave for everyone — visible to all
@@ -142,7 +143,8 @@ function typeColor(r) {
 }
 function userName(id) {
   if (id == null) return '—';
-  const u = S.users.find(x => String(x.id) === String(id));
+  const u = S.users.find(x => String(x.id) === String(id))
+         || S.approverPool.find(x => String(x.id) === String(id));   // approver from the other country
   return u ? u.full_name : '—';
 }
 function covers(r, dISO) { return r.start_date <= dISO && r.end_date >= dISO; }
@@ -281,8 +283,14 @@ function VC() { try { return viewCountry(); } catch (e) { return 'UG'; } }
 async function countryIds() { try { return await countryUserIds(); } catch (e) { return (S.users || []).map(u => String(u.id)); } }
 
 async function loadUsers() {
-  const { data } = await DB().from('users').select('id,full_name,email,role,is_active').eq('country', VC()).order('full_name');
+  const [{ data }, { data: pool }] = await Promise.all([
+    DB().from('users').select('id,full_name,email,role,is_active').eq('country', VC()).eq('status', 'approved').order('full_name'),
+    // approvers can come from either country (e.g. a Ugandan manager approving Kenyan staff)
+    DB().from('users').select('id,full_name,role,is_active,country').in('role', ['admin', 'manager'])
+      .eq('is_active', true).eq('status', 'approved').order('full_name'),
+  ]);
   S.users = data || [];
+  S.approverPool = pool || [];
 }
 
 async function loadApprovers() {
@@ -1127,7 +1135,8 @@ function listRow(r) {
 function renderSettings() {
   // Everyone active — sales reps, managers and admins — can have an approver assigned.
   const employees = S.users.filter(u => u.is_active !== false);
-  const mgrs = S.users.filter(u => u.is_active !== false && ['admin','manager'].includes(u.role));
+  const mgrs = S.approverPool;   // managers + admins from Uganda AND Kenya
+  const countryOf = m => { try { return COUNTRY_NAMES[m.country || 'UG'] || m.country; } catch (e) { return m.country || 'UG'; } };
 
   return `
   <div class="card" style="margin-bottom:14px;">
@@ -1152,7 +1161,7 @@ function renderSettings() {
 
   <div class="card" style="margin-bottom:0;">
     <div class="card-hdr"><span class="card-title">Who approves whose leave</span>
-      <span style="font-size:11px;color:var(--txt3);">Employees with no approver fall back to all admins</span></div>
+      <span style="font-size:11px;color:var(--txt3);">Employees with no approver fall back to their country's admins</span></div>
     <div class="lv-scroll"><table><thead><tr>
       <th>Employee</th><th>Approvers</th><th></th>
     </tr></thead><tbody>
@@ -1168,7 +1177,7 @@ function renderSettings() {
             <select class="sel" style="font-size:11px;padding:4px 8px;" onchange="Leave.assign('${r.id}',this.value);this.value='';">
               <option value="">＋ Add approver…</option>
               ${mgrs.filter(m => String(m.id) !== String(r.id) && !assigned.some(a => String(a.manager_id) === String(m.id)))
-                    .map(m => `<option value="${m.id}">${esc(m.full_name)}</option>`).join('')}
+                    .map(m => `<option value="${m.id}">${esc(m.full_name)} (${esc(countryOf(m))})</option>`).join('')}
             </select>
           </td></tr>`;
       }).join('') : `<tr><td colspan="3" class="empty-state">No active employees found.</td></tr>`}
@@ -1875,7 +1884,7 @@ function patchHost() {
   if (typeof origSignOut === 'function') {
     window.signOut = function () {
       S.booted = false; leaveActive = false;
-      Object.assign(S, { types:[], users:[], approvers:[], requests:[], notifs:[], teamIds:null });
+      Object.assign(S, { types:[], users:[], approverPool:[], approvers:[], requests:[], notifs:[], teamIds:null });
       document.getElementById('lv-panel')?.classList.remove('open');
       const dot = document.getElementById('lv-bell-dot');
       if (dot) dot.classList.remove('on');

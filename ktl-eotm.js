@@ -279,7 +279,7 @@
       eotmSetDotVisible(true);
 
       const { data: users, error: usersErr } = await sb
-        .from('users').select('id,full_name,role').eq('is_active', true).eq('country', eotmCountry()).order('full_name');
+        .from('users').select('id,full_name,role').eq('is_active', true).eq('status', 'approved').eq('country', eotmCountry()).order('full_name');
       if (usersErr) throw usersErr;
       eotmState.users = (users || []).filter(u => u.id !== currentUser.id);
       eotmState.step = 'list';

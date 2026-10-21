@@ -6309,7 +6309,7 @@ let _teamSelectedRepId = null;
 let _teamSelectedRepName = '';
 
 async function loadTeamScreen() {
-  const { data: allUsers } = await sb.from('users').select('*').eq('country', viewCountry()).order('full_name');
+  const { data: allUsers } = await sb.from('users').select('*').eq('country', viewCountry()).eq('status', 'approved').order('full_name');
   const reps = (allUsers||[]).filter(u => u.role==='sales_rep' && u.is_active!==false);
   document.getElementById('team-rep-count').textContent = reps.length + ' reps';
 
@@ -8054,7 +8054,7 @@ async function loadAdminWallet() {
   const lb = document.getElementById('wadmin-leaderboard-list');
   if (lb) lb.innerHTML = '<div class="empty-state">Calculating wallet balances…</div>';
 
-  const { data: allUsers } = await sb.from('users').select('id,full_name,email,role,is_active').eq('country', viewCountry()).order('full_name');
+  const { data: allUsers } = await sb.from('users').select('id,full_name,email,role,is_active').eq('country', viewCountry()).eq('status', 'approved').order('full_name');
   const reps = (allUsers || []).filter(u => u.role === 'sales_rep' && u.is_active !== false);
 
   const repStats = {};

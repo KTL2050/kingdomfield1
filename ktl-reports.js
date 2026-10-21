@@ -357,7 +357,7 @@ table.rp-tbl tfoot td:last-child{padding-right:30px;}
 async function loadRefData() {
   if (S.users.length && S.clients.length && S.leaveTypes.length) return;
   const [u, c, lt] = await Promise.all([
-    DB().from('users').select('id,full_name,email,role,is_active').eq('country', viewCountry()).order('full_name'),
+    DB().from('users').select('id,full_name,email,role,is_active').eq('country', viewCountry()).eq('status', 'approved').order('full_name'),
     DB().from('clients').select('id,name').order('name'),
     DB().from('leave_types').select('id,name').order('sort_order'),
   ]);

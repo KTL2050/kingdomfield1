@@ -198,7 +198,7 @@
   // ── loading ───────────────────────────────────────────────────────────
   async function loadUsers() {
     const { data, error } = await sb.from('users').select('id,full_name,role').eq('is_active', true)
-      .eq('country', me()?.country || 'UG').order('full_name');
+      .eq('status', 'approved').eq('country', me()?.country || 'UG').order('full_name');
     if (error) throw error;
     chat.users = new Map((data || []).map(u => [String(u.id), u]));
   }
