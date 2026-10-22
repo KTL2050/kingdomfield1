@@ -48,6 +48,9 @@
   const otherOf = key => { const [, x, y] = key.split(':'); return x === myId() ? y : x; };
   const initials = name => String(name || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const nameOf = id => chat.users.get(String(id))?.full_name || 'Unknown';
+  const viewC = () => { try { return viewCountry(); } catch (e) { return me()?.country || 'UG'; } };
+  // People of the country you're viewing, plus admins and managers from both countries
+  const canStartWith = u => (u.country || 'UG') === viewC() || ['admin', 'manager'].includes(u.role);
   // Timestamps arrive as "2026-10-13T09:15:02.123456+00:00" from queries but may use
   // a space / short offset from the live feed — compare as milliseconds, never as text.
   const tsOf = s => s ? Date.parse(String(s).replace(' ', 'T').replace(/\.(\d{3})\d+/, '.$1').replace(/([+-]\d\d)$/, '$1:00')) : 0;
@@ -197,8 +200,10 @@
 
   // ── loading ───────────────────────────────────────────────────────────
   async function loadUsers() {
-    const { data, error } = await sb.from('users').select('id,full_name,role').eq('is_active', true)
-      .eq('status', 'approved').eq('country', me()?.country || 'UG').order('full_name');
+    // Everyone approved, both countries — so names in private chats always resolve.
+    // Who you can START a chat with is narrowed in canStartWith().
+    const { data, error } = await sb.from('users').select('id,full_name,role,country').eq('is_active', true)
+      .eq('status', 'approved').order('full_name');
     if (error) throw error;
     chat.users = new Map((data || []).map(u => [String(u.id), u]));
   }
@@ -383,7 +388,7 @@
       }).join('');
     }
     const people = [...chat.users.values()].filter(u => String(u.id) !== id && !withChat.has(String(u.id))
-      && (!q || (u.full_name || '').toLowerCase().includes(q)));
+      && canStartWith(u) && (!q || (u.full_name || '').toLowerCase().includes(q)));
     if (people.length) {
       html += `<div class="chat-sec">${q ? 'People' : 'Start a chat'}</div>` + people.map(u =>
         `<button class="chat-row" onclick="chatStartWith('${esc(u.id)}')">
@@ -399,7 +404,7 @@
   function renderConvShell() {
     const key = chat.current, group = key === ALL;
     const title = group ? 'Everyone' : nameOf(otherOf(key));
-    const sub = group ? `${chat.users.size} people` : (chat.users.get(otherOf(key))?.role || '').replace('_', ' ');
+    const sub = group ? `${[...chat.users.values()].filter(u => (u.country || 'UG') === viewC()).length} people` :(chat.users.get(otherOf(key))?.role || '').replace('_', ' ');
     document.getElementById('chat-hd').innerHTML = `
       <button class="chat-icon-btn" onclick="chatBack()" aria-label="Back">${ICON_BACK}</button>
       <div class="chat-av${group ? ' group' : ''}" style="width:34px;height:34px;">${group ? ICON_GROUP : esc(initials(title))}</div>
@@ -570,7 +575,7 @@
     const hasSb = typeof sb !== 'undefined' && sb;
     if (!(hasUser && hasSb && appEl && !appEl.classList.contains('hidden'))) return;
     clearInterval(readyPoll);
-    ALL = 'all:' + (currentUser.country || 'UG');
+    ALL = 'all:' + viewC();   // the Everyone chat of the country you're viewing
     injectOnce();
     try {
       await loadUsers();

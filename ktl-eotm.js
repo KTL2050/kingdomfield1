@@ -294,7 +294,8 @@
 
   // Star of the Day runs separately per country: you nominate people in your
   // own country, and each country gets its own monthly winner.
-  function eotmCountry() { return currentUser?.country || 'UG'; }
+  // Follows the country being viewed: a Ugandan admin/manager in Kenya view recognises Kenyans
+  function eotmCountry() { try { return viewCountry(); } catch (e) { return currentUser?.country || 'UG'; } }
 
   async function eotmEnsurePreviousMonthComputed() {
     const prevKey = eotmPrevMonthKey();
