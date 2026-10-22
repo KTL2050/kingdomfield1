@@ -1094,9 +1094,8 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                 <div style="font-size:11.5px;color:var(--txt3);margin-top:2px;">Punch in when you reach a stop, punch out when you leave</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center;">
-                <button onclick="exportFieldVisitsExcel()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;background:var(--gold-mid);color:#fff;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;box-shadow:0 2px 6px rgba(212,160,23,0.3);">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  Export Excel
+                <button onclick="DailyReport.openSend()" style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;background:var(--gold-mid);color:#fff;border:none;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;box-shadow:0 2px 6px rgba(212,160,23,0.3);">
+                  📤 Send today's report
                 </button>
                 <button onclick="openActivityModal()" style="display:flex;align-items:center;gap:6px;padding:8px 15px;border-radius:9px;background:var(--royal);color:#fff;border:none;cursor:pointer;font-size:12.5px;font-weight:700;font-family:inherit;box-shadow:0 2px 8px rgba(37,99,235,0.3);">📍 Punch In</button>
               </div>
@@ -10878,7 +10877,7 @@ ${canCover ? `
                 <div class="fg ${existing && existing.contact_name && !clientNames.includes(existing.contact_name)?'':'hidden'}" id="act-contact-other-wrap" style="grid-column:1/-1;"><label class="flbl">New Client Name</label><input class="fin" id="act-contact-other" placeholder="e.g. China Town Store - Lugogo" value="${existing && !clientNames.includes(existing.contact_name)?existing.contact_name||'':''}" ${isPunchOut?'readonly style="background:var(--bg2);"':''}/></div>
         <div class="fg ${existing && !typeOpts.includes(existing.type)?'':'hidden'}" id="act-type-other-wrap" style="grid-column:1/-1;"><label class="flbl">Custom Activity Type</label><input class="fin" id="act-type-other" placeholder="e.g. Product training" value="${existing && !typeOpts.includes(existing.type)?existing.type:''}" ${isPunchOut?'readonly style="background:var(--bg2);"':''}/></div>
         <div class="fg"><label class="flbl">Calendar</label><input class="fin" type="date" id="act-date" value="${existing?.date || new Date().toISOString().split('T')[0]}" ${roField}/></div>
-        <div class="fg" style="grid-column:1/-1;"><label class="flbl">${isPunchOut ? 'Outcome — required' : 'Notes'}</label><textarea class="fin" id="act-notes" rows="3" style="resize:vertical;" ${isPunchOut ? `maxlength="120" oninput="document.getElementById('act-notes-count').textContent=this.value.length+' / 120'"` : ''} placeholder="${isPunchOut ? _actFeedbackPlaceholder(existing?.type) : ''}">${isPunchOut ? '' : (existing?.notes||'')}</textarea>
+        <div class="fg" style="grid-column:1/-1;"><label class="flbl">${isPunchOut ? 'Outcome — required' : 'Reason for visit — required'}</label><textarea class="fin" id="act-notes" rows="3" style="resize:vertical;" ${isPunchOut ? `maxlength="120" oninput="document.getElementById('act-notes-count').textContent=this.value.length+' / 120'"` : ''} placeholder="${isPunchOut ? _actFeedbackPlaceholder(existing?.type) : ''}">${isPunchOut ? '' : (existing?.notes||'')}</textarea>
           ${isPunchOut ? '<div id="act-notes-count" style="font-size:10.5px;color:var(--txt3);text-align:right;margin-top:3px;">0 / 120</div>' : ''}</div>
         ${isPunchOut && FV_INSTORE_TYPES.includes(existing?.type) ? `
         <div class="fg" style="grid-column:1/-1;"><label class="flbl">Issues seen at the store (optional)</label>
@@ -10990,6 +10989,8 @@ async function punchInActivity() {
     contact_name = contactSel === '__new__' ? document.getElementById('act-contact-other').value.trim() : contactSel;
     if (!contact_name) { alert('Please select an existing client or add a new one.'); return; }
   }
+  // The reason for the visit is required (it appears in the rep's daily activity report)
+  if (!document.getElementById('act-notes').value.trim()) { alert('Please write the reason for this visit before punching in.'); return; }
 
   const btn = document.getElementById('act-punchin-btn');
   const statusEl = document.getElementById('act-punchin-status');
@@ -12017,6 +12018,7 @@ function saveCRMSettings(){alert('✅ CRM settings saved!');}
 <script src="ktl-eotm.js"></script>
 <script src="ktl-role-other.js"></script>
 <script src="ktl-country.js"></script>
+<script src="ktl-daily-report.js"></script>
 <script src="ktl-chat.js"></script>
 </body>
 </html>

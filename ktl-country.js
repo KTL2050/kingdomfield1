@@ -30,7 +30,7 @@
   const user = () => (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null;
   const kenyaView = () => { try { return viewCountry() === 'KE'; } catch (e) { return false; } };
   function allowedInKenya(screen) {
-    if (screen === 'attendance' || screen === 'leave') return true;
+    if (screen === 'attendance' || screen === 'leave' || screen === 'dailyreports') return true;
     // Ugandan admins keep User Management so they can approve and manage Kenyan staff
     return screen === 'admin' && user()?.role === 'admin' && (user()?.country || 'UG') === 'UG';
   }
