@@ -8983,15 +8983,16 @@ async function exportFieldVisitsExcel() {
     { key: 'in_loc',   width: 34 }, { key: 'out_time', width: 11 },
     { key: 'out_loc',  width: 34 }, { key: 'duration', width: 11 },
     { key: 'status',   width: 13 }, { key: 'feedback', width: 40 },
+    { key: 'amount',   width: 16 },
   ];
 
-  ws.mergeCells('A1:L1');
+  ws.mergeCells('A1:M1');
   const title = ws.getCell('A1');
   title.value = 'Kingdom Trading Ltd — Field Visits Report';
   title.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF1A3A6B' } };
   ws.getRow(1).height = 26;
 
-  ws.mergeCells('A2:L2');
+  ws.mergeCells('A2:M2');
   const sub = ws.getCell('A2');
   sub.value = `Range: ${from} to ${to}${(!isRep && (document.getElementById('fv-filter-name')?.value||'').trim()) ? '  ·  Employee: ' + document.getElementById('fv-filter-name').value.trim() : ''}  ·  Generated ${new Date().toLocaleString('en-UG',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}`;
   sub.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF6B6B67' } };
@@ -8999,7 +9000,7 @@ async function exportFieldVisitsExcel() {
   ws.getRow(3).height = 6;
 
   const headerRow = ws.getRow(4);
-  headerRow.values = ['Rep','Type','Contact','Phone','Date','Punch In','In Location','Punch Out','Out Location','Duration','Status','Feedback / Notes'];
+  headerRow.values = ['Rep','Type','Contact','Phone','Date','Punch In','In Location','Punch Out','Out Location','Duration','Status','Feedback / Notes','Amount Collected'];
   headerRow.height = 20;
   headerRow.eachCell(cell => {
     cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -9023,16 +9024,21 @@ async function exportFieldVisitsExcel() {
       in_time: inTime, in_loc: a.punch_in_location || '—',
       out_time: outTime, out_loc: a.punch_out_location || '—',
       duration, status, feedback: a.feedback || a.notes || '',
+      amount: a.amount_collected != null && a.amount_collected !== '' ? Number(a.amount_collected) : '',
     });
+    row.getCell(13).numFmt = '#,##0';
 
     if (i % 2 === 1) row.eachCell(c => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4F7FC' } }; });
     row.eachCell(c => { c.font = { name: 'Calibri', size: 10.5, ...(c.font||{}) }; c.border = { bottom: { style: 'hair', color: { argb: 'FFE0E5EE' } } }; });
     row.getCell(11).font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: status==='Completed'?'FF1D9E75':'FFE8891A' } };
   });
 
-  const totalRow = ws.addRow({ status: 'Total visits:', feedback: acts.length });
+  const totalCollected = acts.reduce((s, a) => s + (Number(a.amount_collected) || 0), 0);
+  const totalRow = ws.addRow({ status: 'Total visits:', feedback: acts.length, amount: totalCollected });
   totalRow.getCell(11).font = { bold: true, size: 10.5 };
   totalRow.getCell(12).font = { bold: true, size: 10.5, color: { argb: 'FF1A3A6B' } };
+  totalRow.getCell(13).font = { bold: true, size: 10.5, color: { argb: 'FF17864F' } };
+  totalRow.getCell(13).numFmt = '#,##0';
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: 'application/octet-stream' });
@@ -9155,6 +9161,7 @@ async function _renderAttPunchList(elId) {
       <div style="flex:1;min-width:0;">
         <div style="font-size:12.5px;font-weight:500;">${a.type}: ${a.contact_name||''}${a.is_cover?' <span class="badge bb" style="font-size:9.5px;">Cover</span>':''}</div>
         <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${a.contact_name||'—'} · ${inTime} → ${outTime}${duration?` · ${duration}`:''}</div>
+        ${_fvOutcomeHtml(a)}
       </div>
       <span class="badge bg" style="align-self:flex-start;">Completed</span>
     </div>`;
@@ -9246,10 +9253,20 @@ async function _loadAdminFieldVisits() {
         <div style="font-size:12.5px;font-weight:500;">${a.employee_name || 'Unknown'} — ${a.type}: ${a.contact_name||''}${a.is_cover?' <span class="badge bb" style="font-size:9.5px;">Cover</span>':''}</div>
         <div style="font-size:10.5px;color:var(--txt3);margin-top:2px;">${dateStr} · ${inTime}${outTime ? ' → ' + outTime : ' (still out)'}</div>
         ${a.punch_in_location ? `<div style="font-size:10.5px;color:var(--royal);margin-top:3px;">📍 ${a.punch_in_location}</div>` : ''}
+        ${_fvOutcomeHtml(a)}
       </div>
       <span class="badge ${a.status==='Completed' ? 'bg' : 'ba'}" style="align-self:flex-start;">${a.status==='Completed' ? 'Completed' : 'Active'}</span>
     </div>`;
   }).join('');
+}
+
+// Outcome (and amount collected) under a completed field visit
+function _fvOutcomeHtml(a) {
+  if (a.status !== 'Completed') return '';
+  const out = (a.feedback || '').trim();
+  const amt = a.amount_collected != null && a.amount_collected !== ''
+    ? `<div style="font-size:11.5px;color:#17864f;font-weight:600;margin-top:2px;">💰 ${_xEsc(a.amount_currency || 'UGX')} ${Number(a.amount_collected).toLocaleString()}</div>` : '';
+  return (out ? `<div style="font-size:11.5px;color:var(--txt2);margin-top:3px;">Outcome: ${_xEsc(out)}</div>` : '') + amt;
 }
 
 async function _loadRepAttendanceView() {
@@ -10858,7 +10875,11 @@ ${canCover ? `
                 <div class="fg ${existing && existing.contact_name && !clientNames.includes(existing.contact_name)?'':'hidden'}" id="act-contact-other-wrap" style="grid-column:1/-1;"><label class="flbl">New Client Name</label><input class="fin" id="act-contact-other" placeholder="e.g. China Town Store - Lugogo" value="${existing && !clientNames.includes(existing.contact_name)?existing.contact_name||'':''}" ${isPunchOut?'readonly style="background:var(--bg2);"':''}/></div>
         <div class="fg ${existing && !typeOpts.includes(existing.type)?'':'hidden'}" id="act-type-other-wrap" style="grid-column:1/-1;"><label class="flbl">Custom Activity Type</label><input class="fin" id="act-type-other" placeholder="e.g. Product training" value="${existing && !typeOpts.includes(existing.type)?existing.type:''}" ${isPunchOut?'readonly style="background:var(--bg2);"':''}/></div>
         <div class="fg"><label class="flbl">Calendar</label><input class="fin" type="date" id="act-date" value="${existing?.date || new Date().toISOString().split('T')[0]}" ${roField}/></div>
-        <div class="fg" style="grid-column:1/-1;"><label class="flbl">${isPunchOut ? 'Feedback' : 'Notes'}</label><textarea class="fin" id="act-notes" rows="3" style="resize:vertical;" placeholder="${isPunchOut ? _actFeedbackPlaceholder(existing?.type) : ''}">${isPunchOut ? '' : (existing?.notes||'')}</textarea></div>
+        ${isPunchOut && existing?.type === 'Collecting Payment' ? `
+        <div class="fg" style="grid-column:1/-1;"><label class="flbl">Amount collected (${myCountry() === 'KE' ? 'KES' : 'UGX'}) — required</label>
+          <input class="fin" type="number" id="act-amount" min="0" step="1" inputmode="numeric" placeholder="e.g. 250000 — enter 0 if nothing was collected"/></div>` : ''}
+        <div class="fg" style="grid-column:1/-1;"><label class="flbl">${isPunchOut ? 'Outcome — required' : 'Notes'}</label><textarea class="fin" id="act-notes" rows="3" style="resize:vertical;" ${isPunchOut ? `maxlength="120" oninput="document.getElementById('act-notes-count').textContent=this.value.length+' / 120'"` : ''} placeholder="${isPunchOut ? _actFeedbackPlaceholder(existing?.type) : ''}">${isPunchOut ? '' : (existing?.notes||'')}</textarea>
+          ${isPunchOut ? '<div id="act-notes-count" style="font-size:10.5px;color:var(--txt3);text-align:right;margin-top:3px;">0 / 120</div>' : ''}</div>
       </div>
       <div class="alert ai" style="font-size:11.5px;margin-top:4px;">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;margin-top:1px;"><circle cx="8" cy="8" r="7"/><path d="M8 5v3M8 11v.5"/></svg>
@@ -11020,12 +11041,22 @@ async function punchInActivity() {
 async function confirmPunchOut(actId) {
   const act = crmActivities.find(a => a.id === actId); // may be null if punched in on another device — that's fine now
 
+  // The outcome is compulsory (max 120 characters); Collecting Payment also needs the amount
+  const feedback = document.getElementById('act-notes').value.trim();
+  if (!feedback) { alert('Please write the outcome of this visit before punching out.'); return; }
+  if (feedback.length > 120) { alert('Keep the outcome to 120 characters or fewer.'); return; }
+  const amtEl = document.getElementById('act-amount');
+  let amount = null;
+  if (amtEl) {
+    amount = amtEl.value === '' ? NaN : Number(amtEl.value);
+    if (!Number.isFinite(amount) || amount < 0) { alert('Enter the amount collected (0 if nothing was collected).'); return; }
+  }
+
   const btn = document.getElementById('act-punchin-btn');
   const statusEl = document.getElementById('act-punchin-status');
   btn.disabled = true; btn.textContent = 'Punching out…';
   statusEl.style.display = 'block';
 
-  const feedback = document.getElementById('act-notes').value.trim();
   const loc = await _attGetVerifiedLocation();
   if (!loc) { btn.disabled = false; btn.textContent = '🏁 Punch Out'; statusEl.style.display = 'none'; return; }
   const addr = await _attReverseGeocode(loc[0], loc[1]);
@@ -11034,6 +11065,7 @@ async function confirmPunchOut(actId) {
   if (act) {
     act.status = 'Completed';
     act.feedback = feedback;
+    if (amtEl) { act.amount_collected = amount; act.amount_currency = myCountry() === 'KE' ? 'KES' : 'UGX'; }
     act.punch_out_time = punchOutTime;
     act.punch_out_lat = loc[0]; act.punch_out_lng = loc[1];
     act.punch_out_location = addr;
@@ -11042,6 +11074,7 @@ async function confirmPunchOut(actId) {
 
   const { error } = await sb.from('field_visits').update({
     status: 'Completed', feedback,
+    ...(amtEl ? { amount_collected: amount, amount_currency: myCountry() === 'KE' ? 'KES' : 'UGX' } : {}),
     punch_out_time: punchOutTime, punch_out_lat: loc[0],
     punch_out_lng: loc[1], punch_out_location: addr,
   }).eq('id', actId);
