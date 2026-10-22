@@ -506,6 +506,11 @@ body.role-admin .sidebar           { background: var(--royal); }
 
 /* Rep topbar status label */
 body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
+
+/* "Issues seen at the store" chips (punch-out) */
+.fv-chip{padding:6px 12px;border-radius:999px;border:1px solid var(--brd2);background:var(--bg);font-size:12px;cursor:pointer;font-family:inherit;color:var(--txt);}
+.fv-chip.on{background:var(--royal);border-color:var(--royal);color:#fff;}
+.fv-issue-tag{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--bg2);border:1px solid var(--brd);font-size:10.5px;color:var(--txt2);margin:3px 4px 0 0;}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -8983,16 +8988,16 @@ async function exportFieldVisitsExcel() {
     { key: 'in_loc',   width: 34 }, { key: 'out_time', width: 11 },
     { key: 'out_loc',  width: 34 }, { key: 'duration', width: 11 },
     { key: 'status',   width: 13 }, { key: 'feedback', width: 40 },
-    { key: 'amount',   width: 16 },
+    { key: 'amount',   width: 16 }, { key: 'issues',   width: 44 },
   ];
 
-  ws.mergeCells('A1:M1');
+  ws.mergeCells('A1:N1');
   const title = ws.getCell('A1');
   title.value = 'Kingdom Trading Ltd — Field Visits Report';
   title.font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF1A3A6B' } };
   ws.getRow(1).height = 26;
 
-  ws.mergeCells('A2:M2');
+  ws.mergeCells('A2:N2');
   const sub = ws.getCell('A2');
   sub.value = `Range: ${from} to ${to}${(!isRep && (document.getElementById('fv-filter-name')?.value||'').trim()) ? '  ·  Employee: ' + document.getElementById('fv-filter-name').value.trim() : ''}  ·  Generated ${new Date().toLocaleString('en-UG',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}`;
   sub.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF6B6B67' } };
@@ -9000,7 +9005,7 @@ async function exportFieldVisitsExcel() {
   ws.getRow(3).height = 6;
 
   const headerRow = ws.getRow(4);
-  headerRow.values = ['Rep','Type','Contact','Phone','Date','Punch In','In Location','Punch Out','Out Location','Duration','Status','Feedback / Notes','Amount Collected'];
+  headerRow.values = ['Rep','Type','Contact','Phone','Date','Punch In','In Location','Punch Out','Out Location','Duration','Status','Feedback / Notes','Amount Collected','Issues'];
   headerRow.height = 20;
   headerRow.eachCell(cell => {
     cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -9025,6 +9030,7 @@ async function exportFieldVisitsExcel() {
       out_time: outTime, out_loc: a.punch_out_location || '—',
       duration, status, feedback: a.feedback || a.notes || '',
       amount: a.amount_collected != null && a.amount_collected !== '' ? Number(a.amount_collected) : '',
+      issues: [(a.issues || []).join(', '), (a.issues_note || '').trim() ? 'Other: ' + a.issues_note.trim() : ''].filter(Boolean).join(' — '),
     });
     row.getCell(13).numFmt = '#,##0';
 
@@ -9266,7 +9272,11 @@ function _fvOutcomeHtml(a) {
   const out = (a.feedback || '').trim();
   const amt = a.amount_collected != null && a.amount_collected !== ''
     ? `<div style="font-size:11.5px;color:#17864f;font-weight:600;margin-top:2px;">💰 ${_xEsc(a.amount_currency || 'UGX')} ${Number(a.amount_collected).toLocaleString()}</div>` : '';
-  return (out ? `<div style="font-size:11.5px;color:var(--txt2);margin-top:3px;">Outcome: ${_xEsc(out)}</div>` : '') + amt;
+  const tags = (a.issues || []).length
+    ? `<div>${a.issues.map(t => `<span class="fv-issue-tag">${_xEsc(t)}</span>`).join('')}</div>` : '';
+  const note = (a.issues_note || '').trim()
+    ? `<div style="font-size:11px;color:var(--txt3);margin-top:3px;">Issues: ${_xEsc(a.issues_note.trim())}</div>` : '';
+  return (out ? `<div style="font-size:11.5px;color:var(--txt2);margin-top:3px;">Outcome: ${_xEsc(out)}</div>` : '') + amt + tags + note;
 }
 
 async function _loadRepAttendanceView() {
@@ -10880,6 +10890,13 @@ ${canCover ? `
           <input class="fin" type="number" id="act-amount" min="0" step="1" inputmode="numeric" placeholder="e.g. 250000 — enter 0 if nothing was collected"/></div>` : ''}
         <div class="fg" style="grid-column:1/-1;"><label class="flbl">${isPunchOut ? 'Outcome — required' : 'Notes'}</label><textarea class="fin" id="act-notes" rows="3" style="resize:vertical;" ${isPunchOut ? `maxlength="120" oninput="document.getElementById('act-notes-count').textContent=this.value.length+' / 120'"` : ''} placeholder="${isPunchOut ? _actFeedbackPlaceholder(existing?.type) : ''}">${isPunchOut ? '' : (existing?.notes||'')}</textarea>
           ${isPunchOut ? '<div id="act-notes-count" style="font-size:10.5px;color:var(--txt3);text-align:right;margin-top:3px;">0 / 120</div>' : ''}</div>
+        ${isPunchOut && FV_INSTORE_TYPES.includes(existing?.type) ? `
+        <div class="fg" style="grid-column:1/-1;"><label class="flbl">Issues seen at the store (optional)</label>
+          <div id="act-issues" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+            ${FV_ISSUE_CHIPS.map(t => `<button type="button" class="fv-chip" onclick="this.classList.toggle('on')">${t}</button>`).join('')}
+          </div>
+          <textarea class="fin" id="act-issues-note" rows="2" maxlength="500" style="resize:vertical;" placeholder="Other issues / details — describe anything else you noticed"></textarea>
+        </div>` : ''}
       </div>
       <div class="alert ai" style="font-size:11.5px;margin-top:4px;">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="flex-shrink:0;margin-top:1px;"><circle cx="8" cy="8" r="7"/><path d="M8 5v3M8 11v.5"/></svg>
@@ -10939,6 +10956,11 @@ function toggleActContactOther() {
   const isNew = document.getElementById('act-contact').value === '__new__';
   document.getElementById('act-contact-other-wrap').classList.toggle('hidden', !isNew);
 }
+
+// "Issues seen at the store" — shown at punch-out for in-store activity types
+const FV_ISSUE_CHIPS   = ['Out of stock','Not listed','Poor shelf space','Price issue','Expired / damaged','Competitor promo','Payment overdue'];
+const FV_INSTORE_TYPES = ['Visit','Order Generation','Merchandising/Stock Check','New Listing/New Account',
+                          'Resolve Issues','Collecting Payment','Collections'];
 
 function _actFeedbackPlaceholder(type) {
   const prompts = {
@@ -11051,6 +11073,9 @@ async function confirmPunchOut(actId) {
     amount = amtEl.value === '' ? NaN : Number(amtEl.value);
     if (!Number.isFinite(amount) || amount < 0) { alert('Enter the amount collected (0 if nothing was collected).'); return; }
   }
+  const issuesBox  = document.getElementById('act-issues');
+  const issueChips = issuesBox ? [...issuesBox.querySelectorAll('.fv-chip.on')].map(b => b.textContent) : [];
+  const issuesNote = document.getElementById('act-issues-note')?.value.trim() || '';
 
   const btn = document.getElementById('act-punchin-btn');
   const statusEl = document.getElementById('act-punchin-status');
@@ -11066,6 +11091,7 @@ async function confirmPunchOut(actId) {
     act.status = 'Completed';
     act.feedback = feedback;
     if (amtEl) { act.amount_collected = amount; act.amount_currency = myCountry() === 'KE' ? 'KES' : 'UGX'; }
+    if (issuesBox) { act.issues = issueChips; act.issues_note = issuesNote || null; }
     act.punch_out_time = punchOutTime;
     act.punch_out_lat = loc[0]; act.punch_out_lng = loc[1];
     act.punch_out_location = addr;
@@ -11075,6 +11101,7 @@ async function confirmPunchOut(actId) {
   const { error } = await sb.from('field_visits').update({
     status: 'Completed', feedback,
     ...(amtEl ? { amount_collected: amount, amount_currency: myCountry() === 'KE' ? 'KES' : 'UGX' } : {}),
+    ...(issuesBox ? { issues: issueChips, issues_note: issuesNote || null } : {}),
     punch_out_time: punchOutTime, punch_out_lat: loc[0],
     punch_out_lng: loc[1], punch_out_location: addr,
   }).eq('id', actId);
