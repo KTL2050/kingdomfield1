@@ -10816,7 +10816,9 @@ async function openActivityModal(existingId = null) {
   const clientOptions = clientNames.map(n=>`<option value="${n}">`).join('');
   window._actCoverClient = null;
   const canCover = isSalesRep() && !isPunchOut; // admins already see every store
-  const typeOpts = ['Call','Meeting','Visit','Order Generation','Collections','Prospecting'];
+  // "Collections" was renamed "Collecting Payment"; visits already logged keep their old label
+  const typeOpts = ['Call','Meeting','Visit','Order Generation','Collecting Payment','Prospecting',
+                    'Merchandising/Stock Check','New Listing/New Account','Resolve Issues'];
   const roField = isPunchOut ? 'readonly style="background:var(--bg2);color:var(--txt2);"' : '';
   d.innerHTML=`<div style="background:#fff;border-radius:16px;width:90%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 16px 60px rgba(0,0,0,0.25);">
     <div style="padding:18px 22px;border-bottom:0.5px solid var(--brd);display:flex;justify-content:space-between;align-items:center;">
@@ -10924,6 +10926,10 @@ function _actFeedbackPlaceholder(type) {
     'Visit': 'What happened during the visit? Any issues or opportunities noted?',
     'Order Generation': 'Did they place an order? What items and quantities?',
     'Collections': 'How much was collected? Any balance still owed?',
+    'Collecting Payment': 'How much was paid, and by what method? Any balance still owed?',
+    'Merchandising/Stock Check': 'How did the shelf look? Any stock-outs, low stock or display issues?',
+    'New Listing/New Account': 'What was listed or opened? Which products, and any first order?',
+    'Resolve Issues': 'What was the issue, and how was it resolved? Anything still open?',
   };
   return prompts[type] || 'How did it go? Any feedback…';
 }
