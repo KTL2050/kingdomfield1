@@ -10829,6 +10829,7 @@ async function openActivityModal(existingId = null) {
       return openActivityModal(openVisit.id);
     }
   }
+  document.getElementById('crm-activity-modal')?.remove();   // never stack two pop-ups (double tap / slow network)
   const d=document.createElement('div'); d.id='crm-activity-modal';
   d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(3px);';
   const clientNames = (isSalesRep() ? visibleClients : allClients).map(c=>c.name);
