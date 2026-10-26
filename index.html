@@ -3511,6 +3511,7 @@ async function selectClient(clientId) {
             <button class="date-preset-btn" onclick="setHistPreset('all','${client.id}',this)">All</button>
           </div>
           <button class="btn btn-sm btn-royal" style="margin-left:auto;" onclick="loadClientSalesHistory('${client.id}')">Apply</button>
+          <button class="btn btn-sm" onclick="openPurchaseDownload('${client.id}')">⬇ Download</button>
         </div>
         <div style="overflow-x:auto;" id="client-products-table">
           <div style="padding:20px;text-align:center;color:var(--txt3);">Loading history...</div>
@@ -3629,6 +3630,211 @@ tableEl.innerHTML = `
       return `<tr><td class="mono">${item.item_code||'—'}</td><td style="font-weight:500;">${(item.item_name||'').slice(0,40)}</td><td style="font-size:11.5px;">${item.last_order} ${recency}</td></tr>`;
     }).join('')}
     </tbody></table></div>`;
+}
+
+// ─── PURCHASE HISTORY DOWNLOAD (Excel / PDF) ──────────────────────────────────
+// One row per product the store bought in the period: SKU · Product · Last Order.
+// Brand comes from the SKU lists in User Management: AIWIBI = in the AIWIBI/AIWINA
+// list; UBL = in the four listing lists (Top 100 … SLOBS) but not the AIWIBI list.
+const _phNorm = s => String(s || '').replace(/[ ​-‍﻿]/g, '').trim().toLowerCase();
+async function _phLoadBrandIndex() {
+  const [aiw, ...lists] = await Promise.all([getTableSkus('aiwibi_aiwina'), ...LISTING_TABLES.map(t => getTableSkus(t))]);
+  const aiwibi = new Set(), ubl = new Set();
+  aiw.forEach(r => { if (r.sku) aiwibi.add(_phNorm(r.sku)); if (r.item_name) aiwibi.add(_phNorm(r.item_name)); });
+  lists.flat().forEach(r => {
+    if (r.sku && !aiwibi.has(_phNorm(r.sku))) ubl.add(_phNorm(r.sku));
+    if (r.item_name && !aiwibi.has(_phNorm(r.item_name))) ubl.add(_phNorm(r.item_name));
+  });
+  return { aiwibi, ubl };
+}
+function _phBrandOf(idx, sku, name) {
+  const k = _phNorm(sku), n = _phNorm(name);
+  if ((k && idx.aiwibi.has(k)) || (n && idx.aiwibi.has(n))) return 'AIWIBI';
+  if ((k && idx.ubl.has(k)) || (n && idx.ubl.has(n))) return 'UBL';
+  return null;
+}
+async function _phLoadProducts(client, from, to, brand) {
+  const fetchAll = async (field, value, op) => {
+    let rows = [], start = 0;
+    for (;;) {
+      let q = sb.from('invoice_line_items').select('item_code,item_name,line_date');
+      q = op === 'ilike' ? q.ilike(field, value) : q.eq(field, value);
+      const r = await q.gte('line_date', from).lte('line_date', to).order('line_date', { ascending: false }).range(start, start + 999);
+      if (r.error) throw r.error;
+      rows = rows.concat(r.data || []);
+      if (!r.data || r.data.length < 1000) break;
+      start += 1000;
+    }
+    return rows;
+  };
+  let rows = client.zoho_customer_id ? await fetchAll('customer_id', client.zoho_customer_id) : [];
+  if (!rows.length) rows = await fetchAll('customer_name', client.name, 'ilike');
+  const idx = brand === 'ALL' ? null : await _phLoadBrandIndex();
+  const map = {};
+  rows.forEach(r => {
+    if (idx && _phBrandOf(idx, r.item_code, r.item_name) !== brand) return;
+    const key = _phNorm(r.item_code) || _phNorm(r.item_name);
+    if (!key) return;
+    if (!map[key]) map[key] = { sku: r.item_code || '', product: r.item_name || '', last: r.line_date };
+    if (r.line_date > map[key].last) map[key].last = r.line_date;
+  });
+  return Object.values(map).sort((a, b) => String(b.last).localeCompare(String(a.last)));
+}
+
+function openPurchaseDownload(clientId) {
+  const client = allClients.find(c => c.id === clientId); if (!client) return;
+  document.getElementById('ph-dl')?.remove();
+  const d = document.createElement('div'); d.id = 'ph-dl'; d.className = 'confirm-overlay';
+  d.innerHTML = `<div class="confirm-box" style="max-width:420px;">
+    <div style="font-size:15px;font-weight:600;margin-bottom:4px;">Download purchase history</div>
+    <div style="font-size:12px;color:var(--txt2);margin-bottom:14px;">${_xEsc(client.name)}</div>
+    <div class="fgrid">
+      <div class="fg"><label class="flbl">From</label><input class="fin" type="date" id="ph-from" value="${document.getElementById('hist-from')?.value || ''}"/></div>
+      <div class="fg"><label class="flbl">To</label><input class="fin" type="date" id="ph-to" value="${document.getElementById('hist-to')?.value || ''}"/></div>
+      <div class="fg" style="grid-column:1/-1;"><label class="flbl">Brand</label>
+        <select class="fin" id="ph-brand"><option value="ALL">All brands</option><option value="AIWIBI">AIWIBI</option><option value="UBL">UBL</option></select></div>
+    </div>
+    <div id="ph-msg" style="font-size:12px;color:var(--txt2);min-height:18px;margin:4px 0 10px;"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn" style="flex:1;justify-content:center;" onclick="document.getElementById('ph-dl').remove()">Cancel</button>
+      <button class="btn btn-royal" style="flex:1;justify-content:center;" onclick="downloadPurchaseHistory('${clientId}','xlsx')">⬇ Excel</button>
+      <button class="btn btn-royal" style="flex:1;justify-content:center;" onclick="downloadPurchaseHistory('${clientId}','pdf')">⬇ PDF</button>
+    </div></div>`;
+  d.addEventListener('click', e => { if (e.target === d) d.remove(); });
+  document.body.appendChild(d);
+}
+
+async function downloadPurchaseHistory(clientId, kind) {
+  const client = allClients.find(c => c.id === clientId); if (!client) return;
+  const from = document.getElementById('ph-from').value, to = document.getElementById('ph-to').value;
+  const brand = document.getElementById('ph-brand').value;
+  const msg = document.getElementById('ph-msg');
+  if (!from || !to || from > to) { msg.innerHTML = '<span style="color:#d0361c;">Choose a valid period.</span>'; return; }
+  msg.textContent = 'Preparing your file…';
+  try {
+    const items = await _phLoadProducts(client, from, to, brand);
+    const brandLabel = brand === 'ALL' ? 'All brands' : brand;
+    if (!items.length) { msg.innerHTML = `<span style="color:#b6650a;">No ${brand === 'ALL' ? '' : brand + ' '}purchases for ${_xEsc(client.name)} in this period.</span>`; return; }
+    const meta = { store: client.name, from, to, brandLabel, by: currentUser?.full_name || '', at: new Date() };
+    const safe = s => String(s).replace(/[^\w-]+/g, '_').replace(/^_+|_+$/g, '');
+    const name = `Purchase_History_${safe(client.name)}_${brand === 'ALL' ? 'All' : brand}_${from}_to_${to}`;
+    const blob = kind === 'pdf' ? await _phPdf(items, meta) : await _phExcel(items, meta);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = name + (kind === 'pdf' ? '.pdf' : '.xlsx');
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    msg.innerHTML = `<span style="color:#17864f;">✅ ${items.length} products downloaded.</span>`;
+  } catch (e) { msg.innerHTML = `<span style="color:#d0361c;">Couldn't create the file: ${_xEsc(e.message || e)}</span>`; }
+}
+
+const _PH_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const _phDate = s => { const [y, m, d] = String(s).split('-'); return `${d} ${_PH_MONTHS[Number(m) - 1]} ${y}`; };
+
+async function _phExcel(items, m) {
+  const INDIGO = 'FF222B9C', BLUE = 'FF2563EB', SOFT = 'FFEAF1FF', ZEBRA = 'FFF6F7F9', RULE = 'FFE6E8EC', INK = 'FF121720', GREY = 'FF667085';
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'KTLSALES — Kingdom Trading Ltd'; wb.created = m.at;
+  const ws = wb.addWorksheet('Purchase History', {
+    views: [{ state: 'frozen', ySplit: 6, showGridLines: false }],
+    pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+                 margins: { left: 0.5, right: 0.5, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 }, printTitlesRow: '6:6' },
+    headerFooter: { oddFooter: '&L&8Kingdom Trading Ltd · Purchase History&R&8Page &P of &N' },
+  });
+  ws.columns = [{ key: 'n', width: 6 }, { key: 'sku', width: 20 }, { key: 'product', width: 58 }, { key: 'last', width: 16 }];
+  const band = (r, text, font, fill, h) => {
+    ws.mergeCells(`A${r}:D${r}`);
+    const c = ws.getCell(`A${r}`); c.value = text; c.font = font;
+    if (fill) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fill } };
+    c.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+    ws.getRow(r).height = h;
+  };
+  band(1, 'Kingdom Trading Ltd', { name: 'Calibri', size: 16, bold: true, color: { argb: 'FFFFFFFF' } }, INDIGO, 32);
+  band(2, `Purchase History — ${m.store}`, { name: 'Calibri', size: 13, bold: true, color: { argb: INK } }, SOFT, 24);
+  band(3, `Period: ${_phDate(m.from)} – ${_phDate(m.to)}   ·   Brand: ${m.brandLabel}   ·   ${items.length} product${items.length === 1 ? '' : 's'}`,
+       { name: 'Calibri', size: 10.5, color: { argb: INK } }, SOFT, 20);
+  band(4, `Generated ${m.at.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}${m.by ? ' by ' + m.by : ''}`,
+       { name: 'Calibri', size: 9, italic: true, color: { argb: GREY } }, null, 16);
+  ws.getRow(5).height = 8;
+
+  const head = ws.getRow(6);
+  head.values = ['#', 'SKU', 'Product', 'Last Order'];
+  head.height = 22;
+  head.eachCell(c => {
+    c.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FFFFFFFF' } };
+    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BLUE } };
+    c.alignment = { vertical: 'middle', horizontal: c.col === 3 ? 'left' : 'center' };
+  });
+  items.forEach((it, i) => {
+    // UTC midnight: Excel stores dates as UTC, so a local (UTC+3) midnight would show as the day before
+    const row = ws.addRow({ n: i + 1, sku: it.sku || '—', product: it.product || '—', last: new Date(it.last + 'T00:00:00Z') });
+    row.height = 18;
+    row.eachCell({ includeEmpty: true }, c => {
+      c.font = { name: c.col === 2 ? 'Consolas' : 'Calibri', size: 10, color: { argb: INK } };
+      c.border = { bottom: { style: 'thin', color: { argb: RULE } } };
+      c.alignment = { vertical: 'middle', horizontal: c.col === 3 ? 'left' : 'center' };
+      if (i % 2 === 1) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ZEBRA } };
+    });
+    row.getCell(1).font = { name: 'Calibri', size: 9, color: { argb: GREY } };
+    row.getCell(4).numFmt = 'dd mmm yyyy';
+  });
+  ws.autoFilter = { from: { row: 6, column: 1 }, to: { row: 6 + items.length, column: 4 } };
+  const foot = ws.addRow({ product: `Total products: ${items.length}` });
+  foot.height = 20;
+  foot.getCell(3).font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: INDIGO } };
+  for (let c = 1; c <= 4; c++) foot.getCell(c).border = { top: { style: 'medium', color: { argb: INDIGO } } };
+  const buf = await wb.xlsx.writeBuffer();
+  return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+async function _phPdf(items, m) {
+  if (!window.jspdf) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = res; s.onerror = () => rej(new Error('Could not load the PDF tool — check your connection.'));
+      document.head.appendChild(s);
+    });
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, L = 14, R = W - 14, COLS = [L, L + 12, L + 52, R - 30];
+  const banner = () => {
+    doc.setFillColor(34, 43, 156); doc.rect(0, 0, W, 22, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text('Kingdom Trading Ltd', L, 14);
+    doc.setTextColor(18, 23, 32); doc.setFontSize(12.5); doc.text(`Purchase History — ${m.store}`.slice(0, 80), L, 32);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(102, 112, 133);
+    doc.text(`Period: ${_phDate(m.from)} – ${_phDate(m.to)}   ·   Brand: ${m.brandLabel}   ·   ${items.length} products`, L, 38);
+    doc.text(`Generated ${m.at.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}${m.by ? ' by ' + m.by : ''}`, L, 43);
+  };
+  const header = y => {
+    doc.setFillColor(37, 99, 235); doc.rect(L, y - 5, R - L, 8, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5);
+    ['#', 'SKU', 'Product', 'Last Order'].forEach((h, i) => doc.text(h, COLS[i] + 2, y));
+    return y + 8;
+  };
+  banner();
+  let y = header(53);
+  doc.setFont('helvetica', 'normal');
+  items.forEach((it, i) => {
+    if (y > 280) { doc.addPage(); y = header(16); doc.setFont('helvetica', 'normal'); }
+    if (i % 2 === 1) { doc.setFillColor(246, 247, 249); doc.rect(L, y - 5, R - L, 7, 'F'); }
+    doc.setDrawColor(230, 232, 236); doc.line(L, y + 2, R, y + 2);
+    doc.setTextColor(102, 112, 133); doc.setFontSize(8.5); doc.text(String(i + 1), COLS[0] + 2, y);
+    doc.setTextColor(18, 23, 32); doc.setFontSize(9);
+    doc.text(String(it.sku || '—').slice(0, 22), COLS[1] + 2, y);
+    doc.text(doc.splitTextToSize(String(it.product || '—'), COLS[3] - COLS[2] - 4)[0], COLS[2] + 2, y);
+    doc.text(_phDate(it.last), COLS[3] + 2, y);
+    y += 7;
+  });
+  doc.setFont('helvetica', 'bold'); doc.setTextColor(34, 43, 156); doc.setFontSize(9.5);
+  if (y > 285) { doc.addPage(); y = 20; }
+  doc.text(`Total products: ${items.length}`, COLS[2] + 2, y + 2);
+  const pages = doc.getNumberOfPages();
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(152, 162, 179);
+    doc.text('Kingdom Trading Ltd · Purchase History', L, 292); doc.text(`Page ${p} of ${pages}`, R, 292, { align: 'right' });
+  }
+  return doc.output('blob');
 }
 
 // ─── CLIENT PAST LISTINGS ──────────────────────────────────────────────────────
