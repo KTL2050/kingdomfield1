@@ -180,6 +180,11 @@
 .eotm-hof-eyebrow{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3);}
 .eotm-hof-name{font-size:14px;font-weight:700;color:var(--txt);margin-top:2px;letter-spacing:-.01em;}
 .eotm-hof-summary{font-size:11.5px;color:var(--txt2);line-height:1.5;margin-top:6px;}
+.eotm-hof-runners{margin-top:10px;padding-top:8px;border-top:.5px solid var(--brd);}
+.eotm-hof-runner{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt2);padding:3px 0;}
+.eotm-hof-place{flex-shrink:0;min-width:74px;color:var(--txt3);}
+.eotm-hof-rname{flex:1;min-width:0;color:var(--txt);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.eotm-hof-rpts{flex-shrink:0;color:var(--txt3);}
 .eotm-empty{text-align:center;padding:24px 10px;color:var(--txt3);font-size:12px;}
 `;
 
@@ -383,13 +388,27 @@
   function eotmHofBlock() {
     if (!eotmState.hof || !eotmState.hof.winner_name) return '';
     if (new Date().getDate() !== 1) return '';   // reveal the winner on the 1st of the month only
+    const h = eotmState.hof;
+    // Top 3: rank by points; equal points share the place (1, 2, 2, 4 …); show everyone placed 1st–3rd
+    const board = (Array.isArray(h.leaderboard) && h.leaderboard.length ? h.leaderboard : [{ full_name: h.winner_name, points: h.winner_points }])
+      .slice().sort((a, b) => b.points - a.points);
+    const ranked = board.map(p => ({ ...p, place: board.findIndex(q => q.points === p.points) + 1 }));
+    const top = ranked.filter(p => p.place <= 3);
+    const stars = top.filter(p => p.place === 1);        // one Star, or joint Stars
+    const others = top.filter(p => p.place > 1);         // 🥈 / 🥉 rows
+    const joint = n => top.filter(p => p.place === n).length > 1;
+    const runnerRow = p => `<div class="eotm-hof-runner">
+        <span class="eotm-hof-place">${p.place === 2 ? '🥈' : '🥉'} ${joint(p.place) ? 'Joint ' : ''}${p.place === 2 ? '2nd' : '3rd'}</span>
+        <span class="eotm-hof-rname">${eotmEsc(p.full_name)}</span>
+        <span class="eotm-hof-rpts">${p.points} pts</span></div>`;
     return `
       <div class="eotm-hof">
         <div class="eotm-hof-icon">${EOTM_ICON_TROPHY}</div>
-        <div>
-          <div class="eotm-hof-eyebrow">${eotmEsc(eotmMonthLabel(eotmState.hof.month_key))} Star</div>
-          <div class="eotm-hof-name">${eotmEsc(eotmState.hof.winner_name)} — ${eotmState.hof.winner_points} pts</div>
-          ${eotmState.hof.winner_summary ? `<div class="eotm-hof-summary">${eotmEsc(eotmState.hof.winner_summary)}</div>` : ''}
+        <div style="flex:1;min-width:0;">
+          <div class="eotm-hof-eyebrow">${eotmEsc(eotmMonthLabel(h.month_key))} ${stars.length > 1 ? 'Joint Stars' : 'Star'}</div>
+          <div class="eotm-hof-name">${stars.map(s => eotmEsc(s.full_name)).join(' & ')} — ${stars[0].points} pts</div>
+          ${stars.length === 1 && h.winner_summary ? `<div class="eotm-hof-summary">${eotmEsc(h.winner_summary)}</div>` : ''}
+          ${others.length ? `<div class="eotm-hof-runners">${others.map(runnerRow).join('')}</div>` : ''}
         </div>
       </div>`;
   }
