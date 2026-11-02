@@ -387,7 +387,7 @@
 
   function eotmHofBlock() {
     if (!eotmState.hof || !eotmState.hof.winner_name) return '';
-    if (new Date().getDate() !== 1) return '';   // reveal the winner on the 1st of the month only
+    if (new Date().getDate() > 3) return '';      // reveal last month's winners on the first 3 days of the month
     const h = eotmState.hof;
     // Top 3: rank by points; equal points share the place (1, 2, 2, 4 …); show everyone placed 1st–3rd
     const board = (Array.isArray(h.leaderboard) && h.leaderboard.length ? h.leaderboard : [{ full_name: h.winner_name, points: h.winner_points }])
@@ -429,7 +429,7 @@
     const rows = eotmState.users.filter(u => u.full_name.toLowerCase().includes(q));
     document.getElementById('eotm-body').innerHTML = `
       ${eotmHofBlock()}
-      <div class="eotm-note">Pick the teammate who stood out today and say why — they earn 10 points. Nothing is shown until the winner is announced on the 1st.</div>
+      <div class="eotm-note">Pick the teammate who stood out today and say why — they earn 10 points. Nothing is shown until the winners are announced on the 1st (shown for the first 3 days of the month).</div>
       <input class="eotm-search f-inp" id="eotm-search" placeholder="Search teammates…" oninput="eotmFilterList(this.value)" value="${eotmEsc(filterText || '')}"/>
       <div id="eotm-list">
         ${rows.length === 0 ? '<div class="eotm-empty">No matching teammates.</div>' : rows.map(u => `
@@ -531,7 +531,7 @@
       <div class="eotm-done-card">
         You picked <b>${eotmEsc(v.nomineeName)}</b>:<br/>"${eotmEsc(v.reason)}"
       </div>
-      <div class="eotm-countdown">🔒 Standings stay hidden — the winner is revealed in ${days} day${days === 1 ? '' : 's'}, on the 1st. Come back tomorrow for another shout-out.</div>`;
+      <div class="eotm-countdown">🔒 Standings stay hidden — the winners are revealed in ${days} day${days === 1 ? '' : 's'}, on the 1st (shown for 3 days). Come back tomorrow for another shout-out.</div>`;
   }
 
   function eotmSetDotVisible(visible) {
