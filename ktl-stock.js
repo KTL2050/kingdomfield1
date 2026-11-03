@@ -440,9 +440,18 @@ async function loadProducts() {
 async function loadSkusForClient(client) {
   const db = DB();
   let catalogRows = [];
-  for (const t of AIWIBI_TABLES) {
-    const { data, error } = await db.from(t).select('*');
+  // 1st choice: products marked AIWIBI/AIWINA (brand 'AIWIBI') in the four listing lists
+  const listingTables = (typeof LISTING_TABLES !== 'undefined') ? LISTING_TABLES : [];
+  for (const t of listingTables) {
+    const { data, error } = await db.from(t).select('*').eq('brand', 'AIWIBI');
     if (!error && data) catalogRows = catalogRows.concat(data);
+  }
+  // until a file with brands has been uploaded: the old AIWIBI/AIWINA list
+  if (!catalogRows.length) {
+    for (const t of AIWIBI_TABLES) {
+      const { data, error } = await db.from(t).select('*');
+      if (!error && data) catalogRows = catalogRows.concat(data);
+    }
   }
   if (!catalogRows.length) {
     catalogRows = allProducts

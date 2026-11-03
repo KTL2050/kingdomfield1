@@ -2332,7 +2332,7 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
               <span class="card-title" style="font-size:12px;">Import Excel — replaces all four lists</span>
               <button class="btn btn-sm" onclick="document.getElementById('excel-import-form').classList.add('hidden')">Cancel</button>
             </div>
-            <div style="font-size:11.5px;color:var(--txt2);margin-bottom:10px;line-height:1.5;">One file with every product (UBL, AIWIBI, AIWINA). Columns: <strong>SKU, Item Name, Rank, Status</strong>.<br>
+            <div style="font-size:11.5px;color:var(--txt2);margin-bottom:10px;line-height:1.5;">One file with every product (UBL, AIWIBI, AIWINA). Columns: <strong>SKU, Item Name, Rank, Status, Brand</strong> (Brand: UBL or AIWIBI/AIWINA — optional).<br>
               <strong>Status SLOB → SLOBS</strong> (3 pts, rank optional) · otherwise by rank:
               <strong>1–100 → Top 100</strong> (0 pts) · <strong>101–500 → Top 101–500</strong> (1 pt) · <strong>501+ → Others</strong> (3 pts).</div>
             <label id="excel-drop-zone" ondragover="event.preventDefault();this.style.borderColor='var(--royal)'" ondragleave="this.style.borderColor=''" ondrop="excelDrop(event)"
@@ -2559,7 +2559,7 @@ let _clientBrandCache = {};
 
 async function getTableSkus(tableName) {
   if (_skuCache[tableName]) return _skuCache[tableName];
-  const { data, error } = await sb.from(tableName).select('sku, item_name');
+  const { data, error } = await sb.from(tableName).select('*');   // includes brand on the four listing tables
   if (error) { console.warn('SKU table error', tableName, error.message); return []; }
   const rows = (data || []).map(r => ({ ...r, _table: tableName }));
   _skuCache[tableName] = rows;
@@ -3640,15 +3640,21 @@ const _phNorm = s => String(s || '').replace(/[ ​-‍﻿]/g, '').trim().toLow
 async function _phLoadBrandIndex() {
   const [aiw, ...lists] = await Promise.all([getTableSkus('aiwibi_aiwina'), ...LISTING_TABLES.map(t => getTableSkus(t))]);
   const aiwibi = new Set(), ubl = new Set();
+  // 1st choice: the Brand saved with the product in the four lists ('UBL' or 'AIWIBI')
+  const byKey = new Map();
+  lists.flat().forEach(r => { if (r.brand) { if (r.sku) byKey.set(_phNorm(r.sku), r.brand); if (r.item_name) byKey.set(_phNorm(r.item_name), r.brand); } });
   aiw.forEach(r => { if (r.sku) aiwibi.add(_phNorm(r.sku)); if (r.item_name) aiwibi.add(_phNorm(r.item_name)); });
   lists.flat().forEach(r => {
     if (r.sku && !aiwibi.has(_phNorm(r.sku))) ubl.add(_phNorm(r.sku));
     if (r.item_name && !aiwibi.has(_phNorm(r.item_name))) ubl.add(_phNorm(r.item_name));
   });
-  return { aiwibi, ubl };
+  return { aiwibi, ubl, byKey };
 }
 function _phBrandOf(idx, sku, name) {
   const k = _phNorm(sku), n = _phNorm(name);
+  const b = (k && idx.byKey.get(k)) || (n && idx.byKey.get(n));
+  if (b) return b;
+  // brand Unknown: the old rule — in the AIWIBI/AIWINA list = AIWIBI, else UBL
   if ((k && idx.aiwibi.has(k)) || (n && idx.aiwibi.has(n))) return 'AIWIBI';
   if ((k && idx.ubl.has(k)) || (n && idx.ubl.has(n))) return 'UBL';
   return null;
@@ -5420,6 +5426,7 @@ async function readExcelImportFile(file) {
     name: findCol(['itemname', 'name', 'item', 'productname', 'product', 'description']),
     rank: findCol(['rank', 'ranking', 'position', 'top']),
     status: findCol(['status', 'slob', 'slobstatus', 'slobs']),
+    brand:  findCol(['brand', 'brandname', 'make']),
   };
   if (col.sku < 0 || col.rank < 0) {
     return fail(`Row 1 must have a <strong>SKU</strong> column and a <strong>Rank</strong> column. Found: ${grid[0].map(h => `"${_xEsc(h)}"`).join(', ') || 'nothing'}.`);
@@ -5437,7 +5444,9 @@ async function readExcelImportFile(file) {
     const rank = /^\d+(\.0+)?$/.test(rankText) ? parseInt(rankText, 10) : null;
     const slob = col.status >= 0 && ['slob', 'slobs'].includes(norm(r[col.status]));
     if (!slob && (rank === null || rank < 1)) { badRank.push(sku); return; }   // not-SLOB needs a rank
-    rows.push({ sku, item_name: col.name >= 0 ? (r[col.name] || '').trim() : '', rank: rank >= 1 ? rank : null, slob });
+    const bt = col.brand >= 0 ? norm(r[col.brand]) : '';
+    const brand = bt === 'ubl' ? 'UBL' : (bt.includes('aiwibi') || bt.includes('aiwina')) ? 'AIWIBI' : null;   // AIWIBI = the AIWIBI/AIWINA group
+    rows.push({ sku, item_name: col.name >= 0 ? (r[col.name] || '').trim() : '', rank: rank >= 1 ? rank : null, slob, brand });
   });
   if (!rows.length) return fail('No usable rows were found (each needs a SKU, and a rank unless its Status is SLOB).');
 
@@ -5456,11 +5465,12 @@ async function readExcelImportFile(file) {
   btn.disabled = false;
   preview.innerHTML = `
     <div class="alert ag" style="font-size:12px;margin-bottom:8px;">✔ <span><strong>${rows.length.toLocaleString()}</strong> items ready from ${_xEsc(file.name)} —
-      ${Object.keys(perList).map(t => `<strong>${_xEsc(TABLE_META[t]?.label || t)}</strong>: ${perList[t].toLocaleString()}`).join(' · ')}</span></div>
+      ${Object.keys(perList).map(t => `<strong>${_xEsc(TABLE_META[t]?.label || t)}</strong>: ${perList[t].toLocaleString()}`).join(' · ')}
+      <br>Brands — <strong>UBL</strong>: ${rows.filter(r => r.brand === 'UBL').length.toLocaleString()} · <strong>AIWIBI/AIWINA</strong>: ${rows.filter(r => r.brand === 'AIWIBI').length.toLocaleString()} · <strong>Unknown</strong>: ${rows.filter(r => !r.brand).length.toLocaleString()}</span></div>
     ${warnings.map(w => `<div class="alert aw" style="font-size:11.5px;margin-bottom:6px;">⚠ <span>${w}</span></div>`).join('')}
     <div style="overflow-x:auto;"><table style="font-size:12px;">
-      <thead><tr><th>Rank</th><th>SKU</th><th>Item Name</th><th>Status</th><th>List</th></tr></thead>
-      <tbody>${rows.slice(0, 5).map(r => `<tr><td class="mono">${r.rank ?? '—'}</td><td class="mono">${_xEsc(r.sku)}</td><td>${_xEsc(r.item_name) || '—'}</td><td>${r.slob ? 'SLOB' : 'Not SLOB'}</td><td>${_xEsc(TABLE_META[_xListOf(r)]?.label || '')}</td></tr>`).join('')}</tbody>
+      <thead><tr><th>Rank</th><th>SKU</th><th>Item Name</th><th>Status</th><th>Brand</th><th>List</th></tr></thead>
+      <tbody>${rows.slice(0, 5).map(r => `<tr><td class="mono">${r.rank ?? '—'}</td><td class="mono">${_xEsc(r.sku)}</td><td>${_xEsc(r.item_name) || '—'}</td><td>${r.slob ? 'SLOB' : 'Not SLOB'}</td><td>${r.brand === 'AIWIBI' ? 'AIWIBI/AIWINA' : r.brand || 'Unknown'}</td><td>${_xEsc(TABLE_META[_xListOf(r)]?.label || '')}</td></tr>`).join('')}</tbody>
     </table></div>
     ${rows.length > 5 ? `<div style="font-size:11px;color:var(--txt3);margin-top:4px;">First 5 of ${rows.length} rows shown.</div>` : ''}`;
 }

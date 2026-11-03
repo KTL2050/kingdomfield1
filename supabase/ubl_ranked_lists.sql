@@ -98,3 +98,44 @@ begin
 end $$;
 
 notify pgrst, 'reload schema';
+
+-- ─── Brand on the four listing tables (UBL, or AIWIBI = the AIWIBI/AIWINA group) ───
+-- Run this whole section at once. Safe to run again.
+alter table public.ubl_t100      add column if not exists brand text;
+alter table public.ubl_t101_500  add column if not exists brand text;
+alter table public.ubl_t501_plus add column if not exists brand text;
+alter table public.list_slobs    add column if not exists brand text;
+
+-- Same import function as above, now also saving each product's brand
+create or replace function public.replace_all_ranked_lists(p_rows jsonb)
+returns jsonb language plpgsql as $$
+declare a integer; b integer; c integer; d integer;
+begin
+  delete from public.ubl_t100      where true;
+  delete from public.ubl_t101_500  where true;
+  delete from public.ubl_t501_plus where true;
+  delete from public.list_slobs    where true;
+  insert into public.ubl_t100 (sku, item_name, rank, brand)
+    select r->>'sku', nullif(r->>'item_name',''), (r->>'rank')::int, nullif(r->>'brand','')
+    from jsonb_array_elements(p_rows) r
+    where not coalesce((r->>'slob')::boolean, false) and (r->>'rank')::int between 1 and 100;
+  get diagnostics a = row_count;
+  insert into public.ubl_t101_500 (sku, item_name, rank, brand)
+    select r->>'sku', nullif(r->>'item_name',''), (r->>'rank')::int, nullif(r->>'brand','')
+    from jsonb_array_elements(p_rows) r
+    where not coalesce((r->>'slob')::boolean, false) and (r->>'rank')::int between 101 and 500;
+  get diagnostics b = row_count;
+  insert into public.ubl_t501_plus (sku, item_name, rank, brand)
+    select r->>'sku', nullif(r->>'item_name',''), (r->>'rank')::int, nullif(r->>'brand','')
+    from jsonb_array_elements(p_rows) r
+    where not coalesce((r->>'slob')::boolean, false) and (r->>'rank')::int >= 501;
+  get diagnostics c = row_count;
+  insert into public.list_slobs (sku, item_name, rank, brand)
+    select r->>'sku', nullif(r->>'item_name',''), (r->>'rank')::int, nullif(r->>'brand','')
+    from jsonb_array_elements(p_rows) r
+    where coalesce((r->>'slob')::boolean, false);
+  get diagnostics d = row_count;
+  return jsonb_build_object('ubl_t100', a, 'ubl_t101_500', b, 'ubl_t501_plus', c, 'list_slobs', d);
+end $$;
+
+notify pgrst, 'reload schema';
