@@ -12,13 +12,21 @@
      starts a new month from the previous one.
    • Staff see their own department's KPIs and can comment on them.
      Managers see every department (others read-only); admins view only.
+   • Staff (sales reps / Other) see them inside the Star of the Day panel's
+     "My Department KPIs" tab (ktl-eotm.js), not as a menu item.
    • A KPI with no manager update for more than 7 days (current month) shows
      an amber "No update for N days" flag.
+   • Department target → +50 Employee of the Month points: a department whose
+     every KPI has "Achieved" as its latest manager update posted before the
+     month ended earns +50 for each person in it with at least one Star of the
+     Day vote (ktl-eotm.js asks achievedDepartments()). With a target figure,
+     the update form suggests the status; the manager can still change it.
+     Past months are read-only so a result can't change afterwards.
    • Uganda only for now: in Kenya view ktl-country.js shows "Coming soon".
 
    DATA (see supabase/dept_kpis.sql)
    • users.department
-   • dept_kpis        — one row per KPI per month per department
+   • dept_kpis        — one row per KPI per month per department (+ lower_is_better)
    • dept_kpi_updates — dated manager updates and staff comments on a KPI
    ════════════════════════════════════════════════════════════════════════ */
 (function () {
@@ -47,12 +55,18 @@
   const daysSince = iso => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
   const parseNum = v => { const s = String(v == null ? '' : v).replace(/,/g, '').trim(); if (!s) return null; const n = Number(s); return isFinite(n) ? n : NaN; };
   const val = id => document.getElementById(id)?.value ?? '';
+  const monthEnd = mk => { const [y, m] = mk.split('-').map(Number); return new Date(y, m, 1); };   // first moment of next month
+  const isPastMonth = () => K.month < monthKey(new Date());
+  const lastDay = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth() + 1, 0); };
+  const finalWeekStart = () => { const d = lastDay(); return new Date(d.getFullYear(), d.getMonth(), d.getDate() - 6); };
+  const inFinalWeek = () => new Date() >= finalWeekStart();
+  const figureMet = (k, a) => a != null && (k.lower_is_better ? a <= Number(k.target) : a >= Number(k.target));
 
-  const K = { month: null, dept: null, kpis: [], updates: {}, open: {} };
+  const K = { month: null, dept: null, kpis: [], updates: {}, open: {}, host: null };   // host = where the board is drawn (screen or panel)
   const role = () => me()?.role;
   const seesAll = () => ['manager', 'admin'].includes(role());
-  const isManagerOf = d => role() === 'manager' && !!K.dept && K.dept === d;
-  const isStaffOf = d => !seesAll() && !!K.dept && K.dept === d;
+  const isManagerOf = d => role() === 'manager' && !!K.dept && K.dept === d && !isPastMonth();
+  const isStaffOf = d => !seesAll() && !!K.dept && K.dept === d && !isPastMonth();
   const unitTxt = k => k.unit ? ' ' + esc(k.unit) : '';
 
   // ── styles ────────────────────────────────────────────────────────────
@@ -90,6 +104,11 @@
 .kp-fld .flbl{display:block;margin-bottom:5px;}
 .kp-in{width:100%;box-sizing:border-box;border:1px solid var(--brd2);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;background:var(--bg);color:var(--txt);}
 textarea.kp-in{resize:vertical;}
+.kp-sign{border-radius:8px;padding:9px 12px;font-size:12px;margin-top:10px;}
+.kp-sign.ok{background:#e7f6ee;color:#17864f;border:1px solid #bfe5cf;}
+.kp-sign.bad{background:#fcebeb;color:#a32d2d;border:1px solid #f7c1c1;}
+.kp-sign.info{background:var(--bg2);color:var(--txt2);}
+.kp-check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--txt2);margin:-2px 0 10px;cursor:pointer;}
 .kp-err{background:#fcebeb;color:#a32d2d;border:1px solid #f7c1c1;border-radius:8px;padding:8px 11px;font-size:12px;margin-top:8px;}
 @media(max-width:600px){.kp-top{flex-direction:column;}.kp-flags{max-width:none;justify-content:flex-start;}}
 `;
@@ -119,6 +138,31 @@ textarea.kp-in{resize:vertical;}
   const findKpi = id => K.kpis.find(k => String(k.id) === String(id));
   const findEntry = id => { for (const list of Object.values(K.updates)) { const e = list.find(x => String(x.id) === String(id)); if (e) return e; } return null; };
 
+  // Which departments achieved their target in a month: at least one KPI, and every KPI's
+  // latest manager update posted before the month ended says "Achieved".
+  function deptResults(kpis, updates, mk) {
+    const end = monthEnd(mk), out = {};
+    kpis.forEach(k => {
+      const fin = updates.filter(u => String(u.kpi_id) === String(k.id) && u.kind === 'update' && new Date(u.created_at) < end)
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+      const r = out[k.department] = out[k.department] || { total: 0, achieved: 0 };
+      r.total++; if (fin?.status === 'achieved') r.achieved++;
+    });
+    Object.values(out).forEach(r => { r.met = r.total > 0 && r.achieved === r.total; });
+    return out;
+  }
+  // For Employee of the Month (ktl-eotm.js). Throws if it can't read, so the result
+  // is tried again later instead of being saved without the department points.
+  async function achievedDepartments(country, mk) {
+    const { data: kpis, error } = await sb.from('dept_kpis').select('id,department').eq('country', country).eq('month_key', mk);
+    if (error) throw error;
+    if (!(kpis || []).length) return new Set();
+    const { data: ups, error: e2 } = await sb.from('dept_kpi_updates').select('kpi_id,kind,status,created_at').in('kpi_id', kpis.map(k => k.id));
+    if (e2) throw e2;
+    const res = deptResults(kpis, ups || [], mk);
+    return new Set(Object.keys(res).filter(d => res[d].met));
+  }
+
   // ── screen ────────────────────────────────────────────────────────────
   async function renderScreen() {
     const content = document.querySelector('.screen')?.parentElement; if (!content) return;
@@ -128,7 +172,14 @@ textarea.kp-in{resize:vertical;}
     el.classList.add('active');
     const pt = document.getElementById('page-title'); if (pt) pt.textContent = TITLE;
     const ms = document.getElementById('mob-screen'); if (ms) ms.textContent = TITLE;
-
+    await fill(el);
+  }
+  // Staff: draw into the Star of the Day panel's KPIs tab
+  function renderInto(el) { return fill(el); }
+  // After a save, redraw wherever the board is showing
+  function refresh() { return K.host && document.body.contains(K.host) ? fill(K.host) : renderScreen(); }
+  async function fill(el) {
+    K.host = el;
     K.month = K.month || monthKey(new Date());
     if (!el.innerHTML) el.innerHTML = '<div class="card"><div class="empty-state">Loading…</div></div>';
     try { await loadMyDept(); await loadMonth(); }
@@ -151,7 +202,7 @@ textarea.kp-in{resize:vertical;}
     el.innerHTML = `
       <div class="kp-bar">
         <input type="month" class="sel" value="${K.month}" onchange="KPIs.setMonth(this.value)" aria-label="Month"/>
-        <span class="kp-note">${note}</span>
+        <span class="kp-note">${note}${isPastMonth() ? ' · This month has ended — read-only.' : ''}</span>
       </div>
       ${depts.map(deptCard).join('')}`;
   }
@@ -167,12 +218,19 @@ textarea.kp-in{resize:vertical;}
          none ? `${none} no update yet` : ''].filter(Boolean).join(' · ')
       : 'No KPIs set for this month';
     const mgr = isManagerOf(d);
+    const r = list.length ? deptResults(list, Object.values(K.updates).flat(), K.month)[d] : null;
+    const result = !r ? '' : isPastMonth()
+      ? (r.met ? `<div class="kp-sign ok">✅ Target achieved — +50 Employee of the Month points for everyone in ${esc(d)}</div>`
+               : `<div class="kp-sign bad">Target not achieved (${r.achieved} of ${r.total} KPIs)</div>`)
+      : (r.met ? `<div class="kp-sign ok">All ${r.total} KPIs achieved so far — on course for +50 Employee of the Month points.</div>`
+               : `<div class="kp-sign info">So far ${r.achieved} of ${r.total} KPIs achieved — every KPI must be Achieved by month end for +50 Employee of the Month points.</div>`);
     return `<div class="card kp-dept">
       <div class="card-hdr"><div><span class="card-title">${esc(d)}</span><div class="kp-dept-sum">${sum}</div></div>
         ${mgr && i >= 0 ? `<div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn btn-sm" onclick="KPIs.copyLast(${i})">Copy last month's KPIs</button>
           <button class="btn btn-sm btn-royal" onclick="KPIs.addKpi(${i})">+ Add KPI</button></div>` : ''}
       </div>
+      ${result}
       ${list.length ? list.map(kpiItem).join('')
         : `<div class="empty-state">No KPIs set for ${esc(monthLabel(K.month))}${mgr ? ' — add one, or copy last month\'s.' : '.'}</div>`}
     </div>`;
@@ -185,10 +243,16 @@ textarea.kp-in{resize:vertical;}
     let flags = st ? `<span class="kp-pill ${st.cls}">${esc(st.label)}</span>` : '<span class="kp-pill none">No update yet</span>';
     if (K.month === monthKey(new Date())) {
       const n = daysSince(u ? u.created_at : k.created_at);
-      if (n > STALE_DAYS) flags += `<span class="kp-pill warn">No update for ${n} days</span>`;
+      if (inFinalWeek() && (!u || new Date(u.created_at) < finalWeekStart()))
+        flags += `<span class="kp-pill warn">Final update due by ${esc(lastDay().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }))}</span>`;
+      else if (n > STALE_DAYS) flags += `<span class="kp-pill warn">No update for ${n} days</span>`;
     }
     let fig = '';
-    if (k.target != null) {
+    if (k.target != null && k.lower_is_better) {
+      const actual = (evs.find(e => e.kind === 'update' && e.actual != null) || {}).actual;
+      fig = `<div class="kp-meta">Max: <strong>${fmtNum(k.target)}${unitTxt(k)}</strong> (lower is better)${actual != null
+        ? ` · So far: <strong>${fmtNum(actual)}${unitTxt(k)}</strong> — ${figureMet(k, actual) ? 'within target ✓' : 'over target'}` : ''}</div>`;
+    } else if (k.target != null) {
       const actual = (evs.find(e => e.kind === 'update' && e.actual != null) || {}).actual;
       const pct = actual != null && Number(k.target) ? Math.round(actual / k.target * 100) : null;
       fig = `<div class="kp-meta">Target: <strong>${fmtNum(k.target)}${unitTxt(k)}</strong>${actual != null
@@ -213,7 +277,7 @@ textarea.kp-in{resize:vertical;}
   }
 
   function entryRow(k, e) {
-    const mine = String(e.author_id) === String(me()?.id);
+    const mine = String(e.author_id) === String(me()?.id) && !isPastMonth();
     const st = e.status ? STATUS[e.status] : null;
     const tag = e.kind === 'update' ? (st ? `<span class="kp-pill ${st.cls}">${esc(st.label)}</span>` : '') : '<span class="kp-pill none">Comment</span>';
     return `<div class="kp-ev"><div class="kp-ev-hd">
@@ -242,7 +306,7 @@ textarea.kp-in{resize:vertical;}
       try {
         const msg = await onSave();
         if (msg) { err.innerHTML = `<div class="kp-err">${esc(msg)}</div>`; btn.disabled = false; return; }
-        closeModal(); renderScreen();
+        closeModal(); refresh();
       } catch (e) { err.innerHTML = `<div class="kp-err">Couldn't save: ${esc(e.message || e)}</div>`; btn.disabled = false; }
     };
   }
@@ -262,13 +326,15 @@ textarea.kp-in{resize:vertical;}
           <input class="kp-in" id="kp-target" inputmode="decimal" placeholder="e.g. 120,000,000" value="${k?.target != null ? esc(k.target) : ''}"/></div>
         <div class="kp-fld" style="flex:1;min-width:110px;"><label class="flbl">Unit (optional)</label>
           <input class="kp-in" id="kp-unit" maxlength="20" placeholder="UGX, leads, %" value="${esc(k?.unit || '')}"/></div>
-      </div>`;
+      </div>
+      <label class="kp-check"><input type="checkbox" id="kp-lower"${k?.lower_is_better ? ' checked' : ''}/>
+        Lower is better (e.g. downtime, delays) — achieved when at or below the target</label>`;
   }
   function readKpiForm() {
     const statement = val('kp-stmt').trim(), target = parseNum(val('kp-target')), unit = val('kp-unit').trim() || null;
     if (!statement) return { err: 'Write the KPI statement.' };
     if (Number.isNaN(target)) return { err: 'The target must be a number, e.g. 120000000.' };
-    return { row: { statement, target, unit } };
+    return { row: { statement, target, unit, lower_is_better: target != null && !!document.getElementById('kp-lower')?.checked } };
   }
   const nextOrder = d => K.kpis.filter(k => k.department === d).reduce((m, k) => Math.max(m, k.sort_order || 0), 0) + 1;
 
@@ -295,13 +361,13 @@ textarea.kp-in{resize:vertical;}
       await sb.from('dept_kpi_updates').delete().eq('kpi_id', k.id);
       const { error } = await sb.from('dept_kpis').delete().eq('id', k.id);
       if (error) alert('Could not delete: ' + error.message);
-      renderScreen();
+      refresh();
     }, true);
   }
   async function copyLast(i) {
     const d = DEPTS[i]; if (!isManagerOf(d)) return;
     const prev = prevMonthKey(K.month);
-    const { data, error } = await sb.from('dept_kpis').select('statement,target,unit,sort_order').eq('country', 'UG').eq('month_key', prev).eq('department', d);
+    const { data, error } = await sb.from('dept_kpis').select('statement,target,unit,lower_is_better,sort_order').eq('country', 'UG').eq('month_key', prev).eq('department', d);
     if (error) { alert('Could not read last month: ' + error.message); return; }
     if (!(data || []).length) { alert(`No ${d} KPIs were set for ${monthLabel(prev)}.`); return; }
     const have = K.kpis.filter(k => k.department === d).length;
@@ -310,12 +376,12 @@ textarea.kp-in{resize:vertical;}
         + 'Statements and targets are copied; progress starts fresh.', 'Copy', async () => {
       const base = nextOrder(d);
       const rows = data.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)).map((k, n) => ({
-        statement: k.statement, target: k.target, unit: k.unit, sort_order: base + n,
+        statement: k.statement, target: k.target, unit: k.unit, lower_is_better: !!k.lower_is_better, sort_order: base + n,
         country: 'UG', month_key: K.month, department: d, created_by: me().id,
       }));
       const { error: e2 } = await sb.from('dept_kpis').insert(rows);
       if (e2) alert('Could not copy: ' + e2.message);
-      renderScreen();
+      refresh();
     });
   }
 
@@ -325,8 +391,9 @@ textarea.kp-in{resize:vertical;}
       <div class="kp-fld"><label class="flbl">Status — required</label>
         <select class="kp-in" id="kp-status"><option value="">— Choose —</option>
           ${STATUSES.map(([s, l]) => `<option value="${s}"${e?.status === s ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
-      ${k.target != null ? `<div class="kp-fld"><label class="flbl">Figure so far (optional) — target ${fmtNum(k.target)}${unitTxt(k)}</label>
-        <input class="kp-in" id="kp-actual" inputmode="decimal" value="${e?.actual != null ? esc(e.actual) : ''}"/></div>` : ''}
+      ${k.target != null ? `<div class="kp-fld"><label class="flbl">Figure so far (optional) — ${k.lower_is_better ? 'max' : 'target'} ${fmtNum(k.target)}${unitTxt(k)}</label>
+        <input class="kp-in" id="kp-actual" inputmode="decimal" value="${e?.actual != null ? esc(e.actual) : ''}" oninput="KPIs.suggest('${k.id}')"/>
+        <div class="kp-meta" id="kp-hint"></div></div>` : ''}
       <div class="kp-fld"><label class="flbl">Progress note (optional)</label>
         <textarea class="kp-in" id="kp-note" maxlength="500" rows="3" placeholder="What's been done, what's next…">${esc(e?.note || '')}</textarea></div>`;
   }
@@ -335,6 +402,21 @@ textarea.kp-in{resize:vertical;}
     if (!status) return { err: 'Choose a status.' };
     if (Number.isNaN(actual)) return { err: 'The figure must be a number.' };
     return { row: { status, actual, note } };
+  }
+  // Figure entered → suggest the status (the manager can still change it)
+  function suggest(id, hintOnly) {
+    const k = findKpi(id), hint = document.getElementById('kp-hint'), sel = document.getElementById('kp-status');
+    if (!k || k.target == null || !hint || !sel) return;
+    const a = parseNum(val('kp-actual'));
+    if (a == null || Number.isNaN(a)) { hint.textContent = ''; return; }
+    const met = figureMet(k, a);
+    hint.textContent = (k.lower_is_better
+      ? `System: ${fmtNum(a)} against a max of ${fmtNum(k.target)} — ${met ? 'achieved' : 'over target, not achieved'}`
+      : `System: ${Number(k.target) ? Math.round(a / k.target * 100) : 0}% of target — ${met ? 'achieved' : 'not achieved yet'}`) + ' (you can change the status)';
+    if (hintOnly) return;
+    if (met) sel.value = 'achieved';
+    else if (K.month === monthKey(new Date()) && inFinalWeek()) sel.value = 'not_achieved';
+    else if (sel.value === 'achieved') sel.value = '';
   }
   function commentForm(k, e) {
     return `<div class="kp-meta" style="margin:0 0 12px;">${esc(k.statement)}</div>
@@ -360,7 +442,7 @@ textarea.kp-in{resize:vertical;}
     });
   }
   function editEntry(id) {
-    const e = findEntry(id); if (!e || String(e.author_id) !== String(me()?.id)) return;
+    const e = findEntry(id); if (!e || String(e.author_id) !== String(me()?.id) || isPastMonth()) return;
     const k = findKpi(e.kpi_id); if (!k) return;
     if (e.kind === 'update') {
       openModal('Edit progress update', updateForm(k, e), async () => {
@@ -368,6 +450,7 @@ textarea.kp-in{resize:vertical;}
         const { error } = await sb.from('dept_kpi_updates').update({ ...r.row, edited_at: new Date().toISOString() }).eq('id', e.id);
         if (error) throw error;
       });
+      suggest(k.id, true);
     } else {
       openModal('Edit comment', commentForm(k, e), async () => {
         const note = val('kp-note').trim(); if (!note) return 'Write your comment.';
@@ -377,18 +460,18 @@ textarea.kp-in{resize:vertical;}
     }
   }
   function deleteEntry(id) {
-    const e = findEntry(id); if (!e || String(e.author_id) !== String(me()?.id)) return;
+    const e = findEntry(id); if (!e || String(e.author_id) !== String(me()?.id) || isPastMonth()) return;
     confirmBox(e.kind === 'update' ? 'Delete this update?' : 'Delete this comment?', 'This can\'t be undone.', 'Delete', async () => {
       const { error } = await sb.from('dept_kpi_updates').delete().eq('id', e.id);
       if (error) alert('Could not delete: ' + error.message);
-      renderScreen();
+      refresh();
     }, true);
   }
 
   // ── nav item + screen routing ─────────────────────────────────────────
   function addNavItem(containerId) {
     const el = document.getElementById(containerId);
-    if (!el || !me() || el.querySelector('[data-kp-nav]')) return;
+    if (!el || !me() || !seesAll() || el.querySelector('[data-kp-nav]')) return;
     const items = [...el.querySelectorAll('.nav-item')];
     const on = s => i => new RegExp(`goTo\\('${s}'\\)`).test(i.getAttribute('onclick') || '');
     const after = items.find(on('targets')) || el.querySelector('[data-dr-nav]') || items.find(on('attendance'));
@@ -416,9 +499,9 @@ textarea.kp-in{resize:vertical;}
   }
 
   window.KPIs = {
-    addKpi, editKpi, deleteKpi, copyLast, postUpdate, addComment, editEntry, deleteEntry, close: closeModal,
-    setMonth: v => { if (v) { K.month = v; K.open = {}; renderScreen(); } },
-    toggle: id => { K.open[id] = !K.open[id]; renderScreen(); },
+    addKpi, editKpi, deleteKpi, copyLast, postUpdate, addComment, editEntry, deleteEntry, suggest, achievedDepartments, renderInto, close: closeModal,
+    setMonth: v => { if (v) { K.month = v; K.open = {}; refresh(); } },
+    toggle: id => { K.open[id] = !K.open[id]; refresh(); },
   };
 
   // ── boot ─────────────────────────────────────────────────────────────

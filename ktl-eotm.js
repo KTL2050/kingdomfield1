@@ -12,6 +12,8 @@
    • Clicking it slides in a panel where the signed-in user picks ONE
      teammate they think stood out today, and writes a short reason.
    • That submission earns the nominee 10 points for the current month.
+   • Department targets (ktl-kpis.js): each person with at least 1 vote whose
+     department achieved every KPI that month gets +50 points on top.
    • Each person can vote once per calendar day. No self-votes.
    • Nobody — including managers/admins — sees any running tally. The
      panel never queries or displays this month's point totals. The
@@ -67,6 +69,7 @@
     const m = d.getMonth() === 0 ? 12 : d.getMonth();
     return `${y}-${eotmPad(m)}`;
   }
+  const EOTM_DEPT_BONUS = 50;
   function eotmDaysUntilReveal() {
     const now = new Date();
     const firstOfNext = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -195,7 +198,13 @@
 .eotm-hof-place{flex-shrink:0;min-width:74px;color:var(--txt3);}
 .eotm-hof-rname{flex:1;min-width:0;color:var(--txt);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .eotm-hof-rpts{flex-shrink:0;color:var(--txt3);}
+.eotm-hof-break{font-size:11px;color:var(--txt3);margin-top:2px;}
 .eotm-empty{text-align:center;padding:24px 10px;color:var(--txt3);font-size:12px;}
+.eotm-tabs{display:flex;gap:6px;padding:0 20px 12px;}
+.eotm-tabs.hidden,.eotm-body.hidden{display:none;}
+.eotm-tabbtn{flex:1;padding:8px 10px;border-radius:999px;border:1px solid var(--brd);background:var(--bg);
+  color:var(--txt2);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;}
+.eotm-tabbtn.on{background:var(--royal);border-color:var(--royal);color:#fff;}
 `;
 
   // ── markup ───────────────────────────────────────────────────────────
@@ -212,9 +221,14 @@
     <button class="eotm-close" onclick="eotmClose()">&times;</button>
   </div>
   <hr class="eotm-hdr-rule"/>
+  <div class="eotm-tabs hidden" id="eotm-tabs">
+    <button class="eotm-tabbtn on" id="eotm-tabbtn-star" onclick="eotmShowTab('star')">Star of the Day</button>
+    <button class="eotm-tabbtn" id="eotm-tabbtn-kpi" onclick="eotmShowTab('kpi')">My Department KPIs</button>
+  </div>
   <div class="eotm-body" id="eotm-body">
     <div class="eotm-empty">Loading…</div>
   </div>
+  <div class="eotm-body hidden" id="eotm-kpi-body"></div>
 </div>`;
 
   function eotmInjectFont() {
@@ -259,7 +273,20 @@
   window.eotmOpen = async function () {
     document.getElementById('eotm-ov').classList.add('open');
     document.getElementById('eotm-panel').classList.add('open');
+    const staffKpis = !['manager', 'admin'].includes(currentUser?.role) && eotmCountry() === 'UG'
+      && !!(window.KPIs && window.KPIs.renderInto);
+    document.getElementById('eotm-tabs').classList.toggle('hidden', !staffKpis);
+    eotmShowTab('star');
     await eotmLoadState();
+  };
+  // Staff: their department's KPIs live in this panel (drawn by ktl-kpis.js)
+  window.eotmShowTab = function (tab) {
+    const kpi = tab === 'kpi';
+    document.getElementById('eotm-body').classList.toggle('hidden', kpi);
+    document.getElementById('eotm-kpi-body').classList.toggle('hidden', !kpi);
+    document.getElementById('eotm-tabbtn-star').classList.toggle('on', !kpi);
+    document.getElementById('eotm-tabbtn-kpi').classList.toggle('on', kpi);
+    if (kpi && window.KPIs && window.KPIs.renderInto) window.KPIs.renderInto(document.getElementById('eotm-kpi-body'));
   };
   window.eotmClose = function () {
     document.getElementById('eotm-ov').classList.remove('open');
@@ -346,11 +373,20 @@
     // Not computed yet — aggregate this once and store it. Idempotent:
     // an upsert on (month_key, country) means a near-simultaneous second computation
     // from another device just overwrites with the same deterministic result.
-    const { data: people } = await sb.from('users').select('id').eq('country', country);
+    const { data: people } = await sb.from('users').select('id,department').eq('country', country);
     const { data: votes, error } = await sb
       .from('eotm_votes').select('nominee_id,reason').eq('month_key', prevKey)
       .in('nominee_id', (people || []).map(p => p.id));
     if (error || !votes || votes.length === 0) { eotmState.hof = null; return; }
+
+    // Department targets: +50 for each voted person whose department achieved every KPI.
+    // If that can't be read right now, try again later instead of saving without it.
+    let achievedDepts = new Set();
+    if (window.KPIs && typeof window.KPIs.achievedDepartments === 'function') {
+      try { achievedDepts = await window.KPIs.achievedDepartments(country, prevKey); }
+      catch (e) { console.warn('EOTM: department targets unavailable — will retry', e); eotmState.hof = null; return; }
+    }
+    const deptOf = {}; (people || []).forEach(p => { deptOf[p.id] = p.department || null; });
 
     const tally = {};
     votes.forEach(v => {
@@ -362,13 +398,19 @@
     const { data: nomineeUsers } = await sb.from('users').select('id,full_name').in('id', nomineeIds);
     const nameOf = {}; (nomineeUsers || []).forEach(u => { nameOf[u.id] = u.full_name; });
 
-    const leaderboard = nomineeIds.map(id => ({
-      employee_id: id,
-      full_name: nameOf[id] || 'Unknown',
-      points: tally[id].votes * 10,
-      vote_count: tally[id].votes,
-      reasons: tally[id].reasons.slice(0, 3),
-    })).sort((a, b) => b.points - a.points);
+    const leaderboard = nomineeIds.map(id => {
+      const dept = deptOf[id];
+      const bonus = dept && achievedDepts.has(dept) ? EOTM_DEPT_BONUS : 0;
+      return {
+        employee_id: id,
+        full_name: nameOf[id] || 'Unknown',
+        points: tally[id].votes * 10 + bonus,
+        vote_count: tally[id].votes,
+        dept_bonus: bonus,
+        department: bonus ? dept : null,
+        reasons: tally[id].reasons.slice(0, 3),
+      };
+    }).sort((a, b) => b.points - a.points);
 
     const winner = leaderboard[0] || null;
     let winnerSummary = null;
@@ -423,6 +465,7 @@
     if (!eotmState.hof || !eotmState.hof.winner_name) return '';
     if (new Date().getDate() > 3) return '';      // reveal last month's winners on the first 3 days of the month
     const h = eotmState.hof;
+    const brk = p => p.dept_bonus ? `${p.vote_count} vote${p.vote_count === 1 ? '' : 's'} + ${p.dept_bonus} ${eotmEsc(p.department)} target` : '';
     // Top 3: rank by points; equal points share the place (1, 2, 2, 4 …); show everyone placed 1st–3rd
     const board = (Array.isArray(h.leaderboard) && h.leaderboard.length ? h.leaderboard : [{ full_name: h.winner_name, points: h.winner_points }])
       .slice().sort((a, b) => b.points - a.points);
@@ -434,13 +477,15 @@
     const runnerRow = p => `<div class="eotm-hof-runner">
         <span class="eotm-hof-place">${p.place === 2 ? '🥈' : '🥉'} ${joint(p.place) ? 'Joint ' : ''}${p.place === 2 ? '2nd' : '3rd'}</span>
         <span class="eotm-hof-rname">${eotmEsc(p.full_name)}</span>
-        <span class="eotm-hof-rpts">${p.points} pts</span></div>`;
+        <span class="eotm-hof-rpts">${p.points} pts</span></div>
+        ${brk(p) ? `<div class="eotm-hof-break" style="margin:-2px 0 3px 82px;">${brk(p)}</div>` : ''}`;
     return `
       <div class="eotm-hof">
         <div class="eotm-hof-icon">${EOTM_ICON_TROPHY}</div>
         <div style="flex:1;min-width:0;">
           <div class="eotm-hof-eyebrow">${eotmEsc(eotmMonthLabel(h.month_key))} ${stars.length > 1 ? 'Joint Stars' : 'Star'}</div>
           <div class="eotm-hof-name">${stars.map(s => eotmEsc(s.full_name)).join(' & ')} — ${stars[0].points} pts</div>
+          ${stars.filter(s => s.dept_bonus).map(s => `<div class="eotm-hof-break">${stars.length > 1 ? eotmEsc(s.full_name) + ': ' : ''}${brk(s)}</div>`).join('')}
           ${stars.length === 1 && h.winner_summary ? `<div class="eotm-hof-summary">${eotmEsc(h.winner_summary)}</div>` : ''}
           ${others.length ? `<div class="eotm-hof-runners">${others.map(runnerRow).join('')}</div>` : ''}
         </div>
@@ -463,7 +508,7 @@
     const rows = eotmState.users.filter(u => u.full_name.toLowerCase().includes(q));
     document.getElementById('eotm-body').innerHTML = `
       ${eotmHofBlock()}
-      <div class="eotm-note">Pick the teammate who stood out today and say why — they earn 10 points. Nothing is shown until the winners are announced on the 1st (shown for the first 3 days of the month).</div>
+      <div class="eotm-note">Pick the teammate who stood out today and say why — they earn 10 points. Everyone in a department that achieves all its KPIs for the month also gets 50 points toward Employee of the Month. Nothing is shown until the winners are announced on the 1st (shown for the first 3 days of the month).</div>
       <input class="eotm-search f-inp" id="eotm-search" placeholder="Search teammates…" oninput="eotmFilterList(this.value)" value="${eotmEsc(filterText || '')}"/>
       <div id="eotm-list">
         ${rows.length === 0 ? '<div class="eotm-empty">No matching teammates.</div>' : rows.map(u => `
