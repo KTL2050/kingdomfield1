@@ -6,14 +6,16 @@
    WHAT IT DOES
    • Five departments (DEPARTMENTS in index.html). Each user has one, set by
      admins in User Management.
-   • A manager sets their own department's KPIs for each month — a statement,
+   • The department's HEAD (one per department, any role, chosen by admins in
+     User Management → "Heads of department") sets its KPIs for each month — a statement,
      optionally with a target figure — and posts dated progress updates
      (status + optional figure so far + note). "Copy last month's KPIs"
      starts a new month from the previous one.
-   • Staff see their own department's KPIs and can comment on them.
-     Managers see every department (others read-only); admins view only.
-   • Staff (sales reps / Other) see them inside the Star of the Day panel's
-     "My Department KPIs" tab (ktl-eotm.js), not as a menu item.
+   • Heads and admins get the "Department KPIs" menu screen: all departments,
+     heads edit only their own; admins view only.
+   • Everyone else (staff, and managers who aren't heads) sees their own
+     department inside the Star of the Day panel's "My Department KPIs" tab
+     (ktl-eotm.js) and can comment.
    • A KPI with no manager update for more than 7 days (current month) shows
      an amber "No update for N days" flag.
    • Department target → +50 Employee of the Month points: a department whose
@@ -28,6 +30,7 @@
    • users.department
    • dept_kpis        — one row per KPI per month per department (+ lower_is_better)
    • dept_kpi_updates — dated manager updates and staff comments on a KPI
+   • dept_heads       — one head per department (supabase/dept_heads.sql)
    ════════════════════════════════════════════════════════════════════════ */
 (function () {
   if (window.__kpisLoaded) return;
@@ -62,10 +65,12 @@
   const inFinalWeek = () => new Date() >= finalWeekStart();
   const figureMet = (k, a) => a != null && (k.lower_is_better ? a <= Number(k.target) : a >= Number(k.target));
 
-  const K = { month: null, dept: null, kpis: [], updates: {}, open: {}, host: null };   // host = where the board is drawn (screen or panel)
+  const K = { month: null, dept: null, kpis: [], updates: {}, open: {}, host: null, heads: {}, headName: {} };   // host = where the board is drawn (screen or panel)
   const role = () => me()?.role;
-  const seesAll = () => ['manager', 'admin'].includes(role());
-  const isManagerOf = d => role() === 'manager' && !!K.dept && K.dept === d && !isPastMonth();
+  const headDept = () => DEPTS.find(d => K.heads[d] && K.heads[d] === String(me()?.id)) || null;
+  const seesAll = () => role() === 'admin' || !!headDept();
+  // "Manager of" a department now means its head (name kept so the rest of the file is unchanged)
+  const isManagerOf = d => !!d && K.heads[d] === String(me()?.id) && !isPastMonth();
   const isStaffOf = d => !seesAll() && !!K.dept && K.dept === d && !isPastMonth();
   const unitTxt = k => k.unit ? ' ' + esc(k.unit) : '';
 
@@ -122,6 +127,18 @@ textarea.kp-in{resize:vertical;}
     const { data } = await sb.from('users').select('department').eq('id', me().id).maybeSingle();
     K.dept = data?.department || null;
     me().department = K.dept;
+  }
+  async function loadHeads() {
+    K.heads = {}; K.headName = {};
+    const { data, error } = await sb.from('dept_heads').select('department,head_id').eq('country', 'UG');
+    if (error) { console.warn('Heads of department not ready — has supabase/dept_heads.sql been run?', error.message); return; }
+    (data || []).forEach(h => { K.heads[h.department] = String(h.head_id); });
+    const ids = Object.values(K.heads);
+    if (ids.length) {
+      const { data: us } = await sb.from('users').select('id,full_name').in('id', ids);
+      const nm = {}; (us || []).forEach(u => { nm[String(u.id)] = u.full_name; });
+      Object.entries(K.heads).forEach(([d, id]) => { K.headName[d] = nm[id] || '—'; });
+    }
   }
   async function loadMonth() {
     const { data: kpis, error } = await sb.from('dept_kpis').select('*').eq('country', 'UG').eq('month_key', K.month);
@@ -182,7 +199,7 @@ textarea.kp-in{resize:vertical;}
     K.host = el;
     K.month = K.month || monthKey(new Date());
     if (!el.innerHTML) el.innerHTML = '<div class="card"><div class="empty-state">Loading…</div></div>';
-    try { await loadMyDept(); await loadMonth(); }
+    try { await loadHeads(); await loadMyDept(); await loadMonth(); }
     catch (e) {
       el.innerHTML = `<div class="card"><div class="kp-err">Couldn't load KPIs: ${esc(e.message || e)}</div></div>`;
       console.warn('Department KPIs not ready — has supabase/dept_kpis.sql been run?', e);
@@ -192,12 +209,12 @@ textarea.kp-in{resize:vertical;}
       el.innerHTML = '<div class="card"><div class="empty-state">Your department hasn\'t been set yet — ask an admin to set it in User Management.</div></div>';
       return;
     }
+    const first = headDept() || K.dept;
     const depts = seesAll()
-      ? (K.dept && DEPTS.includes(K.dept) ? [K.dept, ...DEPTS.filter(d => d !== K.dept)] : DEPTS)
+      ? (first && DEPTS.includes(first) ? [first, ...DEPTS.filter(d => d !== first)] : DEPTS)
       : [K.dept];
     const note = role() === 'admin' ? 'Viewing all departments (read-only).'
-      : role() === 'manager' ? (K.dept ? `You manage <strong>${esc(K.dept)}</strong> — other departments are read-only.`
-                                       : 'Your department isn\'t set — ask an admin to set it so you can add KPIs.')
+      : headDept() ? `You're head of <strong>${esc(headDept())}</strong> — other departments are read-only.`
       : `Your department: <strong>${esc(K.dept)}</strong>`;
     el.innerHTML = `
       <div class="kp-bar">
@@ -225,11 +242,13 @@ textarea.kp-in{resize:vertical;}
       : (r.met ? `<div class="kp-sign ok">All ${r.total} KPIs achieved so far — on course for +50 Employee of the Month points.</div>`
                : `<div class="kp-sign info">So far ${r.achieved} of ${r.total} KPIs achieved — every KPI must be Achieved by month end for +50 Employee of the Month points.</div>`);
     return `<div class="card kp-dept">
-      <div class="card-hdr"><div><span class="card-title">${esc(d)}</span><div class="kp-dept-sum">${sum}</div></div>
+      <div class="card-hdr"><div><span class="card-title">${esc(d)}</span>
+        <div class="kp-dept-sum">${K.heads[d] ? `Head: ${esc(K.headName[d])} · ` : ''}${sum}</div></div>
         ${mgr && i >= 0 ? `<div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button class="btn btn-sm" onclick="KPIs.copyLast(${i})">Copy last month's KPIs</button>
           <button class="btn btn-sm btn-royal" onclick="KPIs.addKpi(${i})">+ Add KPI</button></div>` : ''}
       </div>
+      ${!K.heads[d] && !isPastMonth() ? '<div class="kp-sign info">No head of department set — an admin can set one in User Management.</div>' : ''}
       ${result}
       ${list.length ? list.map(kpiItem).join('')
         : `<div class="empty-state">No KPIs set for ${esc(monthLabel(K.month))}${mgr ? ' — add one, or copy last month\'s.' : '.'}</div>`}
@@ -468,6 +487,39 @@ textarea.kp-in{resize:vertical;}
     }, true);
   }
 
+  // ── admin: heads of department (User Management) ──────────────────────
+  async function renderHeadsCard() {
+    if (role() !== 'admin') return;
+    const screen = document.getElementById('screen-admin'); if (!screen) return;
+    let card = document.getElementById('kp-heads-card');
+    if (!card) { card = document.createElement('div'); card.className = 'card'; card.id = 'kp-heads-card'; screen.insertBefore(card, screen.querySelector('.card')); }
+    await loadHeads();
+    const { data: people } = await sb.from('users').select('id,full_name,department').eq('country', 'UG')
+      .eq('status', 'approved').eq('is_active', true).order('full_name');
+    const opts = d => {
+      const inDept = (people || []).filter(p => p.department === d);
+      const cur = K.heads[d];
+      const extra = cur && !inDept.some(p => String(p.id) === cur) ? `<option value="${esc(cur)}" selected>${esc(K.headName[d])} (not in ${esc(d)})</option>` : '';
+      return `<option value="">— Not set —</option>${extra}` + inDept.map(p =>
+        `<option value="${esc(p.id)}"${String(p.id) === cur ? ' selected' : ''}>${esc(p.full_name)}</option>`).join('');
+    };
+    card.innerHTML = `<div class="card-hdr"><span class="card-title">Heads of department</span>
+      <span style="font-size:11.5px;color:var(--txt3);">Only the head sets and updates their department's KPIs (Uganda)</span></div>
+      <div class="fgrid">${DEPTS.map((d, i) => `<div class="fg"><label class="flbl">${esc(d)}</label>
+        <select class="fin" onchange="KPIs.setHead(${i}, this.value)">${opts(d)}</select></div>`).join('')}</div>
+      <div style="font-size:11px;color:var(--txt3);margin-top:4px;">Only people whose Department is set to that department are listed.</div>`;
+  }
+  async function setHead(i, userId) {
+    if (role() !== 'admin') return;
+    const d = DEPTS[i];
+    const q = userId
+      ? sb.from('dept_heads').upsert({ country: 'UG', department: d, head_id: userId, updated_at: new Date().toISOString() }, { onConflict: 'country,department' })
+      : sb.from('dept_heads').delete().eq('country', 'UG').eq('department', d);
+    const { error } = await q;
+    if (error) { alert('Could not save: ' + error.message); }
+    renderHeadsCard().catch(() => {});
+  }
+
   // ── nav item + screen routing ─────────────────────────────────────────
   function addNavItem(containerId) {
     const el = document.getElementById(containerId);
@@ -496,10 +548,15 @@ textarea.kp-in{resize:vertical;}
       renderScreen();
       buildNav('sidebar-nav'); buildNav('drawer-nav', true);
     };
+    if (typeof loadAdmin === 'function') {
+      const oa = loadAdmin;
+      window.loadAdmin = async function () { const r = await oa.apply(this, arguments); renderHeadsCard().catch(() => {}); return r; };
+    }
   }
 
   window.KPIs = {
-    addKpi, editKpi, deleteKpi, copyLast, postUpdate, addComment, editEntry, deleteEntry, suggest, achievedDepartments, renderInto, close: closeModal,
+    addKpi, editKpi, deleteKpi, copyLast, postUpdate, addComment, editEntry, deleteEntry, suggest, achievedDepartments, renderInto, setHead, close: closeModal,
+    usesPanel: () => !seesAll(),   // Star of the Day panel tab instead of the menu screen
     setMonth: v => { if (v) { K.month = v; K.open = {}; refresh(); } },
     toggle: id => { K.open[id] = !K.open[id]; refresh(); },
   };
@@ -511,6 +568,6 @@ textarea.kp-in{resize:vertical;}
     const appEl = document.getElementById('app');
     if (!(me() && typeof sb !== 'undefined' && appEl && !appEl.classList.contains('hidden'))) return;
     clearInterval(readyPoll);
-    rebuildNav();
+    loadHeads().catch(() => {}).then(rebuildNav);
   }, 300);
 })();

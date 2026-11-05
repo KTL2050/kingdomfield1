@@ -273,8 +273,7 @@
   window.eotmOpen = async function () {
     document.getElementById('eotm-ov').classList.add('open');
     document.getElementById('eotm-panel').classList.add('open');
-    const staffKpis = !['manager', 'admin'].includes(currentUser?.role) && eotmCountry() === 'UG'
-      && !!(window.KPIs && window.KPIs.renderInto);
+    const staffKpis = eotmCountry() === 'UG' && !!(window.KPIs && window.KPIs.renderInto && window.KPIs.usesPanel && window.KPIs.usesPanel());
     document.getElementById('eotm-tabs').classList.toggle('hidden', !staffKpis);
     eotmShowTab('star');
     await eotmLoadState();
