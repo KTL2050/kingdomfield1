@@ -128,7 +128,8 @@
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     soon.classList.add('active');
     const label = { dashboard: 'Dashboard', clients: 'Clients', orders: 'Place Listing', targets: 'Targets', wallet: 'My Wallet',
-                    reports: 'Reports', admin: 'User Management', team: 'Sales Team', stock: 'Stock Position' }[screen] || 'Coming soon';
+                    reports: 'Reports', admin: 'User Management', team: 'Sales Team', stock: 'Stock Position',
+                    kpis: 'Department KPIs' }[screen] || 'Coming soon';
     const pt = document.getElementById('page-title'); if (pt) pt.textContent = label;
     const ms = document.getElementById('mob-screen'); if (ms) ms.textContent = label;
   };

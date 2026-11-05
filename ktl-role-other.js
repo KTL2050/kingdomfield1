@@ -65,8 +65,8 @@
   window.__ktlOtherRoleLoaded = true;
 
   const OTHER_ROLE = 'other';
-  const ALLOWED_NAV_LABELS = ['Attendance', 'Dashboard', 'Leave Management', 'Clients', 'Stock Position', 'Sign out'];
-  const ALLOWED_SCREEN_PREFIXES = ['dashboard', 'attendance', 'leave', 'clients'];
+  const ALLOWED_NAV_LABELS = ['Attendance', 'Dashboard', 'Leave Management', 'Clients', 'Stock Position', 'Department KPIs', 'Sign out'];
+  const ALLOWED_SCREEN_PREFIXES = ['dashboard', 'attendance', 'leave', 'clients', 'kpis'];
   // ktl-stock.js's Stock Position screen isn't referenced anywhere inside
   // clockin.html itself (same as Leave Management — it's self-contained),
   // so its exact screen id can't be read off with certainty. Matching on

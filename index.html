@@ -2388,6 +2388,13 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
                 <option value="KE">Kenya</option>
               </select>
             </div>
+            <div class="fg"><label class="flbl">Department</label>
+              <select class="fin" id="u-dept">
+                <option value="">— Not set —</option>
+                <option>IT</option><option>Finance</option><option>Store &amp; Delivery</option>
+                <option>Sales</option><option>Marketing</option>
+              </select>
+            </div>
             <div class="fg">
               <label class="flbl">One-Time Password</label>
               <div style="display:flex;gap:6px;">
@@ -2585,6 +2592,8 @@ const canManage  = () => ['admin','manager'].includes(currentUser?.role);
 // Ugandan admins/managers can switch which country they're viewing (ktl-country.js).
 const COUNTRY_NAMES = { UG: 'Uganda', KE: 'Kenya' };
 const COUNTRY_MAP_CENTRE = { UG: [0.3136, 32.5811], KE: [-1.2864, 36.8172] };   // Kampala, Nairobi
+// Departments a user can belong to (Department KPIs, ktl-kpis.js)
+const DEPARTMENTS = ['IT', 'Finance', 'Store & Delivery', 'Sales', 'Marketing'];
 const myCountry = () => currentUser?.country || 'UG';
 function viewCountry() {
   if (myCountry() !== 'UG' || !canManage()) return myCountry();
@@ -4922,6 +4931,7 @@ async function loadAdmin() {
                 <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Email</th>
                 <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Role</th>
                 <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Country</th>
+                <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Department</th>
                 <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Status</th>
                 <th style="text-align:left; padding: 10px 8px; background: var(--bg2); border-bottom: 1px solid var(--brd);">Actions</th>
               </tr>
@@ -4947,6 +4957,12 @@ async function loadAdmin() {
             <td style="padding: 10px 8px; vertical-align: middle; font-size: 12px; color: var(--txt2);">${u.email}</td>
             <td style="padding: 10px 8px; vertical-align: middle;"><span class="badge ${roleBadge[u.role] || 'bb'}">${roleLabel(u.role || '')}</span></td>
             <td style="padding: 10px 8px; vertical-align: middle; font-size: 12px;">${COUNTRY_NAMES[u.country || 'UG'] || u.country}</td>
+            <td style="padding: 10px 8px; vertical-align: middle;">
+              <select class="sel" style="font-size:12px;" onchange="setUserDepartment('${u.id}', this.value)">
+                <option value="">— Not set —</option>
+                ${DEPARTMENTS.map(d => `<option${u.department === d ? ' selected' : ''}>${_xEsc(d)}</option>`).join('')}
+              </select>
+            </td>
             <td style="padding: 10px 8px; vertical-align: middle;">${u.status === 'rejected' ? '<span class="badge br">Rejected</span>' : `<span class="badge ${u.is_active ? 'bg' : 'br'}">${u.is_active ? 'Active' : 'Inactive'}</span>`}</td>
             <td style="padding: 10px 8px; vertical-align: middle;">
               <div style="display: flex; gap: 5px; flex-wrap: wrap; align-items: center;">
@@ -5648,14 +5664,15 @@ function _renderPendingSignups(pending) {
   if (!pending.length) { el.innerHTML = ''; return; }
   const roles = [['sales_rep', 'Sales Rep'], ['manager', 'Manager'], ['admin', 'Admin'], ['other', 'Other']];
   el.innerHTML = `
-    <div class="alert aw" style="margin-bottom:10px;">⏳ <span><strong>${pending.length}</strong> sign-up${pending.length > 1 ? 's' : ''} waiting for approval — choose a role and country, then approve.</span></div>
+    <div class="alert aw" style="margin-bottom:10px;">⏳ <span><strong>${pending.length}</strong> sign-up${pending.length > 1 ? 's' : ''} waiting for approval — choose a role, country and department, then approve.</span></div>
     <div style="overflow-x:auto;margin-bottom:18px;"><table style="font-size:12.5px;">
-      <thead><tr><th>Name</th><th>Email</th><th>Country</th><th>Role</th><th>Signed up</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Email</th><th>Country</th><th>Role</th><th>Department</th><th>Signed up</th><th></th></tr></thead>
       <tbody>${pending.map(u => `<tr>
         <td style="font-weight:500;">${_xEsc(u.full_name)}</td>
         <td style="color:var(--txt2);">${_xEsc(u.email)}</td>
         <td><select class="sel" id="ps-country-${u.id}">${Object.entries(COUNTRY_NAMES).map(([k, v]) => `<option value="${k}"${(u.country || 'UG') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></td>
         <td><select class="sel" id="ps-role-${u.id}">${roles.map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></td>
+        <td><select class="sel" id="ps-dept-${u.id}"><option value="">— Not set —</option>${DEPARTMENTS.map(d => `<option>${_xEsc(d)}</option>`).join('')}</select></td>
         <td style="font-size:11px;color:var(--txt3);">${u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}</td>
         <td style="white-space:nowrap;">
           <button class="btn btn-sm btn-green" onclick="approveSignup('${u.id}')">Approve</button>
@@ -5666,11 +5683,18 @@ function _renderPendingSignups(pending) {
 async function approveSignup(id) {
   const role = document.getElementById('ps-role-' + id).value;
   const country = document.getElementById('ps-country-' + id).value;
-  const { error } = await sb.from('users').update({ status: 'approved', role, country, is_active: true }).eq('id', id);
+  const department = document.getElementById('ps-dept-' + id).value || null;
+  const { error } = await sb.from('users').update({ status: 'approved', role, country, department, is_active: true }).eq('id', id);
   if (error) { alert('Error: ' + error.message); return; }
   Object.keys(_countryIdCache).forEach(k => delete _countryIdCache[k]);
   if (window.ktlRefreshPending) ktlRefreshPending();
   loadAdmin();
+}
+// Admin changes a user's department straight from the Users table
+async function setUserDepartment(id, department) {
+  const { error } = await sb.from('users').update({ department: department || null }).eq('id', id);
+  if (error) { alert('Error: ' + error.message); loadAdmin(); return; }
+  if (currentUser && String(currentUser.id) === String(id)) currentUser.department = department || null;
 }
 function rejectSignup(id, name) {
   showConfirmDialog({ icon: '🚫', title: 'Reject sign-up', message: `<strong>${name}</strong> won't be able to sign in. You can remove the account afterwards.`,
@@ -5688,7 +5712,7 @@ function reactivateUser(userId,userName){showConfirmDialog({icon:'✅',title:'Re
 function confirmRemoveUser(userId,userName){showConfirmDialog({icon:'🗑️',title:'Remove User',message:`This will <strong>permanently delete ${userName}</strong>. Cannot be undone.`,confirmLabel:'Yes, Remove Permanently',confirmStyle:'background:#A32D2D;color:#fff;border:none;',onConfirm:async()=>{const{error}=await sb.from('users').delete().eq('id',userId);if(error){alert('Error: '+error.message);return;}loadAdmin();}});}
 function showConfirmDialog({icon,title,message,confirmLabel,confirmStyle,onConfirm}){const existing=document.getElementById('confirm-dialog');if(existing)existing.remove();const d=document.createElement('div');d.id='confirm-dialog';d.className='confirm-overlay';d.innerHTML=`<div class="confirm-box"><div style="font-size:32px;text-align:center;margin-bottom:10px;">${icon}</div><div style="font-size:15px;font-weight:700;text-align:center;margin-bottom:8px;">${title}</div><div style="font-size:12.5px;color:var(--txt2);text-align:center;line-height:1.65;margin-bottom:22px;">${message}</div><div style="display:flex;gap:8px;"><button onclick="document.getElementById('confirm-dialog').remove()" style="flex:1;padding:10px;border-radius:9px;background:transparent;border:0.5px solid var(--brd2);cursor:pointer;font-size:13px;font-family:inherit;font-weight:500;">Cancel</button><button id="confirm-action-btn" style="flex:1;padding:10px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;${confirmStyle}">${confirmLabel}</button></div></div>`;document.body.appendChild(d);document.getElementById('confirm-action-btn').addEventListener('click',async()=>{d.remove();await onConfirm();});d.addEventListener('click',(e)=>{if(e.target===d)d.remove();});}
 function generateOTP(){const chars='ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';const otp=Array.from({length:10},()=>chars[Math.floor(Math.random()*chars.length)]).join('');document.getElementById('u-otp').value=otp;}
-async function addUser(){const name=document.getElementById('u-name').value.trim();const email=document.getElementById('u-email').value.trim();const role=document.getElementById('u-role').value;const otp=document.getElementById('u-otp').value.trim();if(!name||!email){alert('Please fill name and email.');return;}if(!otp){alert('Please set a one-time password or click Generate.');return;}const country=document.getElementById('u-country')?.value||viewCountry();const{error}=await sb.from('users').insert({full_name:name,email,role,country,status:'approved',is_active:true,password_hash:otp,must_change_password:true});if(error){alert('Error: '+error.message);return;}document.getElementById('add-user-form').classList.add('hidden');document.getElementById('u-name').value='';document.getElementById('u-email').value='';document.getElementById('u-otp').value='';loadAdmin();showOTPDialog(name,email,otp);}
+async function addUser(){const name=document.getElementById('u-name').value.trim();const email=document.getElementById('u-email').value.trim();const role=document.getElementById('u-role').value;const otp=document.getElementById('u-otp').value.trim();if(!name||!email){alert('Please fill name and email.');return;}if(!otp){alert('Please set a one-time password or click Generate.');return;}const country=document.getElementById('u-country')?.value||viewCountry();const department=document.getElementById('u-dept')?.value||null;const{error}=await sb.from('users').insert({full_name:name,email,role,country,department,status:'approved',is_active:true,password_hash:otp,must_change_password:true});if(error){alert('Error: '+error.message);return;}document.getElementById('add-user-form').classList.add('hidden');document.getElementById('u-name').value='';document.getElementById('u-email').value='';document.getElementById('u-otp').value='';document.getElementById('u-dept').value='';loadAdmin();showOTPDialog(name,email,otp);}
 function showOTPDialog(name,email,otp){const existing=document.getElementById('otp-dialog');if(existing)existing.remove();const d=document.createElement('div');d.id='otp-dialog';d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(3px);';d.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px 32px;max-width:380px;width:90%;box-shadow:0 12px 48px rgba(0,0,0,0.2);"><div style="font-size:30px;text-align:center;margin-bottom:8px;">🔐</div><div style="font-size:16px;font-weight:700;text-align:center;margin-bottom:4px;">User Created!</div><div style="font-size:12px;color:var(--txt3);text-align:center;margin-bottom:18px;">Share these credentials securely with <strong>${name}</strong></div><div style="background:var(--bg2);border-radius:9px;padding:13px 15px;margin-bottom:10px;"><div style="font-size:10.5px;font-weight:600;color:var(--txt3);margin-bottom:3px;">EMAIL</div><div style="font-size:13px;font-weight:500;">${email}</div></div><div style="background:var(--gold-light);border:1.5px dashed var(--gold-mid);border-radius:9px;padding:13px 15px;margin-bottom:18px;"><div style="font-size:10.5px;font-weight:600;color:var(--gold);margin-bottom:6px;">ONE-TIME PASSWORD</div><div style="font-size:22px;font-weight:700;letter-spacing:0.12em;color:var(--royal);font-family:'SF Mono','Courier New',monospace;">${otp}</div><div style="font-size:10.5px;color:var(--txt3);margin-top:6px;">⚠ User will be prompted to change this on first login.</div></div><button onclick="navigator.clipboard.writeText('${otp}').then(()=>{this.textContent='✓ Copied!';this.style.background='#1D9E75';})" style="width:100%;padding:10px;border-radius:9px;background:var(--royal);color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:600;margin-bottom:8px;">Copy Password</button><button onclick="document.getElementById('otp-dialog').remove()" style="width:100%;padding:10px;border-radius:9px;background:transparent;border:0.5px solid var(--brd2);cursor:pointer;font-size:13px;color:var(--txt2);font-weight:500;">Done</button></div>`;document.body.appendChild(d);}
 
 // ─── SYNC MODAL ────────────────────────────────────────────────────────────────
@@ -12237,5 +12261,6 @@ function saveCRMSettings(){alert('✅ CRM settings saved!');}
 <script src="ktl-country.js"></script>
 <script src="ktl-daily-report.js"></script>
 <script src="ktl-chat.js"></script>
+<script src="ktl-kpis.js"></script>
 </body>
 </html>
