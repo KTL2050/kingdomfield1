@@ -469,13 +469,13 @@
         </div>
       </div>
       <label class="eotm-reason-label">What did they do well today?</label>
-      <textarea class="eotm-reason-textarea f-inp" id="eotm-reason" maxlength="75" placeholder="e.g. Closed a tricky order and helped a teammate hit their target too."></textarea>
-      <div class="eotm-char-count"><span id="eotm-char-count">0</span>/75</div>
+      <textarea class="eotm-reason-textarea f-inp" id="eotm-reason" maxlength="175" placeholder="e.g. Closed a tricky order and helped a teammate hit their target too."></textarea>
+      <div class="eotm-char-count"><span id="eotm-char-count">0</span>/175</div>
       <button class="eotm-submit-btn" id="eotm-submit-btn" onclick="eotmSubmitVote()">Submit recognition</button>
       <div id="eotm-submit-err"></div>`;
     const ta = document.getElementById('eotm-reason');
     ta.addEventListener('input', () => {
-      if (ta.value.length > 75) ta.value = ta.value.slice(0, 75);
+      if (ta.value.length > 175) ta.value = ta.value.slice(0, 175);
       document.getElementById('eotm-char-count').textContent = ta.value.length;
     });
     ta.focus();
@@ -487,8 +487,8 @@
     const reason = (ta.value || '').trim();
     const errEl = document.getElementById('eotm-submit-err');
     errEl.innerHTML = '';
-    if (reason.length > 75) {
-      errEl.innerHTML = `<div class="eotm-err">Keep it to 75 characters or fewer (you have ${reason.length}).</div>`;
+    if (reason.length > 175) {
+      errEl.innerHTML = `<div class="eotm-err">Keep it to 175 characters or fewer (you have ${reason.length}).</div>`;
       return;
     }
     eotmState.busy = true;
