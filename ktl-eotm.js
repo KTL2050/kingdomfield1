@@ -158,11 +158,18 @@
 .eotm-reason-label{font-size:12.5px;font-weight:600;color:var(--txt);display:block;margin-bottom:7px;}
 .eotm-reason-textarea.f-inp{min-height:96px;resize:vertical;margin-bottom:0;}
 .eotm-char-count{font-size:10.5px;color:var(--txt3);text-align:right;margin-top:5px;}
+.eotm-values{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+.eotm-value-chip{padding:8px 14px;border-radius:999px;border:1px solid var(--brd);background:var(--bg);
+  color:var(--txt2);font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;}
+.eotm-value-chip.on{background:var(--royal);border-color:var(--royal);color:#fff;}
+.eotm-value-tags{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px;}
+.eotm-value-tag{padding:3px 10px;border-radius:999px;background:var(--royal);color:#fff;font-size:11px;font-weight:600;}
 .eotm-submit-btn{width:100%;padding:12px;border-radius:9px;background:var(--royal);color:#fff;
   border:none;font-weight:700;font-size:13.5px;cursor:pointer;margin-top:14px;font-family:inherit;
   transition:background .15s;}
 .eotm-submit-btn:hover{background:#0f2550;}
 .eotm-submit-btn:disabled{opacity:.5;cursor:not-allowed;}
+.eotm-submit-btn.incomplete{opacity:.5;}
 .eotm-err{background:#FCEBEB;color:#A32D2D;border:.5px solid #F7C1C1;border-radius:8px;
   padding:8px 11px;font-size:11.5px;margin-top:10px;}
 .eotm-done-title{font-size:16px;font-weight:700;color:var(--txt);margin-bottom:14px;}
@@ -265,7 +272,7 @@
       const today = eotmTodayISO();
       const { data: myVote, error: voteErr } = await sb
         .from('eotm_votes')
-        .select('id,nominee_id,reason,created_at')
+        .select('id,nominee_id,reason,core_values,created_at')
         .eq('voter_id', currentUser.id)
         .eq('vote_date', today)
         .maybeSingle();
@@ -446,8 +453,11 @@
 
   window.eotmFilterList = function (val) { eotmRenderList(val); };
 
+  const EOTM_CORE_VALUES = ['Excellence', 'Performance', 'Integrity', 'Customer Focus'];
+
   window.eotmSelectNominee = function (id, name) {
     eotmState.selected = { id, name };
+    eotmState.values = [];
     eotmState.step = 'reason';
     eotmRenderReasonStep();
   };
@@ -468,17 +478,34 @@
           <div class="eotm-row-role">Earns 10 points if you submit</div>
         </div>
       </div>
-      <label class="eotm-reason-label">What did they do well today?</label>
+      <label class="eotm-reason-label">1. Which value did they show today? <span style="font-weight:400;color:var(--txt3)">(pick one or more)</span></label>
+      <div class="eotm-values">
+        ${EOTM_CORE_VALUES.map(v => `<button type="button" class="eotm-value-chip" onclick="eotmToggleValue(this,'${v}')">${v}</button>`).join('')}
+      </div>
+      <label class="eotm-reason-label">2. What did they do well today?</label>
       <textarea class="eotm-reason-textarea f-inp" id="eotm-reason" maxlength="175" placeholder="e.g. Closed a tricky order and helped a teammate hit their target too."></textarea>
       <div class="eotm-char-count"><span id="eotm-char-count">0</span>/175</div>
-      <button class="eotm-submit-btn" id="eotm-submit-btn" onclick="eotmSubmitVote()">Submit recognition</button>
+      <button class="eotm-submit-btn incomplete" id="eotm-submit-btn" onclick="eotmSubmitVote()">Submit recognition</button>
       <div id="eotm-submit-err"></div>`;
     const ta = document.getElementById('eotm-reason');
     ta.addEventListener('input', () => {
       if (ta.value.length > 175) ta.value = ta.value.slice(0, 175);
       document.getElementById('eotm-char-count').textContent = ta.value.length;
+      eotmUpdateSubmitLook();
     });
     ta.focus();
+  }
+
+  window.eotmToggleValue = function (btn, v) {
+    const i = eotmState.values.indexOf(v);
+    if (i >= 0) eotmState.values.splice(i, 1); else eotmState.values.push(v);
+    btn.classList.toggle('on', i < 0);
+    eotmUpdateSubmitLook();
+  };
+
+  function eotmUpdateSubmitLook() {
+    const ok = eotmState.values.length > 0 && document.getElementById('eotm-reason').value.trim().length > 0;
+    document.getElementById('eotm-submit-btn').classList.toggle('incomplete', !ok);
   }
 
   window.eotmSubmitVote = async function () {
@@ -487,6 +514,14 @@
     const reason = (ta.value || '').trim();
     const errEl = document.getElementById('eotm-submit-err');
     errEl.innerHTML = '';
+    if (eotmState.values.length === 0) {
+      errEl.innerHTML = `<div class="eotm-err">Pick at least one value they showed today.</div>`;
+      return;
+    }
+    if (!reason) {
+      errEl.innerHTML = `<div class="eotm-err">Write a short reason — what did they do well today?</div>`;
+      return;
+    }
     if (reason.length > 175) {
       errEl.innerHTML = `<div class="eotm-err">Keep it to 175 characters or fewer (you have ${reason.length}).</div>`;
       return;
@@ -500,6 +535,7 @@
         voter_id: currentUser.id,
         nominee_id: eotmState.selected.id,
         reason,
+        core_values: EOTM_CORE_VALUES.filter(v => eotmState.values.includes(v)),
         vote_date: today,
         month_key: eotmMonthKey(),
       });
@@ -529,7 +565,9 @@
       ${eotmHofBlock()}
       <div class="eotm-done-title">You've recognized someone today</div>
       <div class="eotm-done-card">
-        You picked <b>${eotmEsc(v.nomineeName)}</b>:<br/>"${eotmEsc(v.reason)}"
+        You picked <b>${eotmEsc(v.nomineeName)}</b>:
+        ${(v.core_values || []).length ? `<div class="eotm-value-tags">${v.core_values.map(c => `<span class="eotm-value-tag">${eotmEsc(c)}</span>`).join('')}</div>` : '<br/>'}
+        "${eotmEsc(v.reason)}"
       </div>
       <div class="eotm-countdown">🔒 Standings stay hidden — the winners are revealed in ${days} day${days === 1 ? '' : 's'}, on the 1st (shown for 3 days). Come back tomorrow for another shout-out.</div>`;
   }
