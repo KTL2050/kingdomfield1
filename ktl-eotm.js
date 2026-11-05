@@ -150,6 +150,9 @@
   background:var(--royal);color:#fff;font-size:12px;font-weight:700;cursor:pointer;
   font-family:inherit;transition:background .15s;}
 .eotm-row-btn:hover{background:#0f2550;}
+.eotm-row.eotm-row-off{opacity:.55;}
+.eotm-row-leave{flex-shrink:0;padding:6px 12px;border-radius:999px;background:var(--bg2);
+  color:var(--txt3);font-size:11.5px;font-weight:600;}
 .eotm-reason-who{display:flex;align-items:center;gap:13px;padding:14px 16px;border-radius:14px;
   background:var(--bg2);margin-bottom:16px;}
 .eotm-back{background:none;border:none;color:var(--txt3);font-size:12px;cursor:pointer;
@@ -264,6 +267,21 @@
   };
 
   // ── data loading ─────────────────────────────────────────────────────
+  // Who is on leave today: approved or pending leave whose dates include today.
+  // If this read fails, nobody is treated as on leave, so voting still works.
+  async function eotmOnLeaveIds() {
+    const today = eotmTodayISO();
+    try {
+      const { data, error } = await sb.from('leave_requests').select('employee_id')
+        .in('status', ['approved', 'pending']).lte('start_date', today).gte('end_date', today);
+      if (error) throw error;
+      return new Set((data || []).map(r => String(r.employee_id)));
+    } catch (e) {
+      console.warn('EOTM leave check failed', e);
+      return new Set();
+    }
+  }
+
   async function eotmLoadState() {
     eotmRenderLoading();
     try {
@@ -286,6 +304,15 @@
         eotmState.step = 'done';
         eotmSetDotVisible(false);
         eotmRenderDone();
+        return;
+      }
+      eotmState.onLeave = await eotmOnLeaveIds();
+      if (eotmState.onLeave.has(String(currentUser.id))) {
+        eotmState.step = 'onleave';
+        eotmSetDotVisible(false);
+        document.getElementById('eotm-body').innerHTML = `
+          <div class="eotm-done-title">You're on leave today</div>
+          <div class="eotm-done-card">Star of the Day is paused for you while you're away. Enjoy your time off 🌴</div>`;
         return;
       }
       eotmSetDotVisible(true);
@@ -440,13 +467,15 @@
       <input class="eotm-search f-inp" id="eotm-search" placeholder="Search teammates…" oninput="eotmFilterList(this.value)" value="${eotmEsc(filterText || '')}"/>
       <div id="eotm-list">
         ${rows.length === 0 ? '<div class="eotm-empty">No matching teammates.</div>' : rows.map(u => `
-          <div class="eotm-row">
+          <div class="eotm-row${eotmState.onLeave?.has(String(u.id)) ? ' eotm-row-off' : ''}">
             <span class="eotm-row-icon">${EOTM_ICON_PERSON}</span>
             <div class="eotm-row-text">
               <div class="eotm-row-name">${eotmEsc(u.full_name)}</div>
               <div class="eotm-row-role">${eotmEsc((u.role || '').replace('_', ' '))}</div>
             </div>
-            <button class="eotm-row-btn" onclick="eotmSelectNominee('${u.id}','${eotmEsc(u.full_name).replace(/'/g, "\\'")}')">Recognize</button>
+            ${eotmState.onLeave?.has(String(u.id))
+              ? `<span class="eotm-row-leave">On leave</span>`
+              : `<button class="eotm-row-btn" onclick="eotmSelectNominee('${u.id}','${eotmEsc(u.full_name).replace(/'/g, "\\'")}')">Recognize</button>`}
           </div>`).join('')}
       </div>`;
   }
@@ -597,8 +626,11 @@
       eotmInjectOnce();
       // Quietly check today's vote status up front so the reminder dot
       // is accurate before the user ever opens the panel.
-      sb.from('eotm_votes').select('id').eq('voter_id', currentUser.id).eq('vote_date', eotmTodayISO()).maybeSingle()
-        .then(({ data }) => eotmSetDotVisible(!data))
+      Promise.all([
+        sb.from('eotm_votes').select('id').eq('voter_id', currentUser.id).eq('vote_date', eotmTodayISO()).maybeSingle(),
+        eotmOnLeaveIds(),
+      ])
+        .then(([{ data }, onLeave]) => eotmSetDotVisible(!data && !onLeave.has(String(currentUser.id))))
         .catch(() => {});
     }
   }, 300);
