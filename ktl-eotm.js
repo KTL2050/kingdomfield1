@@ -72,7 +72,7 @@
   const EOTM_DEPT_BONUS = 50;
   // People who can't be voted for and never appear on the Employee of the Month board
   // (they can still vote). Matched by full name, ignoring capitals and extra spaces.
-  const EOTM_NOT_VOTABLE = ['Ambrose Odokonyero', 'Raymond Mpamizo'];
+  const EOTM_NOT_VOTABLE = ['Ambrose Odokonyero', 'Raymond Mpamizo', 'Ivan Byamukama'];
   const eotmNameKey = n => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
   const eotmNotVotable = n => EOTM_NOT_VOTABLE.some(x => eotmNameKey(x) === eotmNameKey(n));
   function eotmDaysUntilReveal() {
