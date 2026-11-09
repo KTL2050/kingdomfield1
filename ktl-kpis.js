@@ -12,7 +12,7 @@
      (status + optional figure so far + note). "Copy last month's KPIs"
      starts a new month from the previous one.
    • Heads and admins get the "Department KPIs" menu screen: all departments,
-     heads edit only their own; admins view only.
+     heads manage only their own; admins can manage every department.
    • Everyone else (staff, and managers who aren't heads) sees their own
      department inside the Star of the Day panel's "My Department KPIs" tab
      (ktl-eotm.js) and can comment.
@@ -69,8 +69,8 @@
   const role = () => me()?.role;
   const headDept = () => DEPTS.find(d => K.heads[d] && K.heads[d] === String(me()?.id)) || null;
   const seesAll = () => role() === 'admin' || !!headDept();
-  // "Manager of" a department now means its head (name kept so the rest of the file is unchanged)
-  const isManagerOf = d => !!d && K.heads[d] === String(me()?.id) && !isPastMonth();
+  // "Manager of" a department = its head, or any admin (name kept so the rest of the file is unchanged)
+  const isManagerOf = d => !!d && (role() === 'admin' || K.heads[d] === String(me()?.id)) && !isPastMonth();
   const isStaffOf = d => !seesAll() && !!K.dept && K.dept === d && !isPastMonth();
   const unitTxt = k => k.unit ? ' ' + esc(k.unit) : '';
 
@@ -213,7 +213,7 @@ textarea.kp-in{resize:vertical;}
     const depts = seesAll()
       ? (first && DEPTS.includes(first) ? [first, ...DEPTS.filter(d => d !== first)] : DEPTS)
       : [K.dept];
-    const note = role() === 'admin' ? 'Viewing all departments (read-only).'
+    const note = role() === 'admin' ? 'You can set and update KPIs for every department.'
       : headDept() ? `You're head of <strong>${esc(headDept())}</strong> — other departments are read-only.`
       : `Your department: <strong>${esc(K.dept)}</strong>`;
     el.innerHTML = `
