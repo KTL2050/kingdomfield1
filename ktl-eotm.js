@@ -70,6 +70,11 @@
     return `${y}-${eotmPad(m)}`;
   }
   const EOTM_DEPT_BONUS = 50;
+  // People who can't be voted for and never appear on the Employee of the Month board
+  // (they can still vote). Matched by full name, ignoring capitals and extra spaces.
+  const EOTM_NOT_VOTABLE = ['Ambrose Odokonyero', 'Raymond Mpamizo'];
+  const eotmNameKey = n => String(n || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const eotmNotVotable = n => EOTM_NOT_VOTABLE.some(x => eotmNameKey(x) === eotmNameKey(n));
   function eotmDaysUntilReveal() {
     const now = new Date();
     const firstOfNext = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -346,7 +351,7 @@
       const { data: users, error: usersErr } = await sb
         .from('users').select('id,full_name,role').eq('is_active', true).eq('status', 'approved').eq('country', eotmCountry()).order('full_name');
       if (usersErr) throw usersErr;
-      eotmState.users = (users || []).filter(u => u.id !== currentUser.id);
+      eotmState.users = (users || []).filter(u => u.id !== currentUser.id && !eotmNotVotable(u.full_name));
       eotmState.step = 'list';
       eotmState.selected = null;
       eotmRenderList('');
@@ -397,7 +402,7 @@
     const { data: nomineeUsers } = await sb.from('users').select('id,full_name').in('id', nomineeIds);
     const nameOf = {}; (nomineeUsers || []).forEach(u => { nameOf[u.id] = u.full_name; });
 
-    const leaderboard = nomineeIds.map(id => {
+    const leaderboard = nomineeIds.filter(id => !eotmNotVotable(nameOf[id])).map(id => {
       const dept = deptOf[id];
       const bonus = dept && achievedDepts.has(dept) ? EOTM_DEPT_BONUS : 0;
       return {
