@@ -11277,8 +11277,6 @@ async function punchInActivity() {
     created_at: new Date().toISOString(),
     is_cover: isCover, cover_for, client_id: coverClient ? String(coverClient.id) : null,
   };
-  crmActivities.unshift(act);
-  saveCRM('activities', crmActivities);
 
   const fvRow = {
     id: act.id, type: act.type, contact_name: act.contact_name,
@@ -11288,17 +11286,25 @@ async function punchInActivity() {
     punch_in_lng: act.punch_in_lng, punch_in_location: act.punch_in_location,
   };
   const fvPayload = isCover ? { ...fvRow, is_cover: true, cover_for: cover_for || null, client_id: String(coverClient.id) } : fvRow;
-  sb.from('field_visits').insert(fvPayload).then(async ({ error }) => {
-    if (!error) return;
+  // Wait for the database: only say "Punched in" once the visit is really saved
+  // (a weak signal or a slow database used to lose the punch silently).
+  let error = null;
+  try {
+    ({ error } = await sb.from('field_visits').insert(fvPayload));
     // If the cover columns haven't been added yet, still save the punch (cover info goes into notes)
-    if (isCover && (error.code === 'PGRST204' || error.code === '42703' || /column/i.test(error.message || ''))) {
+    if (error && isCover && (error.code === 'PGRST204' || error.code === '42703' || /column/i.test(error.message || ''))) {
       const tag = `[COVER${cover_for ? ' for ' + cover_for : ''}] `;
-      const { error: e2 } = await sb.from('field_visits').insert({ ...fvRow, notes: tag + (fvRow.notes || '') });
-      if (e2) console.error('field_visits sync failed:', e2.message);
-    } else {
-      console.error('field_visits sync failed:', error.message);
+      ({ error } = await sb.from('field_visits').insert({ ...fvRow, notes: tag + (fvRow.notes || '') }));
     }
-  });
+  } catch (e) { error = e; }
+  if (error) {
+    console.error('field_visits save failed:', error.message || error);
+    btn.disabled = false; btn.textContent = '📍 Punch In'; statusEl.style.display = 'none';
+    alert("⚠️ Your punch-in was NOT saved — check your internet signal and tap Punch In again.\n\n(" + (error.message || error) + ')');
+    return;
+  }
+  crmActivities.unshift(act);
+  saveCRM('activities', crmActivities);
 
   document.getElementById('crm-activity-modal')?.remove();
   if (currentScreen === 'crm-activities') loadActivitiesScreen();
