@@ -3117,6 +3117,12 @@ async function loadTopListers(period) {
   if (_topListPeriod === 'month')   from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
   else if (_topListPeriod === '30') from = new Date(Date.now() - 30*86400000).toISOString().split('T')[0];
 
+  // Same ranking for everyone: reuse it for 15 minutes on this device instead of re-running
+  // the whole Wallet calculation on every Dashboard open (it was the heaviest database load).
+  const cacheKey = 'ktl_top_listers_' + _topListPeriod;
+  const cached = _topListCacheGet(cacheKey);
+  if (cached) { _renderTopListers(host, cached); return; }
+
   // Find which reps have non-draft, non-cancelled listings in this period
   let repQ = sb.from('orders').select('created_by').in('status', ['submitted', 'fulfilled', 'partial']).limit(5000);
   if (from) repQ = repQ.gte('order_date', from);
@@ -3153,6 +3159,19 @@ async function loadTopListers(period) {
     .sort((a, b) => b.items - a.items)
     .slice(0, 5);
 
+  _topListCacheSet(cacheKey, rows);
+  _renderTopListers(host, rows);
+}
+
+const _TOP_LIST_TTL_MS = 15 * 60 * 1000;
+function _topListCacheGet(key) {
+  try { const c = JSON.parse(localStorage.getItem(key) || 'null'); return c && Date.now() - c.at < _TOP_LIST_TTL_MS ? c.rows : null; }
+  catch (e) { return null; }
+}
+function _topListCacheSet(key, rows) {
+  try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), rows })); } catch (e) {}
+}
+function _renderTopListers(host, rows) {
   if (!rows.length) {
     host.innerHTML = `<div class="empty-state" style="padding:26px;">
       <div style="font-size:24px;margin-bottom:8px;">📋</div>
