@@ -531,7 +531,7 @@
 
   window.eotmFilterList = function (val) { eotmRenderList(val); };
 
-  const EOTM_CORE_VALUES = ['Excellence', 'Performance', 'Integrity', 'Customer Focus'];
+  const EOTM_CORE_VALUES = ['Customer Focus', 'Excellence', 'Performance', 'Collaboration', 'Innovation'];
 
   window.eotmSelectNominee = function (id, name) {
     eotmState.selected = { id, name };
