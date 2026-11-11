@@ -2392,7 +2392,7 @@ body.role-rep #sync-status         { color: rgba(255,255,255,0.6); }
               <select class="fin" id="u-dept">
                 <option value="">— Not set —</option>
                 <option>IT</option><option>Finance</option><option>Store &amp; Delivery</option>
-                <option>Sales</option><option>Marketing</option>
+                <option>Sales</option><option>Marketing Uncle Bills</option><option>Marketing Aiwibi</option>
               </select>
             </div>
             <div class="fg">
@@ -2593,7 +2593,7 @@ const canManage  = () => ['admin','manager'].includes(currentUser?.role);
 const COUNTRY_NAMES = { UG: 'Uganda', KE: 'Kenya' };
 const COUNTRY_MAP_CENTRE = { UG: [0.3136, 32.5811], KE: [-1.2864, 36.8172] };   // Kampala, Nairobi
 // Departments a user can belong to (Department KPIs, ktl-kpis.js)
-const DEPARTMENTS = ['IT', 'Finance', 'Store & Delivery', 'Sales', 'Marketing'];
+const DEPARTMENTS = ['IT', 'Finance', 'Store & Delivery', 'Sales', 'Marketing Uncle Bills', 'Marketing Aiwibi'];
 const myCountry = () => currentUser?.country || 'UG';
 function viewCountry() {
   if (myCountry() !== 'UG' || !canManage()) return myCountry();

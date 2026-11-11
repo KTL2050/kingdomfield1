@@ -38,7 +38,7 @@
 
   const SCREEN = 'kpis';
   const TITLE = 'Department KPIs';
-  const DEPTS = (typeof DEPARTMENTS !== 'undefined') ? DEPARTMENTS : ['IT', 'Finance', 'Store & Delivery', 'Sales', 'Marketing'];
+  const DEPTS = (typeof DEPARTMENTS !== 'undefined') ? DEPARTMENTS : ['IT', 'Finance', 'Store & Delivery', 'Sales', 'Marketing Uncle Bills', 'Marketing Aiwibi'];
   const STATUSES = [
     ['on_track', 'On track', 'ok'], ['at_risk', 'At risk', 'warn'],
     ['achieved', 'Achieved', 'ok'], ['partly', 'Partly achieved', 'warn'], ['not_achieved', 'Not achieved', 'bad'],
