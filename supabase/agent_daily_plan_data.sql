@@ -6,6 +6,8 @@
 -- photos. The caller proves itself with a key; only its SHA-256 hash is
 -- stored here. The function is stable, so Postgres refuses any write
 -- inside it. Revoke the agent by deleting its row in agent_keys.
+-- Each machine running the agent has its own row: 'daily-plan-check', or a
+-- name starting 'daily-plan-check-' such as 'daily-plan-check-machine'.
 -- Run once in the Supabase SQL Editor. Safe to run again.
 
 create extension if not exists pgcrypto with schema extensions;
@@ -33,7 +35,7 @@ declare
 begin
   if p_key is null or p_date is null or not exists (
     select 1 from agent_keys
-    where name = 'daily-plan-check'
+    where (name = 'daily-plan-check' or name like 'daily-plan-check-%')
       and key_hash = encode(extensions.digest(p_key, 'sha256'), 'hex')
   ) then
     raise exception 'Not allowed' using errcode = '42501';

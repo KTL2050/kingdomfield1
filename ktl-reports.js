@@ -29,7 +29,8 @@ const CFG = {
   pointsPerItem: 1,        // wallet points earned per product listed
   ugxPerPoint:   1000,
   rowLimit:      8000,     // safety cap on any single query
-  countedStatuses: ['submitted', 'fulfilled'],   // listings that count as real
+  countedStatuses: ['submitted', 'fulfilled', 'partial'],   // same as Wallet/Dashboard
+  maxListings:   50000,    // safety cap when paging through listings
 };
 
 // ─── STATE ─────────────────────────────────────────────────────────────────
@@ -371,11 +372,21 @@ function cacheKey(kind) { return `${kind}|${S.from}|${S.to}`; }
 async function fetchOrders() {
   const key = cacheKey('orders');
   if (S.cache[key]) return S.cache[key];
-  const { data, error } = await DB().from('orders').select('*')
-    .gte('order_date', S.from).lte('order_date', S.to)
-    .order('order_date', { ascending: false }).limit(CFG.rowLimit);
-  if (error) throw new Error('Listings: ' + error.message);
-  S.cache[key] = data || [];
+  // Supabase sends at most 1,000 rows per request, so page through the whole period
+  // (a single request silently dropped everything past 1,000). Viewed country only.
+  const userIds = await countryUserIds();
+  const out = [];
+  for (let from = 0; from < CFG.maxListings; from += 1000) {
+    const { data, error } = await DB().from('orders').select('*')
+      .in('created_by', userIds)
+      .gte('order_date', S.from).lte('order_date', S.to)
+      .order('order_date', { ascending: false }).order('id', { ascending: true })
+      .range(from, from + 999);
+    if (error) throw new Error('Listings: ' + error.message);
+    out.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  S.cache[key] = out;
   return S.cache[key];
 }
 
@@ -386,9 +397,13 @@ async function fetchOrderItems(orders) {
   const ids = orders.map(o => o.id);
   const out = [];
   for (let i = 0; i < ids.length; i += 200) {          // chunked: URLs have limits
-    const { data, error } = await DB().from('order_items').select('*').in('order_id', ids.slice(i, i+200));
-    if (error) throw new Error('Listing items: ' + error.message);
-    out.push(...(data || []));
+    for (let from = 0; ; from += 1000) {               // a batch can hold more than 1,000 product lines
+      const { data, error } = await DB().from('order_items').select('*').in('order_id', ids.slice(i, i+200))
+        .order('order_id', { ascending: true }).range(from, from + 999);
+      if (error) throw new Error('Listing items: ' + error.message);
+      out.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
   }
   S.cache[key] = out;
   return out;
@@ -417,7 +432,7 @@ async function fetchConfirmedByOrder() {
   }, '');
   const history = await _wBuildPurchaseHistory(clientIds, sinceDate);
 
-  const byOrder = {}, pointsByOrder = {};
+  const byOrder = {}, pointsByOrder = {}, matchesByOrder = {};
   orders.forEach(o => {
     const cid = String(o.client_id || '');
     const matches = cid
@@ -425,10 +440,12 @@ async function fetchConfirmedByOrder() {
       : {};
     byOrder[o.id] = Object.keys(matches).length;
     pointsByOrder[o.id] = _wPointsOf(matches);
+    matchesByOrder[o.id] = matches;          // item-level: which products were bought, and their points
   });
 
   S.cache[key] = byOrder;
   S.cache[cacheKey('points')] = pointsByOrder;
+  S.cache[cacheKey('matches')] = matchesByOrder;
   return byOrder;
 }
 
@@ -436,6 +453,19 @@ async function fetchConfirmedByOrder() {
 async function fetchPointsByOrder() {
   await fetchConfirmedByOrder();
   return S.cache[cacheKey('points')] || {};
+}
+/** Confirmed purchases per listing, item by item (same matching as Wallet). */
+async function fetchMatchesByOrder() {
+  await fetchConfirmedByOrder();
+  return S.cache[cacheKey('matches')] || {};
+}
+/** Product → brand ('UBL' / 'AIWIBI'), the same rule as the Purchase History download. */
+async function fetchBrandIndex() {
+  const key = cacheKey('brands');
+  if (key in S.cache) return S.cache[key];
+  try { S.cache[key] = typeof _phLoadBrandIndex === 'function' ? await _phLoadBrandIndex() : null; }
+  catch (e) { console.warn('[reports] brand index:', e.message); S.cache[key] = null; }
+  return S.cache[key];
 }
 
 async function fetchAttendance() {
@@ -544,7 +574,8 @@ const REPORTS = [
   filters:['rep','status'],
   cols:[
     { key:'store',      label:'Store',            type:'text' },
-    { key:'products',   label:'Products Listed',  type:'num',  total:true, r:true },
+    { key:'products',   label:'Products Listed',      type:'num',  total:true, r:true },
+    { key:'confirmed',  label:'Confirmed Purchases',  type:'num',  total:true, r:true },
     { key:'listings',   label:'Listing Count',    type:'num',  total:true, r:true },
     { key:'reps',       label:'Reps Involved',    type:'num',  r:true },
     { key:'avg',        label:'Avg per Listing',  type:'num',  r:true },
@@ -557,16 +588,16 @@ const REPORTS = [
     const g = {};
     orders.forEach(o => {
       const confirmed = byOrder[o.id] || 0;
-      if (confirmed === 0) return;   // only count listings the store actually bought from
       const k = String(o.client_id || 'none');
-      if (!g[k]) g[k] = { store:o.client_name || 'Unknown store', products:0, listings:0, reps:new Set(), last:null };
-      g[k].products += confirmed;
+      if (!g[k]) g[k] = { store:o.client_name || 'Unknown store', products:0, confirmed:0, listings:0, reps:new Set(), last:null };
+      g[k].products  += Number(o.item_count || 0);   // everything listed
+      g[k].confirmed += confirmed;                   // what the store went on to buy (what Wallet pays on)
       g[k].listings += 1;
       if (o.created_by) g[k].reps.add(String(o.created_by));
       if (!g[k].last || o.order_date > g[k].last) g[k].last = o.order_date;
     });
     return Object.values(g).map(r => ({
-      store: r.store, products: r.products, listings: r.listings,
+      store: r.store, products: r.products, confirmed: r.confirmed, listings: r.listings,
       reps: r.reps.size, avg: r.listings ? +(r.products / r.listings).toFixed(1) : 0, last: r.last,
     })).sort((a, b) => b.products - a.products);
   },
@@ -578,7 +609,8 @@ const REPORTS = [
   filters:['store','status'],
   cols:[
     { key:'rep',       label:'Sales Rep',        type:'text' },
-    { key:'products',  label:'Products Listed',  type:'num',  total:true, r:true },
+    { key:'products',  label:'Products Listed',      type:'num',  total:true, r:true },
+    { key:'confirmed', label:'Confirmed Purchases',  type:'num',  total:true, r:true },
     { key:'listings',  label:'Listing Count',    type:'num',  total:true, r:true },
     { key:'stores',    label:'Stores Covered',   type:'num',  r:true },
     { key:'avg',       label:'Avg per Listing',  type:'num',  r:true },
@@ -592,10 +624,10 @@ const REPORTS = [
     const g = {};
     orders.forEach(o => {
       const confirmed = byOrder[o.id] || 0;
-      if (confirmed === 0) return;   // only count listings the store actually bought from
       const k = String(o.created_by || 'none');
-      if (!g[k]) g[k] = { rep:userName(o.created_by), products:0, listings:0, stores:new Set(), last:null };
-      g[k].products += confirmed;
+      if (!g[k]) g[k] = { rep:userName(o.created_by), products:0, confirmed:0, listings:0, stores:new Set(), last:null };
+      g[k].products  += Number(o.item_count || 0);   // everything listed
+      g[k].confirmed += confirmed;                   // what the store went on to buy (what Wallet pays on)
       g[k].listings += 1;
       if (o.client_id) g[k].stores.add(String(o.client_id));
       if (!g[k].last || o.order_date > g[k].last) g[k].last = o.order_date;
@@ -603,7 +635,7 @@ const REPORTS = [
     const rows = Object.values(g);
     const total = rows.reduce((s, r) => s + r.products, 0) || 1;
     return rows.map(r => ({
-      rep: r.rep, products: r.products, listings: r.listings, stores: r.stores.size,
+      rep: r.rep, products: r.products, confirmed: r.confirmed, listings: r.listings, stores: r.stores.size,
       avg: r.listings ? +(r.products / r.listings).toFixed(1) : 0,
       share: +(r.products / total * 100).toFixed(1), last: r.last,
     })).sort((a, b) => b.products - a.products);
@@ -618,6 +650,7 @@ const REPORTS = [
     { key:'rep',      label:'Sales Rep',       type:'text' },
     { key:'store',    label:'Store',           type:'text' },
     { key:'products', label:'Products Listed', type:'num', total:true, r:true },
+    { key:'confirmed', label:'Confirmed Purchases', type:'num', total:true, r:true },
     { key:'listings', label:'Listing Count',   type:'num', total:true, r:true },
     { key:'first',    label:'First Listing',   type:'date' },
     { key:'last',     label:'Last Listing',    type:'date' },
@@ -629,10 +662,10 @@ const REPORTS = [
     const g = {};
     orders.forEach(o => {
       const confirmed = byOrder[o.id] || 0;
-      if (confirmed === 0) return;   // only count listings the store actually bought from
       const k = `${o.created_by}|${o.client_id}`;
-      if (!g[k]) g[k] = { rep:userName(o.created_by), store:o.client_name || 'Unknown store', products:0, listings:0, first:o.order_date, last:o.order_date };
-      g[k].products += confirmed;
+      if (!g[k]) g[k] = { rep:userName(o.created_by), store:o.client_name || 'Unknown store', products:0, confirmed:0, listings:0, first:o.order_date, last:o.order_date };
+      g[k].products  += Number(o.item_count || 0);   // everything listed
+      g[k].confirmed += confirmed;                   // what the store went on to buy (what Wallet pays on)
       g[k].listings += 1;
       if (o.order_date < g[k].first) g[k].first = o.order_date;
       if (o.order_date > g[k].last)  g[k].last  = o.order_date;
@@ -650,6 +683,7 @@ const REPORTS = [
     { key:'date',     label:'Date',       type:'date' },
     { key:'store',    label:'Store',      type:'text' },
     { key:'rep',      label:'Sales Rep',  type:'text' },
+    { key:'listed',   label:'Products Listed',     type:'num', total:true, r:true },
     { key:'products', label:'Confirmed Purchases', type:'num', total:true, r:true },
     { key:'status',   label:'Status',     type:'badge' },
     { key:'created',  label:'Submitted',  type:'datetime' },
@@ -659,7 +693,7 @@ const REPORTS = [
     const byOrder = await fetchConfirmedByOrder();
     return orders.map(o => ({
       ref: o.order_ref, date: o.order_date, store: o.client_name || '—',
-      rep: userName(o.created_by), products: byOrder[o.id] || 0,
+      rep: userName(o.created_by), listed: Number(o.item_count || 0), products: byOrder[o.id] || 0,
       status: o.status, created: o.created_at,
     }));
   },
@@ -695,12 +729,57 @@ const REPORTS = [
 },
 
 {
+  id:'items-listed-vs-purchased', ranked:true, cat:'Listings', name:'Items Listed vs Purchased',
+  desc:'Per product: how often it was listed, how often the store went on to buy it, and what reps earned on it.',
+  filters:['rep','store','status','brand'],
+  cols:[
+    { key:'product',   label:'Product',             type:'text' },
+    { key:'sku',       label:'SKU',                 type:'text' },
+    { key:'brand',     label:'Brand',               type:'text' },
+    { key:'listed',    label:'Times Listed',        type:'num',   total:true, r:true },
+    { key:'stores',    label:'Stores Listed In',    type:'num',   r:true },
+    { key:'confirmed', label:'Confirmed Purchases', type:'num',   total:true, r:true },
+    { key:'conv',      label:'Conversion',          type:'pct',   r:true },
+    { key:'points',    label:'Points Earned',       type:'num',   total:true, r:true },
+    { key:'ugx',       label:'Earned (UGX)',        type:'money', total:true, r:true },
+  ],
+  async run() {
+    const all     = await fetchOrders();
+    const orders  = countedOrders(applyOrderFilters(all));
+    const items   = await fetchOrderItems(all);
+    const matches = await fetchMatchesByOrder();
+    const idx     = await fetchBrandIndex();
+    const want    = S.filters.brand || '';
+    const oMap = {}; orders.forEach(o => { oMap[o.id] = o; });
+    const g = {};
+    items.forEach(it => {
+      const o = oMap[it.order_id]; if (!o) return;
+      const brand = idx ? (_phBrandOf(idx, it.sku, it.product_name) || '') : '';
+      if (want && brand !== want) return;
+      const key = _wNorm(it.sku || it.product_name || '');   // same key Wallet matches on
+      if (!key) return;
+      if (!g[key]) g[key] = { product: it.product_name || '—', sku: it.sku || '—', brand: brand || '—', listed: 0, stores: new Set(), confirmed: 0, points: 0 };
+      g[key].listed += 1;
+      if (o.client_id) g[key].stores.add(String(o.client_id));
+      const m = (matches[o.id] || {})[key];
+      if (m) { g[key].confirmed += 1; g[key].points += Number(m.points || 0); }
+    });
+    return Object.values(g).map(r => ({
+      ...r, stores: r.stores.size,
+      conv: r.listed ? +(r.confirmed / r.listed * 100).toFixed(1) : 0,
+      ugx: r.points * CFG.ugxPerPoint,
+    })).sort((a, b) => b.listed - a.listed);
+  },
+},
+
+{
   id:'listings-daily', cat:'Listings', name:'Daily Listing Summary',
   desc:'Listing activity per day — volume, stores covered and reps active.',
   filters:['rep','store','status'],
   cols:[
     { key:'date',     label:'Date',            type:'date' },
     { key:'products', label:'Products Listed', type:'num', total:true, r:true },
+    { key:'confirmed', label:'Confirmed Purchases', type:'num', total:true, r:true },
     { key:'listings', label:'Listings',        type:'num', total:true, r:true },
     { key:'stores',   label:'Stores',          type:'num', r:true },
     { key:'reps',     label:'Reps Active',     type:'num', r:true },
@@ -711,10 +790,10 @@ const REPORTS = [
     const g = {};
     orders.forEach(o => {
       const confirmed = byOrder[o.id] || 0;
-      if (confirmed === 0) return;   // only count listings the store actually bought from
       const k = o.order_date;
-      if (!g[k]) g[k] = { date:k, products:0, listings:0, stores:new Set(), reps:new Set() };
-      g[k].products += confirmed;
+      if (!g[k]) g[k] = { date:k, products:0, confirmed:0, listings:0, stores:new Set(), reps:new Set() };
+      g[k].products  += Number(o.item_count || 0);   // everything listed
+      g[k].confirmed += confirmed;                   // what the store went on to buy (what Wallet pays on)
       g[k].listings += 1;
       if (o.client_id)  g[k].stores.add(String(o.client_id));
       if (o.created_by) g[k].reps.add(String(o.created_by));
@@ -1546,6 +1625,13 @@ function filterControls(def) {
     bits.push(chip('Store', `<select onchange="Reports.setFilter('store',this.value)">
         <option value="">All stores</option>
         ${S.clients.map(c => `<option value="${c.id}"${f.store === String(c.id) ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}
+      </select>`));
+  }
+
+  if (wants.includes('brand')) {
+    bits.push(chip('Brand', `<select onchange="Reports.setFilter('brand',this.value)">
+        ${[['', 'All brands'], ['UBL', 'UBL'], ['AIWIBI', 'AIWIBI']]
+          .map(([v, l]) => `<option value="${v}"${(f.brand || '') === v ? ' selected' : ''}>${l}</option>`).join('')}
       </select>`));
   }
 
