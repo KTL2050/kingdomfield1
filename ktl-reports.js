@@ -295,6 +295,17 @@ table.rp-tbl td:last-child{padding-right:30px;}
 table.rp-tbl td.r{text-align:right;white-space:nowrap;}
 table.rp-tbl tbody tr{transition:background .12s;}
 table.rp-tbl tbody tr:hover{background:var(--rp-canvas);}
+table.rp-tbl tbody tr.rp-click{cursor:pointer;}
+table.rp-tbl tbody tr.rp-click:hover{background:var(--rp-royal-soft);}
+.rp-dr-ov{position:fixed;inset:0;background:rgba(16,24,40,.45);z-index:950;display:flex;align-items:center;justify-content:center;padding:16px;}
+.rp-dr{background:var(--rp-paper);border-radius:12px;width:100%;max-width:1050px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(16,24,40,.25);}
+.rp-dr-hd{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 24px;border-bottom:1px solid var(--rp-rule-mid);}
+.rp-dr-t{font-size:16px;font-weight:700;color:var(--rp-ink);}
+.rp-dr-s{font-size:12px;color:var(--rp-txt3);margin-top:3px;}
+.rp-dr-x{width:32px;height:32px;border-radius:8px;border:1px solid var(--rp-rule-mid);background:var(--rp-paper);cursor:pointer;font-size:18px;color:var(--rp-txt3);flex-shrink:0;}
+.rp-dr-bd{overflow:auto;}
+.rp-dr-msg{padding:34px;text-align:center;color:var(--rp-txt3);font-size:13px;}
+.rp-dr-ft{display:flex;justify-content:flex-end;gap:8px;padding:14px 24px;border-top:1px solid var(--rp-rule-mid);}
 .rp-lead{font-weight:600;color:var(--rp-ink);}
 .rp-rank{font-family:var(--rp-serif);font-size:13px;color:var(--rp-txt3);width:34px;padding-right:0!important;}
 .rp-rank.top{color:var(--rp-gold);font-weight:600;}
@@ -570,6 +581,7 @@ const REPORTS = [
 // ── LISTINGS ──────────────────────────────────────────────────────────────
 {
   id:'listings-by-store', ranked:true, cat:'Listings', name:'Listings by Store',
+  drill:true,
   desc:'Top stores ranked by how many products have been listed at each one.',
   filters:['rep','status'],
   cols:[
@@ -589,7 +601,7 @@ const REPORTS = [
     orders.forEach(o => {
       const confirmed = byOrder[o.id] || 0;
       const k = String(o.client_id || 'none');
-      if (!g[k]) g[k] = { store:o.client_name || 'Unknown store', products:0, confirmed:0, listings:0, reps:new Set(), last:null };
+      if (!g[k]) g[k] = { _store:k, store:o.client_name || 'Unknown store', products:0, confirmed:0, listings:0, reps:new Set(), last:null };
       g[k].products  += Number(o.item_count || 0);   // everything listed
       g[k].confirmed += confirmed;                   // what the store went on to buy (what Wallet pays on)
       g[k].listings += 1;
@@ -597,7 +609,7 @@ const REPORTS = [
       if (!g[k].last || o.order_date > g[k].last) g[k].last = o.order_date;
     });
     return Object.values(g).map(r => ({
-      store: r.store, products: r.products, confirmed: r.confirmed, listings: r.listings,
+      _store: r._store, store: r.store, products: r.products, confirmed: r.confirmed, listings: r.listings,
       reps: r.reps.size, avg: r.listings ? +(r.products / r.listings).toFixed(1) : 0, last: r.last,
     })).sort((a, b) => b.products - a.products);
   },
@@ -605,6 +617,7 @@ const REPORTS = [
 
 {
   id:'listings-by-rep', ranked:true, cat:'Listings', name:'Listings by Sales Rep',
+  drill:true,
   desc:'Products listed by each sales rep across all stores. Filter by store to see one store only.',
   filters:['store','status'],
   cols:[
@@ -625,7 +638,7 @@ const REPORTS = [
     orders.forEach(o => {
       const confirmed = byOrder[o.id] || 0;
       const k = String(o.created_by || 'none');
-      if (!g[k]) g[k] = { rep:userName(o.created_by), products:0, confirmed:0, listings:0, stores:new Set(), last:null };
+      if (!g[k]) g[k] = { _rep:k, rep:userName(o.created_by), products:0, confirmed:0, listings:0, stores:new Set(), last:null };
       g[k].products  += Number(o.item_count || 0);   // everything listed
       g[k].confirmed += confirmed;                   // what the store went on to buy (what Wallet pays on)
       g[k].listings += 1;
@@ -635,7 +648,7 @@ const REPORTS = [
     const rows = Object.values(g);
     const total = rows.reduce((s, r) => s + r.products, 0) || 1;
     return rows.map(r => ({
-      rep: r.rep, products: r.products, confirmed: r.confirmed, listings: r.listings, stores: r.stores.size,
+      _rep: r._rep, rep: r.rep, products: r.products, confirmed: r.confirmed, listings: r.listings, stores: r.stores.size,
       avg: r.listings ? +(r.products / r.listings).toFixed(1) : 0,
       share: +(r.products / total * 100).toFixed(1), last: r.last,
     })).sort((a, b) => b.products - a.products);
@@ -644,6 +657,7 @@ const REPORTS = [
 
 {
   id:'listings-rep-store', cat:'Listings', name:'Listings by Rep and Store',
+  drill:true,
   desc:'One row per rep and store pair — who listed what, and where.',
   filters:['rep','store','status'],
   cols:[
@@ -663,7 +677,7 @@ const REPORTS = [
     orders.forEach(o => {
       const confirmed = byOrder[o.id] || 0;
       const k = `${o.created_by}|${o.client_id}`;
-      if (!g[k]) g[k] = { rep:userName(o.created_by), store:o.client_name || 'Unknown store', products:0, confirmed:0, listings:0, first:o.order_date, last:o.order_date };
+      if (!g[k]) g[k] = { _rep:String(o.created_by || 'none'), _store:String(o.client_id || 'none'), rep:userName(o.created_by), store:o.client_name || 'Unknown store', products:0, confirmed:0, listings:0, first:o.order_date, last:o.order_date };
       g[k].products  += Number(o.item_count || 0);   // everything listed
       g[k].confirmed += confirmed;                   // what the store went on to buy (what Wallet pays on)
       g[k].listings += 1;
@@ -1806,6 +1820,7 @@ function renderReport() {
   const st   = CAT_STYLE[def.cat] || CAT_STYLE.Listings;
   const cols = visibleCols(def);
   const rows = sortRows(applyConds(S.rows, def), def);
+  S.viewRows = rows;                       // the row order on screen, for click-through
 
   const totals = {};
   def.cols.filter(c => c.total).forEach(c => {
@@ -1877,7 +1892,7 @@ function renderReport() {
               S.sort.key === c.key ? `<span class="rp-caret">${S.sort.dir === 'asc' ? '▲' : '▼'}</span>` : ''}</th>`).join('')}
         </tr></thead>
         <tbody>
-          ${rows.map((r, i) => `<tr>
+          ${rows.map((r, i) => `<tr${def.drill ? ` class="rp-click" onclick="Reports.drill(${i})" title="See confirmed items"` : ''}>
             ${ranked ? `<td class="rp-rank${i < 3 ? ' top' : ''}">${i + 1}</td>` : ''}
             ${cols.map((c, ci) => {
               const isPk = c.key === pk && pkMax > 0;
@@ -1897,7 +1912,7 @@ function renderReport() {
         </tr></tfoot>` : ''}
       </table></div>
       <div class="rp-foot">
-        <span>${fmtNum(rows.length)} row${rows.length === 1 ? '' : 's'}${S.conds.length ? ` after ${S.conds.length} condition${S.conds.length === 1 ? '' : 's'}` : ''}</span>
+        <span>${fmtNum(rows.length)} row${rows.length === 1 ? '' : 's'}${S.conds.length ? ` after ${S.conds.length} condition${S.conds.length === 1 ? '' : 's'}` : ''}${def.drill ? ' · Click a row to see its confirmed items' : ''}</span>
         <span>${esc(st.source)} · figures cover ${esc(rangeLabel().toLowerCase())}</span>
       </div>`
     : `<div class="rp-empty">
@@ -2094,8 +2109,8 @@ function exportCSV() {
   toast('CSV downloaded.');
 }
 
-async function exportExcel() {
-  const { def, cols, rows } = currentTable();
+async function exportExcel(override) {
+  const { def, cols, rows } = (override && override.rows) ? override : currentTable();
   if (!rows.length) { toast('Nothing to export.', 'warn'); return; }
   if (typeof ExcelJS === 'undefined') { toast('Excel library not loaded — using CSV instead.', 'warn'); return exportCSV(); }
 
@@ -2264,6 +2279,87 @@ function patchHost() {
 patchHost();
 document.addEventListener('DOMContentLoaded', patchHost);
 
+// ─── CLICK-THROUGH: the confirmed items behind a row (rep / store / rep + store) ───
+const DRILL_COLS = [
+  { key:'product', label:'Product',      type:'text' },
+  { key:'sku',     label:'SKU',          type:'text' },
+  { key:'store',   label:'Store',        type:'text' },
+  { key:'rep',     label:'Rep',          type:'text' },
+  { key:'listed',  label:'Listed on',    type:'date' },
+  { key:'bought',  label:'Bought on',    type:'date' },
+  { key:'points',  label:'Points',       type:'num',   total:true, r:true },
+  { key:'ugx',     label:'Earned (UGX)', type:'money', total:true, r:true },
+];
+let _drill = null, _drillSeq = 0;
+
+async function drill(i) {
+  const def = reportById(S.reportId), r = (S.viewRows || [])[i];
+  if (!def || !def.drill || !r) return;
+  const who = [r.rep, r.store].filter(Boolean).join(' — ');
+  const seq = ++_drillSeq;
+  showDrill(who, null);
+  try {
+    const all     = await fetchOrders();
+    const items   = await fetchOrderItems(all);
+    const matches = await fetchMatchesByOrder();
+    // same period, filters and statuses as the report row that was clicked
+    const orders = countedOrders(applyOrderFilters(all)).filter(o =>
+      (r._rep   === undefined || String(o.created_by || 'none') === r._rep) &&
+      (r._store === undefined || String(o.client_id  || 'none') === r._store));
+    const itemsByOrder = {};
+    items.forEach(it => (itemsByOrder[it.order_id] || (itemsByOrder[it.order_id] = [])).push(it));
+    const rows = [];
+    orders.forEach(o => {
+      const m = matches[o.id] || {}, seen = new Set();
+      (itemsByOrder[o.id] || []).forEach(it => {
+        const key = _wNorm(it.sku || it.product_name || '');   // same key Wallet matches on
+        if (!key || seen.has(key) || !m[key]) return;
+        seen.add(key);
+        const pts = Number(m[key].points || 0);
+        rows.push({ product: it.product_name || '—', sku: it.sku || '—', store: o.client_name || '—',
+          rep: userName(o.created_by), listed: o.order_date, bought: m[key].purchase_date || '',
+          points: pts, ugx: pts * CFG.ugxPerPoint });
+      });
+    });
+    rows.sort((a, b) => String(b.bought).localeCompare(String(a.bought)));
+    if (seq === _drillSeq) showDrill(who, rows);
+  } catch (e) { if (seq === _drillSeq) showDrill(who, e); }
+}
+
+function showDrill(who, data) {
+  const host = root(); if (!host) return;
+  document.getElementById('rp-dr-ov')?.remove();
+  _drill = { who, rows: Array.isArray(data) ? data : [] };
+  const total = k => data.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+  const body = data === null ? '<div class="rp-dr-msg">Loading confirmed items…</div>'
+    : data instanceof Error ? `<div class="rp-dr-msg">Couldn't load: ${esc(data.message)}</div>`
+    : !data.length ? '<div class="rp-dr-msg">No confirmed purchases for this row in the period.</div>'
+    : `<table class="rp-tbl">
+        <thead><tr>${DRILL_COLS.map(c => `<th class="${c.r ? 'r' : ''}">${esc(c.label)}</th>`).join('')}</tr></thead>
+        <tbody>${data.map(r => `<tr>${DRILL_COLS.map(c => `<td class="${c.r ? 'r' : ''}">${esc(fmtCell(r[c.key], c.type))}</td>`).join('')}</tr>`).join('')}</tbody>
+        <tfoot><tr>${DRILL_COLS.map((c, i) => `<td class="${c.r ? 'r' : ''}">${
+          i === 0 ? `Total — ${data.length} item${data.length === 1 ? '' : 's'}` : c.total ? esc(fmtCell(total(c.key), c.type)) : ''}</td>`).join('')}</tr></tfoot>
+      </table>`;
+  const ov = document.createElement('div');
+  ov.className = 'rp-dr-ov'; ov.id = 'rp-dr-ov';
+  ov.innerHTML = `<div class="rp-dr">
+    <div class="rp-dr-hd"><div><div class="rp-dr-t">${esc(who)} — confirmed items</div><div class="rp-dr-s">${esc(rangeLabel())}</div></div>
+      <button class="rp-dr-x" onclick="Reports.closeDrill()" aria-label="Close">&times;</button></div>
+    <div class="rp-dr-bd">${body}</div>
+    <div class="rp-dr-ft">
+      ${Array.isArray(data) && data.length ? '<button class="rp-run" onclick="Reports.exportDrill()">Export Excel</button>' : ''}
+      <button class="rp-ghost" onclick="Reports.closeDrill()">Close</button></div>
+  </div>`;
+  ov.addEventListener('click', e => { if (e.target === ov) closeDrill(); });
+  host.appendChild(ov);
+}
+function closeDrill() { _drillSeq++; document.getElementById('rp-dr-ov')?.remove(); }
+function exportDrill() {
+  if (!_drill || !_drill.rows.length) return;
+  const name = (_drill.who + ' confirmed items').replace(/[\\/?*[\]:]/g, ' ');
+  return exportExcel({ def: { name, cols: DRILL_COLS }, cols: DRILL_COLS, rows: _drill.rows });
+}
+
 // ─── PUBLIC API (inline onclick handlers) ──────────────────────────────────
 window.Reports = {
   open, home, run, reset,
@@ -2272,6 +2368,7 @@ window.Reports = {
   sortBy, toggleCol, toggleColsMenu,
   addCond, setCond, removeCond,
   exportCSV, exportExcel, print,
+  drill, closeDrill, exportDrill,
   boot, state: S, definitions: REPORTS, config: CFG,
 };
 
