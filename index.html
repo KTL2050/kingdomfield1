@@ -7213,6 +7213,11 @@ function _buildPayoutRequestRow(r) {
           🧾 Receipt
         </button>
       ` : `<div style="font-size:10.5px;color:var(--txt3);">${r.status}</div>`}
+      ${r.status !== 'rejected' ? `
+        <button class="btn btn-sm" style="font-size:11px;padding:4px 10px;white-space:nowrap;"
+          onclick="window.Reports && Reports.payoutItems('${r.rep_id}','${r.id}','${(r.rep_name||'').replace(/'/g,"\\'")}')">
+          📦 Items
+        </button>` : ''}
     </div>
   </div>`;
 }

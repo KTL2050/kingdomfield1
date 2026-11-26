@@ -169,7 +169,7 @@ function injectStyles() {
    The report body is treated as a printed statement: serif masthead, hairline
    rules, tabular figures, a ruled totals line. The app chrome stays as it is;
    everything here is scoped to #rpt-root so nothing else shifts.           */
-#rpt-root{
+#rpt-root,.rp-dr-ov{
   --rp-ink:#12233F;
   --rp-royal:#1A3A6B;      --rp-royal-soft:#EAF0F8;
   --rp-gold:#A97406;       --rp-gold-soft:#FAF2DE;
@@ -306,6 +306,15 @@ table.rp-tbl tbody tr.rp-click:hover{background:var(--rp-royal-soft);}
 .rp-dr-bd{overflow:auto;}
 .rp-dr-msg{padding:34px;text-align:center;color:var(--rp-txt3);font-size:13px;}
 .rp-dr-ft{display:flex;justify-content:flex-end;gap:8px;padding:14px 24px;border-top:1px solid var(--rp-rule-mid);}
+.rp-po-tabs{display:flex;gap:6px;flex-wrap:wrap;padding:12px 24px;border-bottom:1px solid var(--rp-rule);}
+.rp-po-tab{border:1px solid var(--rp-rule-mid);background:var(--rp-paper);border-radius:999px;padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--rp-txt2);}
+.rp-po-tab span{margin-left:6px;color:var(--rp-txt3);font-size:11px;}
+.rp-po-tab.on{background:var(--rp-royal);border-color:var(--rp-royal);color:#fff;}
+.rp-po-tab.on span{color:#dbe4f3;}
+.rp-po-sum{padding:12px 24px 4px;font-size:12.5px;color:var(--rp-txt2);}
+.rp-po-warn{color:var(--rp-neg);}
+.rp-po-note{padding:10px 24px;font-size:11px;color:var(--rp-txt3);border-top:1px solid var(--rp-rule);}
+.rp-po-split{display:block;font-size:10.5px;color:var(--rp-gold);}
 .rp-lead{font-weight:600;color:var(--rp-ink);}
 .rp-rank{font-family:var(--rp-serif);font-size:13px;color:var(--rp-txt3);width:34px;padding-right:0!important;}
 .rp-rank.top{color:var(--rp-gold);font-weight:600;}
@@ -1026,6 +1035,7 @@ const REPORTS = [
 
 {
   id:'payout-requests', cat:'Wallet', name:'Payout Requests',
+  drill:true, onDrill: r => openPayouts(r._repId, r._payout, r.rep),
   desc:'Every cash-out request with amount, status and who approved it.',
   filters:['rep','payoutstatus'],
   cols:[
@@ -1046,6 +1056,7 @@ const REPORTS = [
       if (f.status && p.status !== f.status)      return false;
       return true;
     }).map(p => ({
+      _payout: p.id, _repId: p.rep_id,
       rep: p.rep_name || userName(p.rep_id), requested: p.requested_at,
       points: Number(p.points_used || 0), amount: Number(p.amount_ugx || 0),
       mobile: p.mobile_number || '—', status: p.status || 'pending',
@@ -2295,6 +2306,7 @@ let _drill = null, _drillSeq = 0;
 async function drill(i) {
   const def = reportById(S.reportId), r = (S.viewRows || [])[i];
   if (!def || !def.drill || !r) return;
+  if (def.onDrill) return def.onDrill(r);
   const who = [r.rep, r.store].filter(Boolean).join(' — ');
   const seq = ++_drillSeq;
   showDrill(who, null);
@@ -2360,6 +2372,158 @@ function exportDrill() {
   return exportExcel({ def: { name, cols: DRILL_COLS }, cols: DRILL_COLS, rows: _drill.rows });
 }
 
+// ─── PAYOUT BREAKDOWN: which confirmed items each payout covered ───────────
+// The app never recorded which items a payout paid for, so this rebuilds it:
+// the rep's confirmed items (same matching as Wallet), oldest purchase first,
+// fill each payout in date order until its points are used; the rest is
+// "Not yet paid out". Each payout's total always matches what was paid.
+const PAY_COLS = [
+  { key:'product', label:'Product',      type:'text' },
+  { key:'sku',     label:'SKU',          type:'text' },
+  { key:'store',   label:'Store',        type:'text' },
+  { key:'listed',  label:'Listed on',    type:'date' },
+  { key:'bought',  label:'Bought on',    type:'date' },
+  { key:'points',  label:'Points',       type:'num',   total:true, r:true },
+  { key:'ugx',     label:'Earned (UGX)', type:'money', total:true, r:true },
+  { key:'split',   label:'Note',         type:'text' },
+];
+let _po = null;
+
+async function repConfirmedItems(repId) {
+  const orders = [];
+  for (let from = 0; from < CFG.maxListings; from += 1000) {
+    const { data, error } = await DB().from('orders')
+      .select('id, order_date, client_id, client_name, created_by, status')
+      .eq('created_by', repId).in('status', CFG.countedStatuses)
+      .order('order_date', { ascending: true }).order('id', { ascending: true }).range(from, from + 999);
+    if (error) throw new Error('Listings: ' + error.message);
+    orders.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  if (!orders.length) return [];
+  const ids = orders.map(o => o.id), items = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await DB().from('order_items').select('*').in('order_id', ids.slice(i, i + 200))
+        .order('order_id', { ascending: true }).range(from, from + 999);
+      if (error) throw new Error('Listing items: ' + error.message);
+      items.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+  }
+  const byOrder = {};
+  items.forEach(it => (byOrder[it.order_id] || (byOrder[it.order_id] = [])).push(it));
+  const M = _wBuildProductMaps();
+  const history = await _wBuildPurchaseHistory([...new Set(orders.map(o => o.client_id).filter(Boolean))], orders[0].order_date || '');
+  const out = [];
+  orders.forEach(o => {
+    const its = byOrder[o.id] || [];
+    const m = o.client_id ? _wConfirmedMatches(o, its, history.get(String(o.client_id)) || [], M) : {};
+    const seen = new Set();
+    its.forEach(it => {
+      const key = _wNorm(it.sku || it.product_name || '');      // same key Wallet matches on
+      if (!key || seen.has(key) || !m[key]) return;
+      seen.add(key);
+      const pts = Number(m[key].points || 0);
+      if (pts > 0) out.push({ product: it.product_name || '—', sku: it.sku || '—', store: o.client_name || '—',
+        listed: o.order_date, bought: m[key].purchase_date || '', points: pts });
+    });
+  });
+  return out.sort((a, b) => String(a.bought).localeCompare(String(b.bought)) || String(a.listed).localeCompare(String(b.listed)));
+}
+
+function allocatePayouts(items, payouts) {
+  const groups = payouts.map(p => ({ payout: p, need: Number(p.points_used || 0), rows: [] }));
+  const unpaid = [];
+  const row = (it, pts) => ({ ...it, points: pts, ugx: pts * CFG.ugxPerPoint, split: pts < it.points ? `${pts} of ${it.points} pts` : '' });
+  let gi = 0;
+  items.forEach(it => {
+    let left = it.points;
+    while (left > 0 && gi < groups.length) {
+      const g = groups[gi];
+      if (g.need <= 0) { gi++; continue; }
+      const take = Math.min(left, g.need);
+      g.rows.push(row(it, take));
+      g.need -= take; left -= take;
+      if (g.need <= 0) gi++;
+    }
+    if (left > 0) unpaid.push(row(it, left));
+  });
+  return { groups, unpaid };
+}
+
+async function openPayouts(repId, payoutId, repName) {
+  injectStyles();
+  const seq = ++_drillSeq;
+  _po = { repName: repName || userName(repId), loading: true };
+  renderPayouts();
+  try {
+    const { data: pays, error } = await DB().from('payout_requests').select('*').eq('rep_id', repId);
+    if (error) throw error;
+    const payouts = (pays || []).filter(p => p.status !== 'rejected')
+      .sort((a, b) => String(a.requested_at || '').localeCompare(String(b.requested_at || '')));
+    const { groups, unpaid } = allocatePayouts(await repConfirmedItems(String(repId)), payouts);
+    const sum = rows => rows.reduce((s, r) => s + r.points, 0);
+    const tabs = groups.map(g => ({
+      id: String(g.payout.id), date: g.payout.requested_at, status: g.payout.status || 'pending',
+      points: Number(g.payout.points_used || 0), traced: sum(g.rows), rows: g.rows,
+      label: g.payout.requested_at ? fmtCell(String(g.payout.requested_at).split('T')[0], 'date') : 'Payout',
+    }));
+    tabs.push({ id: 'unpaid', label: 'Not yet paid out', points: sum(unpaid), traced: sum(unpaid), rows: unpaid });
+    if (seq !== _drillSeq) return;
+    _po = { repName: _po.repName, tabs, sel: tabs.some(t => t.id === String(payoutId)) ? String(payoutId) : tabs[tabs.length - 1].id };
+  } catch (e) {
+    if (seq !== _drillSeq) return;
+    _po = { repName: _po.repName, error: e };
+  }
+  renderPayouts();
+}
+
+function renderPayouts() {
+  document.getElementById('rp-dr-ov')?.remove();
+  if (!_po) return;
+  const t = _po.tabs ? _po.tabs.find(x => x.id === _po.sel) : null;
+  const money = n => 'UGX ' + Number(n || 0).toLocaleString('en-US');
+  let body;
+  if (_po.loading) body = '<div class="rp-dr-msg">Working out each payout\'s items…</div>';
+  else if (_po.error) body = `<div class="rp-dr-msg">Couldn't load: ${esc(_po.error.message || _po.error)}</div>`;
+  else {
+    const sumLine = t.id === 'unpaid'
+      ? `Earned but not yet requested: <strong>${t.points} pts (${money(t.points * CFG.ugxPerPoint)})</strong> · ${t.rows.length} item${t.rows.length === 1 ? '' : 's'}`
+      : `${esc(t.status[0].toUpperCase() + t.status.slice(1))} · <strong>${t.points} pts (${money(t.points * CFG.ugxPerPoint)})</strong> on ${esc(t.label)} · ${t.rows.length} item${t.rows.length === 1 ? '' : 's'}`
+        + (t.traced < t.points ? ` · <span class="rp-po-warn">only ${t.traced} of ${t.points} pts could be traced to confirmed items</span>` : '');
+    body = `<div class="rp-po-tabs">${_po.tabs.map(x => `<button class="rp-po-tab${x.id === _po.sel ? ' on' : ''}" onclick="Reports.payoutTab('${x.id}')">${esc(x.label)}<span>${x.points} pts</span></button>`).join('')}</div>
+      <div class="rp-po-sum">${sumLine}</div>
+      ${t.rows.length ? `<table class="rp-tbl">
+        <thead><tr>${PAY_COLS.filter(c => c.key !== 'split').map(c => `<th class="${c.r ? 'r' : ''}">${esc(c.label)}</th>`).join('')}</tr></thead>
+        <tbody>${t.rows.map(r => `<tr>${PAY_COLS.filter(c => c.key !== 'split').map(c => `<td class="${c.r ? 'r' : ''}">${esc(fmtCell(r[c.key], c.type))}${
+          c.key === 'points' && r.split ? `<span class="rp-po-split">${esc(r.split)}</span>` : ''}</td>`).join('')}</tr>`).join('')}</tbody>
+        <tfoot><tr>${PAY_COLS.filter(c => c.key !== 'split').map((c, i) => `<td class="${c.r ? 'r' : ''}">${
+          i === 0 ? `Total — ${t.rows.length} item${t.rows.length === 1 ? '' : 's'}` : c.total ? esc(fmtCell(t.rows.reduce((s, r) => s + (Number(r[c.key]) || 0), 0), c.type)) : ''}</td>`).join('')}</tr></tfoot>
+      </table>` : '<div class="rp-dr-msg">No items here.</div>'}
+      <div class="rp-po-note">The app doesn't record which items each payout paid for, so they are assigned in purchase order (oldest purchase first). Each payout's total matches what was paid.</div>`;
+  }
+  const ov = document.createElement('div');
+  ov.className = 'rp-dr-ov'; ov.id = 'rp-dr-ov';
+  ov.innerHTML = `<div class="rp-dr">
+    <div class="rp-dr-hd"><div><div class="rp-dr-t">${esc(_po.repName)} — payouts</div><div class="rp-dr-s">Confirmed items behind each payout</div></div>
+      <button class="rp-dr-x" onclick="Reports.closeDrill()" aria-label="Close">&times;</button></div>
+    <div class="rp-dr-bd">${body}</div>
+    <div class="rp-dr-ft">
+      ${t && t.rows.length ? '<button class="rp-run" onclick="Reports.exportPayout()">Export Excel</button>' : ''}
+      <button class="rp-ghost" onclick="Reports.closeDrill()">Close</button></div>
+  </div>`;
+  ov.addEventListener('click', e => { if (e.target === ov) closeDrill(); });
+  document.body.appendChild(ov);
+}
+function payoutTab(id) { if (_po && _po.tabs) { _po.sel = id; renderPayouts(); } }
+function exportPayout() {
+  const t = _po && _po.tabs && _po.tabs.find(x => x.id === _po.sel);
+  if (!t || !t.rows.length) return;
+  const name = `${_po.repName} payout ${t.label}`.replace(/[\\/?*[\]:]/g, ' ');
+  return exportExcel({ def: { name, cols: PAY_COLS }, cols: PAY_COLS, rows: t.rows });
+}
+
 // ─── PUBLIC API (inline onclick handlers) ──────────────────────────────────
 window.Reports = {
   open, home, run, reset,
@@ -2369,6 +2533,7 @@ window.Reports = {
   addCond, setCond, removeCond,
   exportCSV, exportExcel, print,
   drill, closeDrill, exportDrill,
+  payoutItems: openPayouts, payoutTab, exportPayout,
   boot, state: S, definitions: REPORTS, config: CFG,
 };
 
